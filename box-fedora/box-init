@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# init script for boxes, ran inside the container as the entrypoint
+
+set -ex
+
+CONTAINER_USER=user
+
+if [[ -z "$HOST_USER" || -z "$HOST_USER_ID" ]]; then
+    echo "Container initialization requires host user and user id"
+    exit 1
+fi
+
+# create sudo group as it does not exist for some reason
+groupadd -f sudo
+
+# create user with same name and uid
+useradd --create-home \
+        --user-group \
+        --groups sudo \
+        -u "${HOST_USER_ID:?}" \
+        --shell /bin/bash \
+        "${HOST_USER:?}"
+
+## move the home and rename user
+#usermod --login "${HOST_USER:?}" --uid "${HOST_USER_ID:?}" --move-home --home "/home/${HOST_USER:?}" "$CONTAINER_USER"
+
+# make sure the container stays alive
+sleep infinity &
+
+# make container respond to being killed
+on_sigterm() {
+	echo Caught SIGTERM, exiting...
+	jobs -p | xargs -r kill -TERM
+	wait
+}
+
+trap "on_sigterm" TERM INT
+wait
