@@ -21,8 +21,17 @@ useradd --create-home \
         --shell /bin/bash \
         "${HOST_USER:?}"
 
+if [[ -d /init.d ]]; then
+    for script in /init.d/*; do
+        if [[ -x "$script" ]]; then
+            # run each script as user
+            sudo -u "${HOST_USER:?}" "$script"
+        fi
+    done
+fi
+
 # TODO move this to some kind of folder and run all '/init.d/*'
-sudo -u "${HOST_USER:?}" -- nvim --headless +Bootstrap +q
+#sudo -u "${HOST_USER:?}" -- nvim --headless +Bootstrap +q
 
 # make sure the container stays alive
 sleep infinity &

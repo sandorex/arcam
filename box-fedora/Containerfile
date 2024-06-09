@@ -25,12 +25,14 @@ RUN dnf -y install $(<extra-packages)
 RUN rm /extra-packages \
     && dnf clean all
 
-# use dotfiles as /etc/skel
-RUN git clone --branch=organization --depth=1 --recurse-submodules https://github.com/sandorex/config /dotfiles \
-    && [[ -L /dotfiles/dotfiles ]] \
-    && rm -rf /etc/skel/ \
-    && cp -r /dotfiles/dotfiles/ /etc/skel/ \
-    && rm -rf /dotfiles
+# if dotfiles are provided during build
+RUN if [[ -d /tmp/dotfiles ]]; then \
+        rm -rf /etc/skel; \
+        cp -r /tmp/dotfiles/ /etc/skel; \
+    fi; true
+
+# copy init scripts
+COPY ./init.d /init.d
 
 # passwordless sudo
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
