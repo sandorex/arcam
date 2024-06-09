@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # init script for boxes, ran inside the container as the entrypoint
 
-set -ex
-
+set -eux -o pipefail
 CONTAINER_USER=user
 
-if [[ -z "$HOST_USER" || -z "$HOST_USER_ID" ]]; then
+if [[ ! -v HOST_USER || ! -v HOST_USER_ID ]]; then
     echo "Container initialization requires host user and user id"
     exit 1
 fi
@@ -13,6 +12,7 @@ fi
 # create sudo group as it does not exist for some reason
 groupadd -f sudo
 
+echo "Creating the user"
 # create user with same name and uid
 useradd --create-home \
         --user-group \
@@ -20,6 +20,9 @@ useradd --create-home \
         -u "${HOST_USER_ID:?}" \
         --shell /bin/bash \
         "${HOST_USER:?}"
+
+# TODO move this to some kind of folder and run all '/init.d/*'
+sudo -u "${HOST_USER:?}" -- nvim --headless +Bootstrap +q
 
 # make sure the container stays alive
 sleep infinity &

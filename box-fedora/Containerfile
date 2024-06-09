@@ -8,6 +8,7 @@ ARG VERSION
 
 ENV box=fedora
 ENV LC_ALL=en_US.UTF-8
+ENV SHELL=/bin/zsh
 
 # improve DNF experience
 RUN echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf \
@@ -19,7 +20,7 @@ RUN echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf \
 RUN dnf -y install "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${VERSION}.noarch.rpm" \
    && dnf -y install "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${VERSION}.noarch.rpm"
 
-COPY ./extra-packages /
+COPY ./box-fedora/extra-packages /
 RUN dnf -y install $(<extra-packages)
 RUN rm /extra-packages \
     && dnf clean all
@@ -31,6 +32,7 @@ RUN git clone --branch=organization --depth=1 --recurse-submodules https://githu
     && cp -r /dotfiles/dotfiles/ /etc/skel/ \
     && rm -rf /dotfiles
 
+# passwordless sudo
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 COPY ./box-init /init

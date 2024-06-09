@@ -2,14 +2,16 @@ zsh
 nano
 neovim
 git
-perl
+gitui
 just
+bat
 cargo
 rust-src
 npm
 gcc
 make
 cmake
+perl
 python3-pip
 latexmk
 shellcheck
