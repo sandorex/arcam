@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# starts a new box in current directory
+
+set -eu -o pipefail
+
+IMAGE=box-fedora:latest
+
+# run detached
+exec podman run -d --rm \
+    --env "HOST_USER=$USER" \
+    --env "HOST_USER_ID=$(id -u)" \
+    --env TERMINFO_DIRS=/host/usr/share/terminfo:/host/usr/lib/terminfo:/host/etc/terminfo:/usr/share/terminfo:/usr/lib/terminfo:/etc/terminfo \
+    --volume /usr/share/terminfo:/host/usr/share/terminfo:ro \
+    --volume /usr/lib/terminfo:/host/usr/lib/terminfo:ro \
+    --volume /etc/terminfo:/host/etc/terminfo:ro \
+    --hostname "$(hostname)" \
+    "$IMAGE"

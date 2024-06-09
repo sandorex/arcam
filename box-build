@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# simple build script for box images
+
+set -eu -o pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+
+VARIANTS=(
+    # automatically find variants
+    $(find . -name 'Containerfile' -type f -printf '%P\n' | xargs dirname)
+)
+
+function usage() {
+    cat <<EOF
+Usage: $0 [<opts...>] <variant>
+
+Opts:
+    --dotfiles <path>   Include files from this path as /etc/skel
+
+Variant images available:
+    ${VARIANTS[*]}
+
+EOF
+    exit 0
+}
+
+POSITIONAL_ARGS=()
+DOTFILES=''
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        --help|-h)
+            usage
+            ;;
+        --dotfiles)
+            DOTFILES="$2"
+            shift 2
+            ;;
+        -*)
+            echo "Unknown option $1"
+            exit 1
+            ;;
+        *)
+            # save positional arg
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# restore positional parameters
+set -- "${POSITIONAL_ARGS[@]}"
+
+if [[ $# -eq 0 ]]; then
+    usage
+fi
+
+variant="${1:?}"
+shift
+
+args=()
+
+if [[ -v DOTFILES ]]; then
+    args+=(--volume "$DOTFILES:/tmp/dotfiles:ro")
+fi
+
+if [[ ! -f "$variant/Containerfile" ]]; then
+    echo "Could not find containerfile for variant '$variant'"
+    exit 1
+fi
+
+podman build \
+    -t "$variant" \
+    -f "$variant/Containerfile" \
+    "${args[@]}" \
+    .
+

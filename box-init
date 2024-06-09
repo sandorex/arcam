@@ -30,9 +30,6 @@ if [[ -d /init.d ]]; then
     done
 fi
 
-# TODO move this to some kind of folder and run all '/init.d/*'
-#sudo -u "${HOST_USER:?}" -- nvim --headless +Bootstrap +q
-
 # make sure the container stays alive
 sleep infinity &
 

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# execute shell inside box container
+
+if [[ -z "$1" ]]; then
+    echo "Usage: $0 <container>"
+    exit 1
+fi
+
+CONTAINER_ID="${1:?}"
+USER_SHELL="$(getent passwd $USER | awk -F: '{print $NF}')"
+
+exec podman exec -it \
+    --user "$USER" \
+    --env "TERM=$TERM" \
+    -w "/home/$USER" \
+    "${CONTAINER_ID}" \
+    "${USER_SHELL}" -l
