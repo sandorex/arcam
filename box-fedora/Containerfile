@@ -7,32 +7,31 @@ FROM registry.fedoraproject.org/fedora-toolbox:$VERSION
 ARG VERSION
 
 ENV box=fedora
-
-# NOTE i disabled these so for faster iteration
-# improve DNF experience
-#RUN echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf \
-#    && echo "defaultyes=True" >> /etc/dnf/dnf.conf \
-#    && echo "fastestmirror=True" >> /etc/dnf/dnf.conf \
-#    && echo "install_weak_deps=False" >> /etc/dnf/dnf.conf
-
-# install rpmfusion
-#RUN dnf -y install "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${VERSION}.noarch.rpm" \
-#   && dnf -y install "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${VERSION}.noarch.rpm"
-
-# packages in outside script as they are long and easier to edit in script form
-#COPY ./install_packages.sh /
-#RUN /install_packages.sh \
-#    && rm -rf /install_packages.sh \
-#    && dnf clean all
-
-# set locale
 ENV LC_ALL=en_US.UTF-8
 
-RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+# improve DNF experience
+RUN echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf \
+    && echo "defaultyes=True" >> /etc/dnf/dnf.conf \
+    && echo "fastestmirror=True" >> /etc/dnf/dnf.conf \
+    && echo "install_weak_deps=False" >> /etc/dnf/dnf.conf
 
-# create sudo group and create a new user which will be renamed to match later
-#RUN groupadd -f sudo \
-#    && useradd --create-home --user-group --groups sudo -u 1000 --shell /bin/bash user
+# install rpmfusion
+RUN dnf -y install "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${VERSION}.noarch.rpm" \
+   && dnf -y install "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${VERSION}.noarch.rpm"
+
+COPY ./extra-packages /
+RUN dnf -y install $(<extra-packages)
+RUN rm /extra-packages \
+    && dnf clean all
+
+# use dotfiles as /etc/skel
+RUN git clone --branch=organization --depth=1 --recurse-submodules https://github.com/sandorex/config /dotfiles \
+    && [[ -L /dotfiles/dotfiles ]] \
+    && rm -rf /etc/skel/ \
+    && cp -r /dotfiles/dotfiles/ /etc/skel/ \
+    && rm -rf /dotfiles
+
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 COPY ./box-init /init
 ENTRYPOINT [ "/init" ]

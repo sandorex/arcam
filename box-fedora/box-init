@@ -21,9 +21,6 @@ useradd --create-home \
         --shell /bin/bash \
         "${HOST_USER:?}"
 
-## move the home and rename user
-#usermod --login "${HOST_USER:?}" --uid "${HOST_USER_ID:?}" --move-home --home "/home/${HOST_USER:?}" "$CONTAINER_USER"
-
 # make sure the container stays alive
 sleep infinity &
 
