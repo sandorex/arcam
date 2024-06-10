@@ -60,7 +60,7 @@ shift
 
 args=()
 
-if [[ -v DOTFILES ]]; then
+if [[ -n "$DOTFILES" ]]; then
     args+=(--volume "$DOTFILES:/tmp/dotfiles:ro")
 fi
 

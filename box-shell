@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # execute shell inside box container
 
-if [[ -z "$1" ]]; then
+set -eu -o pipefail
+
+if [[ $# -eq 0 ]]; then
     echo "Usage: $0 <container>"
     exit 1
 fi
 
 CONTAINER_ID="${1:?}"
-USER_SHELL="$(getent passwd $USER | awk -F: '{print $NF}')"
 
+# get shell from container (tr is here cause i keep getting control characters from getent)
+USER_SHELL="$(podman exec -it "${CONTAINER_ID}" getent passwd "$USER" | awk -F: '{print $NF}' | tr -dc '[:print:]')"
+
+# using login shell by default as it cannot really load profile
+# TODO source ~/.profile in init and then just write to env?
 exec podman exec -it \
     --user "$USER" \
     --env "TERM=$TERM" \

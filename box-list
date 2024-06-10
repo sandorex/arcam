@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# list all boxes running
+
+# just pass it to podman and allow further arguments
+podman container ls --filter 'label=box' "$@"

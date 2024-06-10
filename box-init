@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # init script for boxes, ran inside the container as the entrypoint
 
+# prevent running on bare host
+[[ -v container ]] || exit 69
+
 set -eux -o pipefail
 CONTAINER_USER=user
 
