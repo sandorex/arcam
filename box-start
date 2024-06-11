@@ -5,6 +5,10 @@ set -eu -o pipefail
 
 IMAGE="${1:-box-fedora}"
 
+if ! podman volume exists box-data; then
+    podman volume create box-data &>/dev/null
+fi
+
 # run detached
 CONTAINER_ID=$(podman run -d --rm \
     --label=manager=box \
@@ -15,9 +19,9 @@ CONTAINER_ID=$(podman run -d --rm \
     --volume /usr/share/terminfo:/host/usr/share/terminfo:ro \
     --volume /usr/lib/terminfo:/host/usr/lib/terminfo:ro \
     --volume /etc/terminfo:/host/etc/terminfo:ro \
+    --volume box-data:/data:z \
     --hostname "$(hostname)" \
     "$IMAGE")
 
 # print human-friendly container name
 podman inspect "${CONTAINER_ID}" --format '{{.Name}}'
-

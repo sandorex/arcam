@@ -21,7 +21,7 @@ useradd --create-home \
         --user-group \
         --groups sudo \
         -u "${HOST_USER_ID:?}" \
-        --shell /bin/bash \
+        --shell "/usr/bin/zsh" \
         "${HOST_USER:?}"
 
 if [[ -d /init.d ]]; then
