@@ -10,6 +10,8 @@ cargo
 rust-src
 npm
 gcc
+clang
+clang-tools-extra
 make
 cmake
 perl

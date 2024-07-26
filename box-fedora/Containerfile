@@ -2,7 +2,7 @@ LABEL name="box-fedora" \
       summary="fedora-toolbox based development container" \
       maintainer="Sandorex <rzhw3h@gmail.com>"
 
-ARG VERSION=39
+ARG VERSION=40
 FROM registry.fedoraproject.org/fedora-toolbox:$VERSION
 ARG VERSION
 
@@ -20,22 +20,44 @@ RUN echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf \
 RUN dnf -y install "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${VERSION}.noarch.rpm" \
    && dnf -y install "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${VERSION}.noarch.rpm"
 
+# SYSTEM
 COPY ./box-fedora/extra-packages /
-RUN dnf -y install $(<extra-packages)
-RUN rm /extra-packages \
+RUN dnf -y install $(<extra-packages) \
+    && rm /extra-packages \
     && dnf clean all
 
-# if dotfiles are provided during build
-RUN if [[ -d /tmp/dotfiles ]]; then \
-        rm -rf /etc/skel; \
-        cp -r /tmp/dotfiles/ /etc/skel; \
-    fi; true
+# NPM
+COPY ./box-fedora/npm-packages /
+RUN npm install -g $(<npm-packages) \
+    && rm /npm-packages \
+    && npm cache clean --force
+
+# PIP
+COPY ./box-fedora/pip-packages /
+RUN pip install $(<pip-packages) \
+    && rm /pip-packages \
+    && pip cache purge
+
+# CARGO
+COPY ./box-fedora/cargo-packages /
+RUN cargo install $(<cargo-packages) \
+    && rm /cargo-packages
 
 # copy init scripts
 COPY ./init.d /init.d
 
 # passwordless sudo
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# use this to trigger rebuild
+RUN echo $RANDOM
+
+# copy dotfiles if provided during build
+RUN if [[ -d /dotfiles ]]; then \
+        echo 'found dotfiles'; \
+        rm -rf /etc/skel; \
+        cp -r /dotfiles/ /etc/skel; \
+    fi; true
 
 COPY ./box-init /init
 ENTRYPOINT [ "/init" ]

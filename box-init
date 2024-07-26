@@ -24,6 +24,8 @@ useradd --create-home \
         --shell "/usr/bin/zsh" \
         "${HOST_USER:?}"
 
+#chown "${HOST_USER:?}:${HOST_USER:?}" /ws
+
 if [[ -d /init.d ]]; then
     for script in /init.d/*; do
         if [[ -x "$script" ]]; then

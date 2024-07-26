@@ -61,7 +61,7 @@ shift
 args=()
 
 if [[ -n "$DOTFILES" ]]; then
-    args+=(--volume "$DOTFILES:/tmp/dotfiles:ro")
+    args+=(--volume "$DOTFILES:/dotfiles:ro,Z")
 fi
 
 if [[ ! -f "$variant/Containerfile" ]]; then
@@ -70,6 +70,7 @@ if [[ ! -f "$variant/Containerfile" ]]; then
 fi
 
 podman build \
+    --security-opt label=disable \
     -t "$variant" \
     -f "$variant/Containerfile" \
     "${args[@]}" \
