@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # simple build script for box images
 
+# TODO allow storing boxes in other locations, .local/share/box/ for example or .config/box/
+
 set -eu -o pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
 
+BOXES_DIR=boxes
+
 VARIANTS=(
     # automatically find variants
-    $(find . -name 'Containerfile' -type f -printf '%P\n' | xargs dirname)
+    $(cd "$BOXES_DIR"; find . -name 'Containerfile' -type f -printf '%P\n' | xargs dirname)
 )
 
 function usage() {
@@ -64,15 +68,16 @@ if [[ -n "$DOTFILES" ]]; then
     args+=(--volume "$DOTFILES:/dotfiles:ro,Z")
 fi
 
-if [[ ! -f "$variant/Containerfile" ]]; then
+if [[ ! -f "$BOXES_DIR/$variant/Containerfile" ]]; then
     echo "Could not find containerfile for variant '$variant'"
     exit 1
 fi
 
+# TODO add flag for timestamp and cleanup of old ones
 podman build \
     --security-opt label=disable \
     -t "$variant" \
-    -f "$variant/Containerfile" \
+    -f "$BOXES_DIR/$variant/Containerfile" \
     "${args[@]}" \
     .
 
