@@ -5,26 +5,18 @@
 [[ -v container ]] || exit 69
 
 set -eux -o pipefail
-CONTAINER_USER=user
 
 if [[ ! -v HOST_USER || ! -v HOST_USER_ID ]]; then
     echo "Container initialization requires host user and user id"
     exit 1
 fi
 
-# create sudo group as it does not exist for some reason
-groupadd -f sudo
+echo "Setting up the user home"
+usermod -d "/home/${HOST_USER:?}" "${HOST_USER:?}"
+/sbin/mkhomedir_helper "${HOST_USER:?}"
 
-echo "Creating the user"
-# create user with same name and uid
-useradd --create-home \
-        --user-group \
-        --groups sudo \
-        -u "${HOST_USER_ID:?}" \
-        --shell "/usr/bin/zsh" \
-        "${HOST_USER:?}"
-
-#chown "${HOST_USER:?}:${HOST_USER:?}" /ws
+# this could be moved into a init.d script
+chsh -s /usr/bin/zsh "${HOST_USER:?}"
 
 if [[ -d /init.d ]]; then
     for script in /init.d/*; do

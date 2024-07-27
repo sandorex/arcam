@@ -8,6 +8,7 @@ just
 bat
 cargo
 rust-src
+rust-analyzer
 npm
 gcc
 clang

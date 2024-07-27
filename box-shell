@@ -18,6 +18,6 @@ USER_SHELL="$(podman exec -it "${CONTAINER_ID}" getent passwd "$USER" | awk -F: 
 exec podman exec -it \
     --user "$USER" \
     --env "TERM=$TERM" \
-    -w "/home/$USER" \
+    -w "/ws" \
     "${CONTAINER_ID}" \
     "${USER_SHELL}" -l

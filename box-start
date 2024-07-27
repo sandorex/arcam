@@ -3,6 +3,41 @@
 
 set -eu -o pipefail
 
+POSITIONAL_ARGS=()
+
+DOTFILES=''
+INTERACTIVE=0
+DEBUG=0
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        --dotfiles)
+            DOTFILES="$2"
+            shift 2
+            ;;
+        -i|--interactive)
+            INTERACTIVE=1
+            shift
+            ;;
+        --debug)
+            DEBUG=1
+            shift
+            ;;
+        -*)
+            echo "Unknown option $1"
+            exit 1
+            ;;
+        *)
+            # save positional arg
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# restore positional parameters
+set -- "${POSITIONAL_ARGS[@]}"
+
 IMAGE="${1:-box-fedora}"
 
 if ! podman volume exists box-data; then
@@ -17,26 +52,38 @@ for i in /usr/share/terminfo /usr/lib/terminfo /etc/terminfo; do
     fi
 done
 
-# TODO toggle this with an option!
 # if dotfiles are defined then use them rather than builtin outdated ones
-if [[ -v DOTFILES ]]; then
+if [[ -n "$DOTFILES" ]]; then
+    # they still only copied at start of container and cannot be modified
     args+=(--volume "$DOTFILES:/etc/skel:ro")
 fi
 
-# run detached
-CONTAINER_ID=$(podman run -d --rm \
+if [[ "$INTERACTIVE" -eq "1" ]]; then
+    # run attached with tty and stdin
+    args+=(-it)
+else
+    # run detached
+    args+=(-d)
+fi
+
+# enter bash without running init
+if [[ "$DEBUG" -eq "1" ]]; then
+    args+=(--entrypoint bash)
+fi
+
+# TODO does label=disable matter, selinux causes issues all the time but what security implications does it have
+exec podman run --rm -it \
     --security-opt label=disable \
+    --user root \
+    --userns=keep-id \
     --label=manager=box \
     --label="box=$IMAGE" \
     --env "HOST_USER=$USER" \
     --env "HOST_USER_ID=$(id -u)" \
     --env TERMINFO_DIRS=/host/usr/share/terminfo:/host/usr/lib/terminfo:/host/etc/terminfo:/usr/share/terminfo:/usr/lib/terminfo:/etc/terminfo \
     "${args[@]}" \
-    --volume box-data:/data:z \
-    --volume "$PWD:/ws" \
+    --volume box-data:/data:Z \
+    --volume "$PWD:/ws:Z" \
     --hostname "$(hostname)" \
-    "$IMAGE" \
-)
+    "$IMAGE"
 
-# print human-friendly container name
-podman inspect "${CONTAINER_ID}" --format '{{.Name}}'

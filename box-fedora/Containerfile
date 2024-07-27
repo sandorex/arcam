@@ -38,19 +38,15 @@ RUN pip install $(<pip-packages) \
     && rm /pip-packages \
     && pip cache purge
 
-# CARGO
-COPY ./box-fedora/cargo-packages /
-RUN cargo install $(<cargo-packages) \
-    && rm /cargo-packages
+# TODO move to a script
+# install zellij cause compilation from cargo takes too long
+RUN curl --location "https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz" | tar -C "/usr/local/bin/" -xz
 
 # copy init scripts
 COPY ./init.d /init.d
 
-# passwordless sudo
-RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-
-# use this to trigger rebuild
-RUN echo $RANDOM
+# passwordless sudo for all
+RUN echo 'ALL ALL = (ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 # copy dotfiles if provided during build
 RUN if [[ -d /dotfiles ]]; then \
@@ -58,6 +54,8 @@ RUN if [[ -d /dotfiles ]]; then \
         rm -rf /etc/skel; \
         cp -r /dotfiles/ /etc/skel; \
     fi; true
+
+#RUN echo $RANDOM
 
 COPY ./box-init /init
 ENTRYPOINT [ "/init" ]
