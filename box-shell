@@ -20,6 +20,7 @@ USER_SHELL="$(podman exec -it "${CONTAINER_ID}" getent passwd "$USER" | awk -F: 
 # TODO source ~/.profile in init and then just write to env?
 exec podman exec -it \
     --user "$USER" \
+    --env "BOX=podman" \
     --env "TERM=$TERM" \
     -w "/ws" \
     "${CONTAINER_ID}" \

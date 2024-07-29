@@ -3,13 +3,15 @@
 
 set -e -o pipefail
 
+# TODO check if these all match
+VERSION='0.1'
+
 ENGINE="${BOX_ENGINE:-podman}"
 
 POSITIONAL_ARGS=()
 
 DOTFILES=''
-INTERACTIVE=0
-DEBUG=0
+NETWORK=1
 
 while [ $# -gt 0 ]; do
     case $1 in
@@ -17,12 +19,8 @@ while [ $# -gt 0 ]; do
             DOTFILES="$2"
             shift 2
             ;;
-        -i|--interactive)
-            INTERACTIVE=1
-            shift
-            ;;
-        --debug)
-            DEBUG=1
+        -nn|--no-network)
+            NETWORK=0
             shift
             ;;
         -*)
@@ -41,6 +39,7 @@ done
 set -- "${POSITIONAL_ARGS[@]}"
 
 IMAGE="${1:-box-fedora}"
+shift || true
 
 # data volume used for persistant things like neovim plugins for example
 # NOTE using volume inspect as it works on both podman and docker
@@ -63,32 +62,36 @@ elif [[ -n "$BOX_DOTFILES" ]]; then
     args+=(--volume "$BOX_DOTFILES:/etc/skel:ro")
 fi
 
-if [[ "$INTERACTIVE" -eq "1" ]]; then
-    # run attached with tty and stdin
-    args+=(-it)
-else
-    # run detached
-    args+=(-d)
+# network is on by default, so disable it if requested
+if [[ "$NETWORK" -eq "0" ]]; then
+    args+=(--network=none)
 fi
 
-# enter bash without running init
-if [[ "$DEBUG" -eq "1" ]]; then
-    args+=(--entrypoint bash)
-fi
-
+# TODO print the name not the ID
 # TODO docker does not support --userns=keep-id
-# TODO print errors to stderr so stdout can be saved for the ID
-exec "$ENGINE" run --rm \
+
+# the bash -c mess is so it waits until init file is pushed to container cause
+# i do not want to manually delete containers later if i remove '--rm' flag
+CONTAINER_ID=$("$ENGINE" run -d --rm \
     --security-opt label=disable \
     --user root \
     --userns=keep-id \
     --label=manager=box \
-    --label="box=box" \
+    --label="box=$ENGINE" \
+    --env "BOX=$ENGINE" \
+    --env "BOX_VERSION=$VERSION" \
     --env "HOST_USER=$USER" \
     --env TERMINFO_DIRS=/host/usr/share/terminfo:/host/usr/lib/terminfo:/host/etc/terminfo:/usr/share/terminfo:/usr/lib/terminfo:/etc/terminfo \
     "${args[@]}" \
     --volume box-data:/data:Z \
     --volume "$PWD:/ws:Z" \
     --hostname "$(hostname)" \
-    "$IMAGE"
+    --entrypoint /bin/bash \
+    "$@" \
+    "$IMAGE" \
+    -c \
+    'while [[ ! -f /init ]]; do sleep 0.1s; done; echo done; exec /init'
+)
 
+# copy init
+command "$ENGINE" cp box-init "$CONTAINER_ID:/init"
