@@ -6,8 +6,8 @@
 
 set -eux -o pipefail
 
-if [[ ! -v HOST_USER || ! -v HOST_USER_ID ]]; then
-    echo "Container initialization requires host user and user id"
+if [[ ! -v HOST_USER ]]; then
+    echo "Container initialization requires host user"
     exit 1
 fi
 

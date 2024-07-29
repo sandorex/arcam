@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # execute shell inside box container
 
-set -eu -o pipefail
+set -e -o pipefail
 
-if [[ $# -eq 0 ]]; then
+# take either the argument or env bar BOX_CONTAINER
+CONTAINER_ID="${1:-${BOX_CONTAINER}}"
+
+if [[ -z "$CONTAINER_ID" ]]; then
     echo "Usage: $0 <container>"
     exit 1
 fi
 
-CONTAINER_ID="${1:?}"
-
 # get shell from container (tr is here cause i keep getting control characters from getent)
 USER_SHELL="$(podman exec -it "${CONTAINER_ID}" getent passwd "$USER" | awk -F: '{print $NF}' | tr -dc '[:print:]')"
+
+# TODO find a way to reliable kill off disconnected ttys
 
 # using login shell by default as it cannot really load profile
 # TODO source ~/.profile in init and then just write to env?
@@ -21,3 +24,4 @@ exec podman exec -it \
     -w "/ws" \
     "${CONTAINER_ID}" \
     "${USER_SHELL}" -l
+

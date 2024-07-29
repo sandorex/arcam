@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # starts a new box in current directory
 
-set -eu -o pipefail
+set -e -o pipefail
+
+ENGINE="${BOX_ENGINE:-podman}"
 
 POSITIONAL_ARGS=()
 
@@ -40,8 +42,10 @@ set -- "${POSITIONAL_ARGS[@]}"
 
 IMAGE="${1:-box-fedora}"
 
-if ! podman volume exists box-data; then
-    podman volume create box-data &>/dev/null
+# data volume used for persistant things like neovim plugins for example
+# NOTE using volume inspect as it works on both podman and docker
+if ! command "$ENGINE" volume inspect box-data &>/dev/null; then
+    command "$ENGINE" volume create box-data &>/dev/null
 fi
 
 # find all terminfo as debian has them scattered around
@@ -52,10 +56,11 @@ for i in /usr/share/terminfo /usr/lib/terminfo /etc/terminfo; do
     fi
 done
 
-# if dotfiles are defined then use them rather than builtin outdated ones
+# prefer argument dotfiles than env var
 if [[ -n "$DOTFILES" ]]; then
-    # they still only copied at start of container and cannot be modified
     args+=(--volume "$DOTFILES:/etc/skel:ro")
+elif [[ -n "$BOX_DOTFILES" ]]; then
+    args+=(--volume "$BOX_DOTFILES:/etc/skel:ro")
 fi
 
 if [[ "$INTERACTIVE" -eq "1" ]]; then
@@ -71,15 +76,15 @@ if [[ "$DEBUG" -eq "1" ]]; then
     args+=(--entrypoint bash)
 fi
 
-# TODO does label=disable matter, selinux causes issues all the time but what security implications does it have
-exec podman run --rm -it \
+# TODO docker does not support --userns=keep-id
+# TODO print errors to stderr so stdout can be saved for the ID
+exec "$ENGINE" run --rm \
     --security-opt label=disable \
     --user root \
     --userns=keep-id \
     --label=manager=box \
-    --label="box=$IMAGE" \
+    --label="box=box" \
     --env "HOST_USER=$USER" \
-    --env "HOST_USER_ID=$(id -u)" \
     --env TERMINFO_DIRS=/host/usr/share/terminfo:/host/usr/lib/terminfo:/host/etc/terminfo:/usr/share/terminfo:/usr/lib/terminfo:/etc/terminfo \
     "${args[@]}" \
     --volume box-data:/data:Z \

@@ -10,7 +10,7 @@ fi
 
 containers_owned=1
 
-for i in "$*"; do
+for i in $*; do
     if ! podman container exists "$i"; then
         echo "Container '$i' not found"
         containers_owned=0
@@ -30,4 +30,4 @@ if [[ $containers_owned -eq 0 ]]; then
 fi
 
 # try stopping it then kill it in 15 seconds
-podman container stop --time 15 "$*"
+podman container stop --time 15 "$@"
