@@ -7,28 +7,8 @@ use std::env;
 use clap::Parser;
 use std::process::Command;
 use base64::prelude::*;
-// use std::path::Path;
-
-// /// Check if running inside a container
-// fn in_container() -> bool {
-//     // in debug version allow ignoring if its a container or not
-//     if cfg!(debug_assertions) {
-//         if let Ok(val) = std::env::var("BOX_FORCE") {
-//             return match val.to_lowercase().as_str() {
-//                 "container" => true,
-//                 "host" => false,
-//                 _ => panic!("BOX_FORCE can only be 'container' or 'host'"),
-//             };
-//         }
-//     }
-//
-//     return Path::new("/run/.containerenv").exists()
-//         || Path::new("/.dockerenv").exists()
-//         || std::env::var("container").is_ok()
-// }
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-// TODO replace version in the script before installing it
 pub const INIT_SCRIPT: &'static str = include_str!("box-init.sh");
 pub const DATA_VOLUME_NAME: &'static str = "box-data";
 
@@ -40,8 +20,9 @@ fn template_init_script(user: &str) -> String {
 }
 
 fn start_container(engine: &str, cli_args: &cli::CmdStartArgs) -> Result<()> {
-    let templated_script = template_init_script(env::var("USER").with_context(|| "unable to get USER from env var")?.as_str());
+    let templated_script = template_init_script(env::var("USER").with_context(|| "Unable to get USER from env var")?.as_str());
 
+    // TODO set XDG_ env vars just in case
     let mut args: Vec<String> = vec![
         "run".into(), "-d".into(), "--rm".into(),
         "--security-opt".into(), "label=disable".into(),
@@ -51,10 +32,14 @@ fn start_container(engine: &str, cli_args: &cli::CmdStartArgs) -> Result<()> {
         format!("--label=box={}", engine),
         "--env".into(), format!("BOX={}", engine),
         "--env".into(), format!("BOX_VERSION={}", VERSION),
-        "--volume".into(), format!("{}:/ws:Z", std::env::current_dir().with_context(|| "failed to get current directory")?.display()),
-        "--hostname".into(), util::get_hostname().with_context(|| "unable to get hostname")?,
+        "--volume".into(), format!("{}:/ws:Z", std::env::current_dir().with_context(|| "Failed to get current directory")?.display()),
+        "--hostname".into(), util::get_hostname().with_context(|| "Unable to get hostname")?,
     ];
 
+    // add the env vars, TODO should this be checked for syntax?
+    for e in &cli_args.env {
+        args.extend(vec!["--env".into(), e.into()]);
+    }
 
     // find all terminfo, they differ mostly on debian...
     {
@@ -87,20 +72,19 @@ fn start_container(engine: &str, cli_args: &cli::CmdStartArgs) -> Result<()> {
         args.extend(vec!["--env".into(), format!("TERMINFO_DIRS={}", terminfo_env)]);
     }
 
-
     // TODO change this to data_volume so its not confusing with the negation
     if ! cli_args.no_data_volume {
         let inspect_cmd = Command::new(engine)
             .args(&["volume", "inspect", DATA_VOLUME_NAME])
             .status()
-            .with_context(|| "unable run inspect volume")?;
+            .with_context(|| "Unable run inspect volume")?;
 
         // if it fails then volume is missing probably
         if ! inspect_cmd.success() {
             let create_vol_cmd = Command::new(engine)
                 .args(&["volume", "create", DATA_VOLUME_NAME])
                 .status()
-                .with_context(|| "unable to create volume")?;
+                .with_context(|| "Unable to create volume")?;
 
             if ! create_vol_cmd.success() {
                 return Err(Error::msg(format!("Could not create data volume")));
@@ -137,13 +121,74 @@ fn start_container(engine: &str, cli_args: &cli::CmdStartArgs) -> Result<()> {
     let cmd = Command::new(engine)
         .args(&args)
         .output()
-        .with_context(|| "unable to spawn engine")?;
+        .with_context(|| "Unable to spawn engine")?;
 
-    if cmd.status.success() {
+    if ! cmd.status.success() {
         return Err(Error::msg(format!("Engine command failed: {:?}", &args)));
     }
 
-    // TODO print the name of container
+    let id = String::from_utf8_lossy(&cmd.stdout);
+
+    // wait for a bit so the container is actually started, important!
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    // print the name of the container
+    let _ = Command::new(engine)
+        .args(&["container", "inspect", &id, "--format", "{{.Name}}"])
+        .status()
+        .with_context(|| "Unable to spawn engine")?;
+
+    Ok(())
+}
+
+// TODO make this so other functions become bit more readable
+/// Run command in container
+// fn run_in_container(engine: &str, container: &str, cmd: Vec<String>) -> Result<(std::process::ExitStatus, String, String)> {
+//     let cmd = Command::new(engine)
+//         .args(&[
+//             "exec",
+//             "-it",
+//             container,
+//         ])
+//         .args(cmd)
+//         .output()
+//         .with_context(|| "cannot execute engine")?;
+//
+//     Ok((cmd.status, String::from_utf8_lossy(&cmd.stdout).into(), String::from_utf8_lossy(&cmd.stderr).into()))
+// }
+
+fn open_shell(engine: &str, cli_args: &cli::CmdShellArgs) -> Result<()> {
+    let user = env::var("USER").with_context(|| "Unable to get USER from env var")?;
+
+    // extract default user shell from /etc/passwd
+    let default_user_shell: String = {
+        let cmd_result = Command::new(engine)
+            .args(&["exec", "--user", "root", "-it", &cli_args.name, "bash", "-c", format!("getent passwd '{}'", user).as_str()])
+            .output()
+            .with_context(|| "Could not execute engine")?;
+
+        let stdout = String::from_utf8_lossy(&cmd_result.stdout);
+        if ! cmd_result.status.success() || stdout.is_empty() {
+            return Err(Error::msg(format!("Error while extracting default shell from container")));
+        }
+
+        // i do not want to rely on external tools like awk so im extracting manually
+        stdout.trim().split(':').last()
+            .with_context(|| "Failed to extract default shell from passwd")?
+            .to_string()
+    };
+
+    let _ = Command::new(engine)
+        .args(&[
+            "exec", "-it",
+            "--user", user.as_str(),
+            "--env", format!("TERM={}", env::var("TERM").unwrap_or("xterm".into())).as_str(),
+            "--workdir", "/ws",
+            &cli_args.name,
+            default_user_shell.as_str(), "-l",
+        ])
+        .status()
+        .with_context(|| "Could not execute engine")?;
 
     Ok(())
 }
@@ -161,6 +206,7 @@ fn main() -> Result<()> {
                 found
             } else {
                 println!("No compatible container engine found in PATH");
+                // TODO temporary as im testing in a container without podman first
                 "echo".to_string()
                 // std::process::exit(1);
             }
@@ -170,7 +216,7 @@ fn main() -> Result<()> {
     use cli::CliCommands;
     match args.cmd {
         CliCommands::Start(x) => start_container(&engine, &x),
-        // CliCommands::Shell(_) => {},
+        CliCommands::Shell(x) => open_shell(&engine, &x),
         // CliCommands::Exec(_) => {},
         // CliCommands::List => {},
         // CliCommands::Kill(_) => {},
