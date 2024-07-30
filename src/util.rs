@@ -1,5 +1,4 @@
 use std::process::Command;
-use anyhow;
 
 /// Check whether executable exists in PATH
 #[cfg(target_os = "linux")]
@@ -27,14 +26,14 @@ pub fn find_available_engine() -> Option<String> {
 
 /// Helper to get hostname using `hostname` utility which should be available on most linux systems
 #[cfg(target_os = "linux")]
-pub fn get_hostname() -> anyhow::Result<String> {
-    let cmd = Command::new("hostname").output().expect("could not call hostname");
+pub fn get_hostname() -> String {
+    let cmd = Command::new("hostname").output().expect("Could not call hostname");
     let hostname = String::from_utf8_lossy(&cmd.stdout);
 
     if ! cmd.status.success() || hostname.is_empty() {
-        return Err(anyhow::Error::msg(format!("Unable to get hostname")));
+        panic!("Unable to get hostname from host");
     }
 
-    return Ok(hostname.trim().into());
+    hostname.trim().into()
 }
 

@@ -58,20 +58,30 @@ pub struct CmdShellArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdExecArgs {
+    /// Execute command using bash shell (avoids bash -c '..')
+    #[arg(long)]
+    pub shell: bool,
+
     /// Name or the ID of the container
     #[arg(env = "BOX_CONTAINER")]
     pub name: String,
 
-    #[arg(last = true)]
+    // command is required but also last so '--' can be used as name can be taken from environ
+    #[arg(last = true, required = true)]
     pub command: Vec<String>,
 }
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdKillArgs {
+    /// Do not ask for confirmation
+    #[arg(short, long)]
+    pub yes: bool,
+
     /// How many seconds to wait before killing the containers forcibly
     #[arg(short, long, default_value_t = 20)]
     pub timeout: u32,
 
+    #[arg(env = "BOX_CONTAINER")]
     pub containers: Vec<String>,
 }
 
