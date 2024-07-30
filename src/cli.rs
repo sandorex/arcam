@@ -82,7 +82,7 @@ pub struct CmdKillArgs {
     pub timeout: u32,
 
     #[arg(env = "BOX_CONTAINER")]
-    pub containers: Vec<String>,
+    pub container: String,
 }
 
 #[derive(Subcommand, Debug)]

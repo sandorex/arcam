@@ -11,6 +11,8 @@ pub const VERSION: &'static str = std::env!("CARGO_PKG_VERSION");
 pub const INIT_SCRIPT: &'static str = include_str!("box-init.sh");
 pub const DATA_VOLUME_NAME: &'static str = "box-data";
 
+static mut DRY_RUN: bool = false;
+
 /// Sets required constants inside the init script
 fn template_init_script(user: &str) -> String {
     INIT_SCRIPT.to_string()
@@ -30,7 +32,7 @@ fn get_user() -> String {
 /// Extracts default shell for user from /etc/passwd inside a container
 fn get_user_shell(engine: &str, container: &str, user: &str) -> String {
     let cmd_result = Command::new(engine)
-        .args(&["exec", "--user", "root", "-it", &container, "bash", "-c", format!("getent passwd '{}'", user).as_str()])
+        .args(&["exec", "--user", "root", "-it", &container, "getent", "passwd", user])
         .output()
         .expect("Could not execute engine");
 
@@ -47,6 +49,11 @@ fn get_user_shell(engine: &str, container: &str, user: &str) -> String {
 
 fn main() -> ExitCode {
     let args = cli::Cli::parse();
+
+    // there is no threading in this application, and it is written to only here
+    unsafe {
+        DRY_RUN = args.dry_run;
+    }
 
     // prefer the one in argument or ENV then try to find one automatically
     let engine = {
@@ -69,8 +76,7 @@ fn main() -> ExitCode {
         CliCommands::Start(x) => commands::start_container(&engine, &x),
         CliCommands::Shell(x) => commands::open_shell(&engine, &x),
         CliCommands::Exec(x) => commands::container_exec(&engine, &x),
-        // CliCommands::List => {},
-        // CliCommands::Kill(_) => {},
-        _ => 1,
+        CliCommands::List => commands::print_containers(&engine),
+        CliCommands::Kill(x) => commands::kill_container(&engine, &x),
     })
 }
