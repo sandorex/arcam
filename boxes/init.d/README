@@ -1,2 +1,0 @@
-All executable files placed here are executed on container initialization (in `box-init`) as the user inside container, use sudo if you need root privileges
-

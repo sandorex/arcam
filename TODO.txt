@@ -1,0 +1,5 @@
+- [ ] Add shell aliases for setting env var BOX_CONTAINER automatically
+- [ ] Add bash/zsh autocompletion
+- [ ] Add example image in the repository
+- [ ] Add tests for some things at least
+- [ ] Add --dry-run for easier debugging
