@@ -1,5 +1,4 @@
-use crate::{VERSION, get_user};
-use super::cmd_init::DATA_VOLUME_NAME;
+use crate::{VERSION, get_user, DATA_VOLUME_NAME};
 use crate::util;
 use crate::cli;
 
@@ -24,7 +23,7 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
         "--env".into(), "BOX=BOX".into(),
         "--env".into(), format!("BOX_VERSION={}", VERSION),
         "--env".into(), format!("BOX_USER={}", get_user()),
-        "--volume".into(), format!("{}:/init:ro", executable_path.display()),
+        "--volume".into(), format!("{}:/box:ro", executable_path.display()),
         "--volume".into(), format!("{}:/ws:Z", &cwd.to_string_lossy()),
         "--hostname".into(), util::get_hostname(),
     ];
@@ -111,7 +110,7 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
     args.extend(vec![
         // TODO add this as an option
         // "--env".into(), "RUST_BACKTRACE=1".into(),
-        "--entrypoint".into(), "/init".into(),
+        "--entrypoint".into(), "/box".into(),
 
         // the container image
         cli_args.image.clone(),

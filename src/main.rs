@@ -9,6 +9,7 @@ use std::process::Command;
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub const FULL_VERSION: &'static str = concat!(env!("CARGO_PKG_VERSION"), env!("GIT_HASH"));
+pub const DATA_VOLUME_NAME: &'static str = "box-data";
 
 /// Check if running inside a container
 fn is_in_container() -> bool {

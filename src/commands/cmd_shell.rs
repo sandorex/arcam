@@ -21,8 +21,13 @@ fn get_user_shell(engine: &str, container: &str, user: &str) -> String {
 }
 
 pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> u8 {
+    // TODO test if container exists at all, do this for all commands!
+
     let user = get_user();
-    let user_shell = get_user_shell(engine, &cli_args.name, user.as_str());
+    let user_shell = match &cli_args.shell {
+        Some(x) => &x,
+        None => &get_user_shell(engine, &cli_args.name, user.as_str()),
+    };
 
     let cmd = crate::engine_cmd_status(engine, dry_run, vec![
         "exec".into(), "-it".into(),
@@ -30,7 +35,8 @@ pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> 
         // propagete TERM but default to xterm
         "--env".into(), format!("TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
         "--workdir".into(), "/ws".into(),
-        user_shell, "-l".into(),
+        cli_args.name.clone(),
+        user_shell.to_string(), "-l".into(),
     ]);
 
     // propagate the exit code even though it does not matter much

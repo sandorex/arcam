@@ -5,7 +5,6 @@ use crate::FULL_VERSION;
 /// Sandboxed pet container manager
 #[derive(Parser, Debug)]
 #[command(name = "box", author, version = FULL_VERSION, about)]
-// #[command(name = "box", author, version = concat!(env!("CARGO_PKG_VERSION"), env!("GIT_HASH")), about)]
 pub struct Cli {
     /// Explicitly set container engine to use
     #[arg(long, env = "BOX_ENGINE")]
@@ -51,13 +50,13 @@ pub struct CmdStartArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdShellArgs {
-    /// Use custom shell
-    #[arg(short, long)]
-    pub shell: Option<String>,
-
     /// Name or the ID of the container
     #[arg(env = "BOX_CONTAINER")]
     pub name: String,
+
+    // i feel like `shell --shell` looks awful so positional arg. it is
+    /// Use custom shell
+    pub shell: Option<String>,
 }
 
 #[derive(Args, Debug, Clone)]

@@ -4,30 +4,45 @@ use std::process::ExitCode;
 use crate::FULL_VERSION;
 
 pub const INIT_SCRIPT: &'static str = include_str!("box-init.sh");
-pub const DATA_VOLUME_NAME: &'static str = "box-data"; // TODO move the vol name to main
 
 pub fn container_init() -> ExitCode {
+    use std::process::Command;
+    use std::os::unix::process::CommandExt;
+    use std::os::unix::fs::PermissionsExt;
+    use std::fs;
+    use std::path::Path;
+    use std::io::Write;
+
     println!("box {}", FULL_VERSION);
 
-    use std::io::Write;
-    use std::process::{Command, Stdio};
+    let mut file = fs::OpenOptions::new().write(true).create(true).open(Path::new("/init"))
+        .expect("Error while creating /init");
 
-    // TODO listen to TERM signals and shutdown properly, currently container has to be killed with
-    // SIGKILL
-    let mut exec_child = Command::new("bash")
-        .args(&["-"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::inherit())
-        .spawn()
-        .expect("Could not execute engine");
+    // set the correct permissions
+    let mut perms = file.metadata()
+        .expect("Cannot get metadata of /init")
+        .permissions();
 
-    {
-        let stdin = exec_child.stdin.as_mut().unwrap();
-        stdin.write_all(INIT_SCRIPT.as_bytes()).unwrap();
-    }
+    // make it executable
+    perms.set_mode(0o755);
 
-    let result = exec_child.wait_with_output().unwrap();
+    let _ = file.set_permissions(perms)
+        .expect("Error while setting permissions for /init");
 
-    // just return the code
-    ExitCode::from(TryInto::<u8>::try_into(result.status.code().unwrap_or(1)).unwrap())
+    // write the init script to it
+    file.write_all(INIT_SCRIPT.as_bytes())
+        .expect("Error while writing to /init");
+
+    // forcibly drop it so it gets written to disk
+    drop(file);
+
+    // execute it and replace this process with it
+    let cmd = Command::new("/init")
+        .exec();
+
+    // NOTE everything here will only be executed if exec fails!
+
+    eprintln!("Error while executing /init: {:?}", cmd);
+
+    ExitCode::FAILURE
 }
