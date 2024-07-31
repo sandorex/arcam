@@ -29,6 +29,15 @@ usermod -d "/home/${BOX_USER:?}" -s "${BOX_SHELL:-$shell}" "${BOX_USER:?}"
 echo "Setting up user home from /etc/skel"
 /sbin/mkhomedir_helper "${BOX_USER:?}"
 
+# only do it if there is sudo installed
+if [[ -f /usr/bin/sudo ]]; then
+    echo "Enabling rootless sudo for all"
+    echo 'ALL ALL = (ALL) NOPASSWD: ALL' >> /etc/sudoers
+else
+    # set root passwd just in case so you can use `su`
+    echo "root:root" | passwd root
+fi
+
 echo "Running /init.d/ scripts"
 # run user scripts
 if [[ -d /init.d ]]; then

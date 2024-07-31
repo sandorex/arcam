@@ -1,9 +1,9 @@
 use clap::{Parser, Subcommand, Args};
 use std::path::PathBuf;
 
-/// Sandboxed project container manager
+/// Sandboxed pet container manager
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(name = "box", author, version, about)]
 pub struct Cli {
     /// Explicitly set container engine to use
     #[arg(long, env = "BOX_ENGINE")]
@@ -26,6 +26,11 @@ pub struct CmdStartArgs {
     /// Path to dotfiles which will be used as /etc/skel inside the container
     #[arg(long, env = "BOX_DOTFILES")]
     pub dotfiles: Option<PathBuf>,
+
+    /// Add or drop capabilities by prefixing them with '!'
+    /// for more details about capabilities read `man 7 capabilities` or box wiki
+    #[arg(long = "cap")]
+    pub capabilities: Vec<String>,
 
     /// Do not mount data volume inside the container
     #[arg(long, action, env = "BOX_NO_DATA_VOLUME")]
