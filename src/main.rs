@@ -2,20 +2,35 @@ mod util;
 mod cli;
 mod commands;
 
-pub use std::process::ExitCode;
-
+use std::path::Path;
+use std::process::ExitCode;
 use clap::Parser;
 use std::process::Command;
 
-pub const VERSION: &'static str = std::env!("CARGO_PKG_VERSION");
-pub const INIT_SCRIPT: &'static str = include_str!("box-init.sh");
-pub const DATA_VOLUME_NAME: &'static str = "box-data";
+pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+pub const FULL_VERSION: &'static str = concat!(env!("CARGO_PKG_VERSION"), env!("GIT_HASH"));
 
-/// Sets required constants inside the init script
-fn template_init_script(user: &str) -> String {
-    INIT_SCRIPT.to_string()
-        .replace("@BOX_VERSION@", VERSION)
-        .replace("@BOX_USER@", user)
+/// Check if running inside a container
+fn is_in_container() -> bool {
+    return Path::new("/run/.containerenv").exists()
+        || Path::new("/.dockerenv").exists()
+        || std::env::var("container").is_ok()
+}
+
+/// Generates random name using adjectives list
+fn generate_name() -> String {
+    const ADJECTIVES_ENGLISH: &'static str = include_str!("adjectives.txt");
+
+    use rand::seq::SliceRandom;
+
+    let mut rng = rand::thread_rng();
+
+    let adjectives: Vec<&str> = ADJECTIVES_ENGLISH.lines().collect();
+    let adjective = adjectives.choose(&mut rng)
+        .expect("Random adjective is empty")
+        .to_string();
+
+    return format!("{}-box", adjective);
 }
 
 fn get_user() -> String {
@@ -38,6 +53,7 @@ fn engine_cmd_output(engine: &str, args: Vec<String>) -> Result<std::process::Ou
     }
 }
 
+// TODO remove this and add print_cmd() for dry_run
 /// Run engine command but keep the stdin/stdout the same so it will be printed
 fn engine_cmd_status(engine: &str, dry_run: bool, args: Vec<String>) -> Result<u8, u8> {
     if dry_run {
@@ -58,26 +74,18 @@ fn engine_cmd_status(engine: &str, dry_run: bool, args: Vec<String>) -> Result<u
     }
 }
 
-/// Extracts default shell for user from /etc/passwd inside a container
-fn get_user_shell(engine: &str, container: &str, user: &str) -> String {
-    let cmd_result = Command::new(engine)
-        .args(&["exec", "--user", "root", "-it", &container, "getent", "passwd", user])
-        .output()
-        .expect("Could not execute engine");
-
-    const ERR: &'static str = "Failed to extract default shell from /etc/passwd";
-    let stdout = String::from_utf8_lossy(&cmd_result.stdout);
-    if ! cmd_result.status.success() || stdout.is_empty() {
-        panic!("{}", ERR);
-    }
-
-    // i do not want to rely on external tools like awk so im extracting manually
-    stdout.trim().split(':').last().map(|x| x.to_string())
-        .expect(ERR)
-}
-
 fn main() -> ExitCode {
     let args = cli::Cli::parse();
+
+    // init does not need engine, just get it from environment if needed
+    if let CliCommands::Init = args.cmd {
+        if !is_in_container() {
+            eprintln!("Running init outside a container is dangerous, qutting..");
+            return ExitCode::FAILURE;
+        }
+
+        return commands::container_init()
+    }
 
     // prefer the one in argument or ENV then try to find one automatically
     let engine = {
@@ -107,5 +115,6 @@ fn main() -> ExitCode {
         CliCommands::Exists(x) => commands::container_exists(&engine, &x),
         CliCommands::List => commands::print_containers(&engine),
         CliCommands::Kill(x) => commands::kill_container(&engine, args.dry_run, &x),
+        CliCommands::Init => unreachable!(),
     })
 }

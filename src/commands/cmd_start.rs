@@ -1,22 +1,30 @@
-use crate::{get_user, VERSION, DATA_VOLUME_NAME, template_init_script};
+use crate::{VERSION, get_user};
+use super::cmd_init::DATA_VOLUME_NAME;
 use crate::util;
 use crate::cli;
-use base64::prelude::*;
 
 pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs) -> u8 {
-    let templated_script = template_init_script(get_user().as_str());
     let cwd = std::env::current_dir().expect("Failed to get current directory");
+    let executable_path = std::env::current_exe().expect("Failed to get executable path");
+
+    // NOTE i am generating the name as its easier than reading output of the command, and this way
+    // i am getting consistant nameing for all boxes :)
+    let container_name = crate::generate_name();
 
     // TODO set XDG_ env vars just in case
+    // TODO add env var with engine used (but only basename in case its a full path)
     let mut args: Vec<String> = vec![
         "run".into(), "-d".into(), "--rm".into(),
         "--security-opt".into(), "label=disable".into(),
+        "--name".into(), container_name.clone(),
         "--user".into(), "root".into(),
         "--userns=keep-id".into(), // TODO podman only
         "--label=manager=box".into(),
-        format!("--label=box={}", engine),
-        "--env".into(), format!("BOX={}", engine),
+        "--label=box=box".into(),
+        "--env".into(), "BOX=BOX".into(),
         "--env".into(), format!("BOX_VERSION={}", VERSION),
+        "--env".into(), format!("BOX_USER={}", get_user()),
+        "--volume".into(), format!("{}:/init:ro", executable_path.display()),
         "--volume".into(), format!("{}:/ws:Z", &cwd.to_string_lossy()),
         "--hostname".into(), util::get_hostname(),
     ];
@@ -100,27 +108,27 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
         args.extend(vec!["--volume".into(), format!("{}:/etc/skel:ro", dotfiles.display())]);
     }
 
-    // TODO remove base64 its getting too big, just start the container then use exec to pipe the
-    // file into the container echo 'blah' | podman .. exec -it 'tee /init' ?
     args.extend(vec![
-        // use bash to decode the script
-        "--entrypoint".into(), "/bin/bash".into(),
+        // TODO add this as an option
+        // "--env".into(), "RUST_BACKTRACE=1".into(),
+        "--entrypoint".into(), "/init".into(),
 
         // the container image
         cli_args.image.clone(),
 
-        "-c".into(),
-        // encoding the init script as base64 to pass it as the entrypoint, maybe not the most
-        // elegant but certainly faster than copying whole >1mb binary for few lines of bash
-        format!("printf '%s' '{}' | base64 -d > /init; exec /init", BASE64_STANDARD.encode(templated_script)),
+        "init".into(),
     ]);
 
+    // TODO add interactive version where i can see output from the container, maybe podman logs -f
+    // TODO add plain command back in, this is ugly
     let cmd = crate::engine_cmd_status(engine, dry_run, args);
 
-    // propagate the exit code
+    // if the command fails just return with the exit code
     match cmd {
-        Ok(_) => 0,
         Err(x) => x,
+        Ok(_) => 0,
     }
+
+    // TODO print user friendly name
 }
 

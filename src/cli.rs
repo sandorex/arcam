@@ -1,9 +1,11 @@
 use clap::{Parser, Subcommand, Args};
 use std::path::PathBuf;
+use crate::FULL_VERSION;
 
 /// Sandboxed pet container manager
 #[derive(Parser, Debug)]
-#[command(name = "box", author, version, about)]
+#[command(name = "box", author, version = FULL_VERSION, about)]
+// #[command(name = "box", author, version = concat!(env!("CARGO_PKG_VERSION"), env!("GIT_HASH")), about)]
 pub struct Cli {
     /// Explicitly set container engine to use
     #[arg(long, env = "BOX_ENGINE")]
@@ -28,7 +30,8 @@ pub struct CmdStartArgs {
     pub dotfiles: Option<PathBuf>,
 
     /// Add or drop capabilities by prefixing them with '!'
-    /// for more details about capabilities read `man 7 capabilities` or box wiki
+    ///
+    /// For more details about capabilities read `man 7 capabilities` or box wiki
     #[arg(long = "cap")]
     pub capabilities: Vec<String>,
 
@@ -118,5 +121,9 @@ pub enum CliCommands {
     /// Stop running containers managed by box
     #[command(arg_required_else_help = true)]
     Kill(CmdKillArgs),
+
+    /// Init command used to setup the container
+    #[command(hide = true)]
+    Init,
 }
 
