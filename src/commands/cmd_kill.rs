@@ -3,6 +3,7 @@ use std::process::Command;
 
 /// Check if container is owned by box, will return false if container does not exist
 fn is_box_container(engine: &str, name: &str) -> bool {
+    // TODO use crate::engine_.. command here
     let cmd = Command::new(engine)
         .args(&["container", "inspect", name, "--format", "{{if .Config.Labels.box}}{{.Config.Labels.box}}{{end}}"])
         .output()
@@ -11,7 +12,7 @@ fn is_box_container(engine: &str, name: &str) -> bool {
     cmd.status.success() && !String::from_utf8_lossy(&cmd.stdout).is_empty()
 }
 
-pub fn kill_container(engine: &str, cli_args: &cli::CmdKillArgs) -> u8 {
+pub fn kill_container(engine: &str, dry_run: bool, cli_args: &cli::CmdKillArgs) -> u8 {
     if ! is_box_container(engine, &cli_args.container) {
         eprintln!("Container '{}' is not owned by box or does not exist", &cli_args.container);
         return 1;
@@ -36,10 +37,12 @@ pub fn kill_container(engine: &str, cli_args: &cli::CmdKillArgs) -> u8 {
         }
     }
 
-    let cmd = Command::new(engine)
-        .args(&["container", "stop", "--time", &cli_args.timeout.to_string(), &cli_args.container])
-        .status()
-        .expect("Could not execute engine");
+    let cmd = crate::engine_cmd_status(engine, dry_run, vec![
+        "container".into(), "stop".into(), "--time".into(), cli_args.timeout.to_string(), cli_args.container.clone(),
+    ]);
 
-    cmd.code().unwrap_or(1).try_into().unwrap()
+    match cmd {
+        Ok(_) => 0,
+        Err(x) => x,
+    }
 }

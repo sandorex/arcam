@@ -22,6 +22,7 @@ fn get_user() -> String {
     std::env::var("USER").expect("Unable to get USER from env var")
 }
 
+// TODO remove this function as its quite pointless
 /// Run engine command and save the output, cannot be run dry
 fn engine_cmd_output(engine: &str, args: Vec<String>) -> Result<std::process::Output, std::process::Output> {
     let cmd = Command::new(engine)
@@ -40,7 +41,7 @@ fn engine_cmd_output(engine: &str, args: Vec<String>) -> Result<std::process::Ou
 /// Run engine command but keep the stdin/stdout the same so it will be printed
 fn engine_cmd_status(engine: &str, dry_run: bool, args: Vec<String>) -> Result<u8, u8> {
     if dry_run {
-        println!("(CMD) {} {}", engine, args.join(" "));
+        println!("(CMD) {} {:?}", engine, args);
 
         Ok(0)
     } else {
@@ -101,9 +102,9 @@ fn main() -> ExitCode {
     use cli::CliCommands;
     ExitCode::from(match args.cmd {
         CliCommands::Start(x) => commands::start_container(&engine, args.dry_run, &x),
-        CliCommands::Shell(x) => commands::open_shell(&engine, &x),
-        CliCommands::Exec(x) => commands::container_exec(&engine, &x),
+        CliCommands::Shell(x) => commands::open_shell(&engine, args.dry_run, &x),
+        CliCommands::Exec(x) => commands::container_exec(&engine, args.dry_run, &x),
         CliCommands::List => commands::print_containers(&engine),
-        CliCommands::Kill(x) => commands::kill_container(&engine, &x),
+        CliCommands::Kill(x) => commands::kill_container(&engine, args.dry_run, &x),
     })
 }

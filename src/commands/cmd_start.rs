@@ -108,6 +108,8 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
         args.extend(vec!["--volume".into(), format!("{}:/etc/skel:ro", dotfiles.display())]);
     }
 
+    // TODO remove base64 its getting too big, just start the container then use exec to pipe the
+    // file into the container echo 'blah' | podman .. exec -it 'tee /init' ?
     args.extend(vec![
         // use bash to decode the script
         "--entrypoint".into(), "/bin/bash".into(),
@@ -122,21 +124,11 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
     ]);
 
     let cmd = crate::engine_cmd_status(engine, dry_run, args);
-    // let cmd = Command::new(engine)
-    //     .args(&args)
-    //     .status()
-    //     .expect("Unable to execute engine");
 
     // propagate the exit code
     match cmd {
         Ok(_) => 0,
         Err(x) => x,
     }
-    // if cmd.success() {
-    //     0
-    // } else {
-    //     // return the exit code so it can be propagated
-    //     cmd.code().unwrap_or(1).try_into().unwrap()
-    // }
 }
 
