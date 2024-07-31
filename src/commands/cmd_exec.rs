@@ -16,7 +16,7 @@ pub fn container_exec(engine: &str, dry_run: bool, cli_args: &cli::CmdExecArgs) 
         args.extend(cli_args.command.clone());
     }
 
-    let cmd = crate::engine_cmd_status(engine, false, args);
+    let cmd = crate::engine_cmd_status(engine, dry_run, args);
 
     match cmd {
         Ok(_) => 0,
