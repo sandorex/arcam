@@ -13,7 +13,7 @@ fn main() {
     let git_hash;
     if is_tagged {
         // nothing when its a release
-        git_hash = "".to_string();
+        git_hash = " ".to_string();
     } else {
         git_hash = match Command::new("git").args(&["rev-parse", "--short=10", "HEAD"]).output() {
             Ok(output) => format!("-{}", String::from_utf8(output.stdout).unwrap()),
