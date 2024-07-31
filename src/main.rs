@@ -104,6 +104,7 @@ fn main() -> ExitCode {
         CliCommands::Start(x) => commands::start_container(&engine, args.dry_run, &x),
         CliCommands::Shell(x) => commands::open_shell(&engine, args.dry_run, &x),
         CliCommands::Exec(x) => commands::container_exec(&engine, args.dry_run, &x),
+        CliCommands::Exists(x) => commands::container_exists(&engine, &x),
         CliCommands::List => commands::print_containers(&engine),
         CliCommands::Kill(x) => commands::kill_container(&engine, args.dry_run, &x),
     })

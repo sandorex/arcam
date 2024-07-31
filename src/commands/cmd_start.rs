@@ -71,10 +71,6 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
         let inspect_cmd = crate::engine_cmd_output(engine, vec![
             "volume".into(), "inspect".into(), DATA_VOLUME_NAME.into(),
         ]);
-        // let inspect_cmd = Command::new(engine)
-        //     .args(&["volume", "inspect", DATA_VOLUME_NAME])
-        //     .output()
-        //     .expect("Unable to execute engine");
 
         // if it fails then volume is missing probably
         if ! inspect_cmd.is_ok() {
@@ -82,10 +78,6 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
             let create_vol_cmd = crate::engine_cmd_status(engine, dry_run, vec![
                 "volume".into(), "create".into(), DATA_VOLUME_NAME.into(),
             ]);
-            // let create_vol_cmd = Command::new(engine)
-            //     .args(&["volume", "create", DATA_VOLUME_NAME])
-            //     .status()
-            //     .expect("Unable to execute engine");
 
             if ! create_vol_cmd.is_ok() {
                 panic!("Failed to create data volume");

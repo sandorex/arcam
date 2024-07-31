@@ -36,15 +36,11 @@ pub struct CmdStartArgs {
     #[arg(long, action, env = "BOX_NO_DATA_VOLUME")]
     pub no_data_volume: bool,
 
-    // NOTE i am leaving this here but i do not believe it to be that useful
-    // /// Mount data read-only
-    // #[arg(long = "read-only-data", action, conflicts_with = "no_data")]
-    // ro_data: bool,
-
     /// Disable network access for the container
     #[arg(long, action)]
     pub no_network: bool,
 
+    // TODO make it possible to use @config to run configuration from a file
     /// Container image to use
     #[arg(env = "BOX_IMAGE")]
     pub image: String,
@@ -77,6 +73,12 @@ pub struct CmdExecArgs {
 }
 
 #[derive(Args, Debug, Clone)]
+pub struct CmdExistsArgs {
+    #[arg(env = "BOX_CONTAINER")]
+    pub container: String,
+}
+
+#[derive(Args, Debug, Clone)]
 pub struct CmdKillArgs {
     /// Do not ask for confirmation
     #[arg(short, long)]
@@ -103,6 +105,11 @@ pub enum CliCommands {
     /// Execute a command inside a running box container
     #[command(arg_required_else_help = true)]
     Exec(CmdExecArgs),
+
+    /// Check if container exists
+    ///
+    /// Exit code is 0 if container exists otherwise 1
+    Exists(CmdExistsArgs),
 
     /// List running containers managed by box
     // TODO see if its possible to stack the --filter podman
