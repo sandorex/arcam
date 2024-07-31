@@ -1,6 +1,6 @@
-use crate::get_user;
+use crate::util::{self, CommandOutputExt};
 use crate::cli;
-use std::process::Command;
+use std::process::{Command, ExitCode};
 
 /// Extracts default shell for user from /etc/passwd inside a container
 fn get_user_shell(engine: &str, container: &str, user: &str) -> String {
@@ -16,20 +16,27 @@ fn get_user_shell(engine: &str, container: &str, user: &str) -> String {
     }
 
     // i do not want to rely on external tools like awk so im extracting manually
-    stdout.trim().split(':').last().map(|x| x.to_string())
+    stdout.trim()
+        .split(':')
+        .last()
+        .map(|x| x.to_string())
         .expect(ERR)
 }
 
-pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> u8 {
-    // TODO test if container exists at all, do this for all commands!
+pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> ExitCode {
+    // check if container is owned
+    if ! util::is_box_container(engine, &cli_args.name) {
+        eprintln!("Container {} is not owned by box or does not exist", &cli_args.name);
+        return ExitCode::FAILURE;
+    }
 
-    let user = get_user();
+    let user = util::get_user();
     let user_shell = match &cli_args.shell {
         Some(x) => &x,
         None => &get_user_shell(engine, &cli_args.name, user.as_str()),
     };
 
-    let cmd = crate::engine_cmd_status(engine, dry_run, vec![
+    let args: Vec<String> = vec![
         "exec".into(), "-it".into(),
         "--user".into(), user,
         // propagete TERM but default to xterm
@@ -37,12 +44,18 @@ pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> 
         "--workdir".into(), "/ws".into(),
         cli_args.name.clone(),
         user_shell.to_string(), "-l".into(),
-    ]);
+    ];
 
-    // propagate the exit code even though it does not matter much
-    match cmd {
-        Ok(_) => 0,
-        Err(x) => x,
+    if dry_run {
+        util::print_cmd_dry_run(engine, args);
+
+        ExitCode::SUCCESS
+    } else {
+        Command::new(engine)
+            .args(&["aa"])
+            .status()
+            .expect("Could not execute engine")
+            .to_exitcode()
     }
 }
 

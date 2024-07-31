@@ -1,10 +1,10 @@
-use std::process::Command;
+use std::process::{Command, ExitCode};
+use crate::util::CommandOutputExt;
 
-pub fn print_containers(engine: &str) -> u8 {
-    let cmd = Command::new(engine)
+pub fn print_containers(engine: &str) -> ExitCode {
+    Command::new(engine)
         .args(&["container", "ls", "--filter", "label=box"])
         .status()
-        .expect("Could not execute engine");
-
-    cmd.code().unwrap_or(1).try_into().unwrap()
+        .expect("Could not execute engine")
+        .to_exitcode()
 }

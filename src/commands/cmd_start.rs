@@ -1,14 +1,16 @@
-use crate::{VERSION, get_user, DATA_VOLUME_NAME};
-use crate::util;
+use crate::{VERSION, DATA_VOLUME_NAME};
+use crate::util::{self, CommandOutputExt};
 use crate::cli;
+use std::process::{Command, ExitCode};
 
-pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs) -> u8 {
+// TODO add option to pass args to podman
+pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs) -> ExitCode {
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let executable_path = std::env::current_exe().expect("Failed to get executable path");
 
     // NOTE i am generating the name as its easier than reading output of the command, and this way
     // i am getting consistant nameing for all boxes :)
-    let container_name = crate::generate_name();
+    let container_name = util::generate_name();
 
     // TODO set XDG_ env vars just in case
     // TODO add env var with engine used (but only basename in case its a full path)
@@ -22,7 +24,7 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
         "--label=box=box".into(),
         "--env".into(), "BOX=BOX".into(),
         "--env".into(), format!("BOX_VERSION={}", VERSION),
-        "--env".into(), format!("BOX_USER={}", get_user()),
+        "--env".into(), format!("BOX_USER={}", util::get_user()),
         "--volume".into(), format!("{}:/box:ro", executable_path.display()),
         "--volume".into(), format!("{}:/ws:Z", &cwd.to_string_lossy()),
         "--hostname".into(), util::get_hostname(),
@@ -75,19 +77,22 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
 
     // TODO change this to data_volume so its not confusing with the negation
     if ! cli_args.no_data_volume {
-        let inspect_cmd = crate::engine_cmd_output(engine, vec![
-            "volume".into(), "inspect".into(), DATA_VOLUME_NAME.into(),
-        ]);
+        let inspect_cmd = Command::new(engine)
+            .args(&["volume", "inspect", DATA_VOLUME_NAME])
+            .output()
+            .expect("Could not execute engine");
 
         // if it fails then volume is missing probably
-        if ! inspect_cmd.is_ok() {
-            // TODO maybe i should run output() then print stdout/stderr if it fails?
-            let create_vol_cmd = crate::engine_cmd_status(engine, dry_run, vec![
-                "volume".into(), "create".into(), DATA_VOLUME_NAME.into(),
-            ]);
+        if ! inspect_cmd.status.success() {
+            let create_vol_cmd = Command::new(engine)
+                .args(&["volume", "create", DATA_VOLUME_NAME])
+                .output()
+                .expect("Could not execute engine");
 
-            if ! create_vol_cmd.is_ok() {
-                panic!("Failed to create data volume");
+            // TODO maybe i should print stdout/stderr if it fails?
+            if ! create_vol_cmd.status.success() {
+                eprintln!("Failed to create data volume: {}", create_vol_cmd.status);
+                return create_vol_cmd.to_exitcode();
             }
         }
 
@@ -118,16 +123,19 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
         "init".into(),
     ]);
 
-    // TODO add interactive version where i can see output from the container, maybe podman logs -f
-    // TODO add plain command back in, this is ugly
-    let cmd = crate::engine_cmd_status(engine, dry_run, args);
+    if dry_run {
+        util::print_cmd_dry_run(engine, args);
 
-    // if the command fails just return with the exit code
-    match cmd {
-        Err(x) => x,
-        Ok(_) => 0,
+        ExitCode::SUCCESS
+    } else {
+        Command::new(engine)
+            .args(args)
+            .status()
+            .expect("Could not execute engine")
+            .to_exitcode()
     }
 
+    // TODO add interactive version where i can see output from the container, maybe podman logs -f
     // TODO print user friendly name
 }
 

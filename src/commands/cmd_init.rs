@@ -15,6 +15,7 @@ pub fn container_init() -> ExitCode {
 
     println!("box {}", FULL_VERSION);
 
+    // open init file for rw
     let mut file = fs::OpenOptions::new().write(true).create(true).open(Path::new("/init"))
         .expect("Error while creating /init");
 
