@@ -1,10 +1,10 @@
-use crate::util::{self, CommandOutputExt};
+use crate::util::{self, CommandOutputExt, Engine};
 use crate::cli;
 use std::process::{Command, ExitCode};
 
 /// Extracts default shell for user from /etc/passwd inside a container
-fn get_user_shell(engine: &str, container: &str, user: &str) -> String {
-    let cmd_result = Command::new(engine)
+fn get_user_shell(engine: &Engine, container: &str, user: &str) -> String {
+    let cmd_result = Command::new(engine.get_path())
         .args(&["exec", "--user", "root", "-it", &container, "getent", "passwd", user])
         .output()
         .expect("Could not execute engine");
@@ -23,9 +23,9 @@ fn get_user_shell(engine: &str, container: &str, user: &str) -> String {
         .expect(ERR)
 }
 
-pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> ExitCode {
+pub fn open_shell(engine: Engine, dry_run: bool, cli_args: &cli::CmdShellArgs) -> ExitCode {
     // check if container is owned
-    if ! util::is_box_container(engine, &cli_args.name) {
+    if ! util::is_box_container(&engine, &cli_args.name) {
         eprintln!("Container {} is not owned by box or does not exist", &cli_args.name);
         return ExitCode::FAILURE;
     }
@@ -33,7 +33,7 @@ pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> 
     let user = util::get_user();
     let user_shell = match &cli_args.shell {
         Some(x) => &x,
-        None => &get_user_shell(engine, &cli_args.name, user.as_str()),
+        None => &get_user_shell(&engine, &cli_args.name, user.as_str()),
     };
 
     let args: Vec<String> = vec![
@@ -47,11 +47,11 @@ pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> 
     ];
 
     if dry_run {
-        util::print_cmd_dry_run(engine, args);
+        util::print_cmd_dry_run(&engine, args);
 
         ExitCode::SUCCESS
     } else {
-        Command::new(engine)
+        Command::new(engine.get_path())
             .args(args)
             .status()
             .expect("Could not execute engine")

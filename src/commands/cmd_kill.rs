@@ -1,9 +1,9 @@
 use crate::cli;
-use crate::util::{self, CommandOutputExt};
+use crate::util::{self, CommandOutputExt, Engine};
 use std::process::{Command, ExitCode};
 
-pub fn kill_container(engine: &str, dry_run: bool, cli_args: &cli::CmdKillArgs) -> ExitCode {
-    if ! util::is_box_container(engine, &cli_args.container) {
+pub fn kill_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdKillArgs) -> ExitCode {
+    if ! util::is_box_container(&engine, &cli_args.container) {
         eprintln!("Container '{}' is not owned by box or does not exist", &cli_args.container);
         return ExitCode::FAILURE;
     }
@@ -32,11 +32,11 @@ pub fn kill_container(engine: &str, dry_run: bool, cli_args: &cli::CmdKillArgs) 
     ];
 
     if dry_run {
-        util::print_cmd_dry_run(engine, args);
+        util::print_cmd_dry_run(&engine, args);
 
         ExitCode::SUCCESS
     } else {
-        Command::new(engine)
+        Command::new(engine.get_path())
             .args(args)
             .status()
             .expect("Could not execute engine")

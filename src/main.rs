@@ -22,34 +22,47 @@ fn main() -> ExitCode {
         return commands::container_init()
     }
 
-    // prefer the one in argument or ENV then try to find one automatically
-    let engine = {
-        if let Some(chosen) = args.engine {
-            chosen
+    // find and detect engine
+    use util::{Engine, find_available_engine};
+    let engine: Engine = if let Some(chosen) = args.engine {
+        // test if engine exists in PATH or as a literal path
+        if !(util::executable_exists(&chosen) || std::path::Path::new(&chosen).exists()) {
+            eprintln!("Engine '{}' not found in PATH or filesystem", &chosen);
+            return ExitCode::FAILURE;
+        }
+
+        // the engine needs to be detected as name is not reliable
+        match Engine::detect(&chosen) {
+            Some(x) => x,
+            None => {
+                // allow it to run as it may work but warn the user that something is wrong
+                eprintln!("---------------------------------------------------");
+                eprintln!("Unknown engine '{}', assuming docker-compatible!", &chosen);
+                eprintln!("Thus here be dragons!");
+                eprintln!("---------------------------------------------------");
+
+                // docker is the standard right?
+                Engine::Docker(chosen)
+            },
+        }
+    } else {
+        if let Some(found) = find_available_engine() {
+            found
         } else {
-            if let Some(found) = util::find_available_engine() {
-                found
-            } else {
-                eprintln!("No compatible container engine found in PATH");
-                return ExitCode::FAILURE;
-            }
+            eprintln!("No compatible container engine found in PATH");
+            return ExitCode::FAILURE;
         }
     };
 
-    // test if engine exists in PATH or as a literal path
-    if !(util::executable_exists(&engine) || std::path::Path::new(&engine).exists()) {
-        eprintln!("Engine '{}' not found in PATH or filesystem", engine);
-        return ExitCode::FAILURE;
-    }
-
+    // TODO use engine in the functions themself
     use cli::CliCommands;
     match args.cmd {
-        CliCommands::Start(x) => commands::start_container(&engine, args.dry_run, &x),
-        CliCommands::Shell(x) => commands::open_shell(&engine, args.dry_run, &x),
-        CliCommands::Exec(x) => commands::container_exec(&engine, args.dry_run, &x),
-        CliCommands::Exists(x) => commands::container_exists(&engine, &x),
-        CliCommands::List => commands::print_containers(&engine),
-        CliCommands::Kill(x) => commands::kill_container(&engine, args.dry_run, &x),
-        CliCommands::Init => unreachable!(),
+        CliCommands::Start(x) => commands::start_container(engine, args.dry_run, &x),
+        CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, &x),
+        CliCommands::Exec(x) => commands::container_exec(engine, args.dry_run, &x),
+        CliCommands::Exists(x) => commands::container_exists(engine, &x),
+        CliCommands::List => commands::print_containers(engine),
+        CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, &x),
+        CliCommands::Init => unreachable!(), // this is handled before
     }
 }

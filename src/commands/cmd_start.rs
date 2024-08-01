@@ -1,10 +1,10 @@
 use crate::{VERSION, DATA_VOLUME_NAME};
-use crate::util::{self, CommandOutputExt};
+use crate::util::{self, CommandOutputExt, Engine};
 use crate::cli;
 use std::process::{Command, ExitCode};
 
-// TODO add option to pass args to podman
-pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs) -> ExitCode {
+// TODO add the option to pass args to podman
+pub fn start_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdStartArgs) -> ExitCode {
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let executable_path = std::env::current_exe().expect("Failed to get executable path");
 
@@ -19,7 +19,6 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
         "--security-opt".into(), "label=disable".into(),
         "--name".into(), container_name.clone(),
         "--user".into(), "root".into(),
-        "--userns=keep-id".into(), // TODO podman only
         "--label=manager=box".into(),
         "--label=box=box".into(),
         "--env".into(), "BOX=BOX".into(),
@@ -29,6 +28,14 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
         "--volume".into(), format!("{}:/ws:Z", &cwd.to_string_lossy()),
         "--hostname".into(), util::get_hostname(),
     ];
+
+    match engine {
+        // TODO add docker equivalent
+        Engine::Podman(_) => {
+            args.push("--userns=keep-id".into())
+        },
+        _ => {},
+    }
 
     // add the env vars, TODO should this be checked for syntax?
     for e in &cli_args.env {
@@ -77,14 +84,14 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
 
     // TODO change this to data_volume so its not confusing with the negation
     if ! cli_args.no_data_volume {
-        let inspect_cmd = Command::new(engine)
+        let inspect_cmd = Command::new(engine.get_path())
             .args(&["volume", "inspect", DATA_VOLUME_NAME])
             .output()
             .expect("Could not execute engine");
 
         // if it fails then volume is missing probably
         if ! inspect_cmd.status.success() {
-            let create_vol_cmd = Command::new(engine)
+            let create_vol_cmd = Command::new(engine.get_path())
                 .args(&["volume", "create", DATA_VOLUME_NAME])
                 .output()
                 .expect("Could not execute engine");
@@ -124,11 +131,11 @@ pub fn start_container(engine: &str, dry_run: bool, cli_args: &cli::CmdStartArgs
     ]);
 
     if dry_run {
-        util::print_cmd_dry_run(engine, args);
+        util::print_cmd_dry_run(&engine, args);
 
         ExitCode::SUCCESS
     } else {
-        Command::new(engine)
+        Command::new(engine.get_path())
             .args(args)
             .status()
             .expect("Could not execute engine")
