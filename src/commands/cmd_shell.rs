@@ -52,7 +52,7 @@ pub fn open_shell(engine: &str, dry_run: bool, cli_args: &cli::CmdShellArgs) -> 
         ExitCode::SUCCESS
     } else {
         Command::new(engine)
-            .args(&["aa"])
+            .args(args)
             .status()
             .expect("Could not execute engine")
             .to_exitcode()
