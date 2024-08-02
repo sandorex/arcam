@@ -22,44 +22,42 @@ impl CommandOutputExt for std::process::Output {
     }
 }
 
-/// Basically carries path to the engine and which engine it actually is
+#[derive(Debug, Clone)]
+pub enum EngineKind {
+    Podman,
+    Docker,
+}
+
+impl TryFrom<String> for EngineKind {
+    type Error = ();
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "podman" => Ok(Self::Podman),
+            "docker" => Ok(Self::Docker),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub enum Engine {
-    Podman(String),
-    Docker(String),
+pub struct Engine {
+    /// Path to the engine, can also be name in PATH
+    pub path: String,
+
+    /// See `EngineKind`
+    pub kind: EngineKind,
 }
 
 #[allow(dead_code)]
 impl Engine {
-    /// Create enum from named string
-    pub fn from_name(name: &str, path: &str) -> Option<Self> {
-        match name {
-            "podman" => Some(Self::Podman(path.to_string())),
-            "docker" => Some(Self::Docker(path.to_string())),
-            _ => None,
-        }
-    }
-
-    pub fn get_name(&self) -> &'static str {
-        match self {
-            Self::Podman(_) => "podman",
-            Self::Docker(_) => "docker",
-        }
-    }
-
-    pub fn get_path(&self) -> &String {
-        match self {
-            Self::Podman(x) => &x,
-            Self::Docker(x) => &x,
-        }
-    }
-
-    /// Detect which engine it is by executing it
+    /// Detect which engine it is by executing `<engine> --version`
     ///
-    /// Do not know how reliable it is though
+    /// If it is stupid but it works, it isn't stupid.
+    /// - Mercedes Lackey
     pub fn detect(engine: &str) -> Option<Self> {
-        // outputs:
+        // output from `<engine> --version`
         // docker: Docker version 27.1.1, build 6312585
         // podman: podman version 5.1.2
 
@@ -68,11 +66,23 @@ impl Engine {
             .output()
             .expect("Could not execute engine");
 
-        // just in case i am making it lowercase
+        // NOTE its important to make it lowercase
         let stdout = String::from_utf8_lossy(&cmd.stdout).to_lowercase();
 
-        // decide based on the first word
-        Self::from_name(stdout.split(" ").nth(0).unwrap_or(""), engine)
+        // convert first word into EngineKind, at least try to..
+        let kind = EngineKind::try_from(
+            stdout.split(" ")
+            .nth(0)
+            .unwrap_or("")
+            .to_string()
+        );
+        match kind {
+            Ok(x) => Some(Engine {
+                path: engine.to_string(),
+                kind: x,
+            }),
+            Err(_) => None,
+        }
     }
 }
 
@@ -88,7 +98,7 @@ pub enum ContainerStatus {
 
 /// Get container status if it exists
 pub fn get_container_status(engine: &Engine, container: &str) -> Option<ContainerStatus> {
-    let cmd = Command::new(engine.get_path())
+    let cmd = Command::new(&engine.path)
         .args(&["container", "inspect", container, "--format", "{{.State.Status}}"])
         .output()
         .expect("Could not execute engine");
@@ -110,7 +120,7 @@ pub fn get_container_status(engine: &Engine, container: &str) -> Option<Containe
 
 /// Check if container is owned by box, will return false if container does not exist
 pub fn is_box_container(engine: &Engine, name: &str) -> bool {
-    let cmd = Command::new(engine.get_path())
+    let cmd = Command::new(&engine.path)
         .args(&["container", "inspect", name, "--format", "{{if .Config.Labels.box}}{{.Config.Labels.box}}{{end}}"])
         .output()
         .expect("Could not execute engine");
@@ -129,14 +139,25 @@ pub fn executable_exists(cmd: &str) -> bool {
     output.status.success()
 }
 
+// TODO move this into impl of engine
 /// Finds first available engine, prioritizes podman!
 pub fn find_available_engine() -> Option<Engine> {
     if executable_exists("podman") {
-        return Some(Engine::Podman("podman".to_string()));
+        return Some(
+            Engine {
+                path: "podman".into(),
+                kind: EngineKind::Podman,
+            }
+        );
     }
 
     if executable_exists("docker") {
-        return Some(Engine::Docker("docker".to_string()));
+        return Some(
+            Engine {
+                path: "docker".into(),
+                kind: EngineKind::Docker,
+            }
+        );
     }
 
     None
@@ -186,7 +207,7 @@ pub fn get_user() -> String { std::env::var("USER").expect("Unable to get USER f
 /// Prints command which would've been ran, pretty ugly but should properly quote things, keyword
 /// being SHOULD
 pub fn print_cmd_dry_run(engine: &Engine, args: Vec<String>) {
-    print!("(CMD) {}", engine.get_path());
+    print!("(CMD) {}", &engine.path);
     for i in args {
         print!(" '{}'", i);
     }

@@ -28,7 +28,7 @@ pub fn container_exec(engine: Engine, dry_run: bool, cli_args: &cli::CmdExecArgs
 
         ExitCode::SUCCESS
     } else {
-        Command::new(engine.get_path())
+        Command::new(&engine.path)
             .args(args)
             .status()
             .expect("Could not execute engine")

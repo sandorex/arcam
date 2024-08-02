@@ -4,6 +4,7 @@ mod commands;
 
 use clap::Parser;
 use std::process::ExitCode;
+use util::{Engine, find_available_engine};
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub const FULL_VERSION: &'static str = concat!(env!("CARGO_PKG_VERSION"), env!("GIT_HASH"));
@@ -22,8 +23,11 @@ fn main() -> ExitCode {
         return commands::container_init()
     }
 
+    if args.dry_run {
+        eprintln!("DRY RUN MODE");
+    }
+
     // find and detect engine
-    use util::{Engine, find_available_engine};
     let engine: Engine = if let Some(chosen) = args.engine {
         // test if engine exists in PATH or as a literal path
         if !(util::executable_exists(&chosen) || std::path::Path::new(&chosen).exists()) {
@@ -31,20 +35,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
 
-        // the engine needs to be detected as name is not reliable
-        match Engine::detect(&chosen) {
-            Some(x) => x,
-            None => {
-                // allow it to run as it may work but warn the user that something is wrong
-                eprintln!("---------------------------------------------------");
-                eprintln!("Unknown engine '{}', assuming docker-compatible!", &chosen);
-                eprintln!("Thus here be dragons!");
-                eprintln!("---------------------------------------------------");
-
-                // docker is the standard right?
-                Engine::Docker(chosen)
-            },
-        }
+        Engine::detect(&chosen).expect("Failed to detect engine kind")
     } else {
         if let Some(found) = find_available_engine() {
             found
@@ -54,14 +45,13 @@ fn main() -> ExitCode {
         }
     };
 
-    // TODO use engine in the functions themself
     use cli::CliCommands;
     match args.cmd {
         CliCommands::Start(x) => commands::start_container(engine, args.dry_run, &x),
         CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, &x),
         CliCommands::Exec(x) => commands::container_exec(engine, args.dry_run, &x),
         CliCommands::Exists(x) => commands::container_exists(engine, &x),
-        CliCommands::List => commands::print_containers(engine),
+        CliCommands::List => commands::print_containers(engine, args.dry_run),
         CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, &x),
         CliCommands::Init => unreachable!(), // this is handled before
     }

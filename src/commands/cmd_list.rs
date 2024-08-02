@@ -1,10 +1,20 @@
 use std::process::{Command, ExitCode};
-use crate::util::{CommandOutputExt, Engine};
+use crate::util::{CommandOutputExt, Engine, print_cmd_dry_run};
 
-pub fn print_containers(engine: Engine) -> ExitCode {
-    Command::new(engine.get_path())
-        .args(&["container", "ls", "--filter", "label=box"])
-        .status()
-        .expect("Could not execute engine")
-        .to_exitcode()
+pub fn print_containers(engine: Engine, dry_run: bool) -> ExitCode {
+    let args: Vec<String> = vec![
+        "container".into(), "ls".into(), "--filter".into(), "label=box".into()
+    ];
+
+    if dry_run {
+        print_cmd_dry_run(&engine, args);
+
+        ExitCode::SUCCESS
+    } else {
+        Command::new(&engine.path)
+            .args(args)
+            .status()
+            .expect("Could not execute engine")
+            .to_exitcode()
+    }
 }

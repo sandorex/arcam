@@ -4,7 +4,7 @@ use std::process::{Command, ExitCode};
 
 /// Extracts default shell for user from /etc/passwd inside a container
 fn get_user_shell(engine: &Engine, container: &str, user: &str) -> String {
-    let cmd_result = Command::new(engine.get_path())
+    let cmd_result = Command::new(&engine.path)
         .args(&["exec", "--user", "root", "-it", &container, "getent", "passwd", user])
         .output()
         .expect("Could not execute engine");
@@ -51,7 +51,7 @@ pub fn open_shell(engine: Engine, dry_run: bool, cli_args: &cli::CmdShellArgs) -
 
         ExitCode::SUCCESS
     } else {
-        Command::new(engine.get_path())
+        Command::new(&engine.path)
             .args(args)
             .status()
             .expect("Could not execute engine")

@@ -36,7 +36,7 @@ pub fn kill_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdKillArgs
 
         ExitCode::SUCCESS
     } else {
-        Command::new(engine.get_path())
+        Command::new(&engine.path)
             .args(args)
             .status()
             .expect("Could not execute engine")

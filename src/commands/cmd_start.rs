@@ -1,5 +1,5 @@
 use crate::{VERSION, DATA_VOLUME_NAME};
-use crate::util::{self, CommandOutputExt, Engine};
+use crate::util::{self, CommandOutputExt, Engine, EngineKind};
 use crate::cli;
 use std::process::{Command, ExitCode};
 
@@ -29,9 +29,9 @@ pub fn start_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdStartAr
         "--hostname".into(), util::get_hostname(),
     ];
 
-    match engine {
+    match engine.kind {
         // TODO add docker equivalent
-        Engine::Podman(_) => {
+        EngineKind::Podman => {
             args.push("--userns=keep-id".into())
         },
         _ => {},
@@ -84,14 +84,14 @@ pub fn start_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdStartAr
 
     // TODO change this to data_volume so its not confusing with the negation
     if ! cli_args.no_data_volume {
-        let inspect_cmd = Command::new(engine.get_path())
+        let inspect_cmd = Command::new(&engine.path)
             .args(&["volume", "inspect", DATA_VOLUME_NAME])
             .output()
             .expect("Could not execute engine");
 
         // if it fails then volume is missing probably
         if ! inspect_cmd.status.success() {
-            let create_vol_cmd = Command::new(engine.get_path())
+            let create_vol_cmd = Command::new(&engine.path)
                 .args(&["volume", "create", DATA_VOLUME_NAME])
                 .output()
                 .expect("Could not execute engine");
@@ -135,7 +135,7 @@ pub fn start_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdStartAr
 
         ExitCode::SUCCESS
     } else {
-        Command::new(engine.get_path())
+        Command::new(&engine.path)
             .args(args)
             .status()
             .expect("Could not execute engine")
