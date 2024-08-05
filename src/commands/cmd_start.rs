@@ -1,19 +1,126 @@
-use crate::{VERSION, DATA_VOLUME_NAME};
+use crate::VERSION;
 use crate::util::{self, CommandOutputExt, Engine, EngineKind};
 use crate::cli;
+use std::collections::HashMap;
 use std::process::{Command, ExitCode};
 
-// TODO add the option to pass args to podman
-pub fn start_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdStartArgs) -> ExitCode {
+// Finds all terminfo directories on host so they can be mounted in the container so no terminfo
+// installing is required
+//
+// This function is required as afaik only debian has non-standard paths for terminfo
+//
+fn find_terminfo(args: &mut Vec<String>) {
+    let mut existing: Vec<String> = vec![];
+    for x in ["/usr/share/terminfo", "/usr/lib/terminfo", "/etc/terminfo"] {
+        if std::path::Path::new(x).exists() {
+            args.extend(vec!["--volume".into(), format!("{0}:/host{0}:ro", x)]);
+            existing.push(x.into());
+        }
+    }
+
+    let mut terminfo_env = "".to_string();
+
+    // add first the host ones as they are preferred
+    for x in &existing {
+        terminfo_env.push_str(format!("/host{}:", x).as_str());
+    }
+
+    // add container ones as fallback
+    for x in &existing {
+        terminfo_env.push_str(format!("{}:", x).as_str());
+    }
+
+    // remove leading ':'
+    if terminfo_env.chars().last().unwrap_or(' ') == ':' {
+        terminfo_env.pop();
+    }
+
+    // generate the env variable to find them all
+    args.extend(vec!["--env".into(), format!("TERMINFO_DIRS={}", terminfo_env)]);
+}
+
+/// Highly inefficient expansion of env vars in string
+fn expand_env(mut string: String, environ: &HashMap<String, String>) -> String {
+    if string.contains("$") {
+        for (k, v) in environ.iter() {
+            string = string.replace(format!("${}", k).as_str(), v);
+        }
+    }
+
+    string
+}
+
+pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStartArgs) -> ExitCode {
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let executable_path = std::env::current_exe().expect("Failed to get executable path");
+    let user = util::get_user();
 
-    // NOTE i am generating the name as its easier than reading output of the command, and this way
-    // i am getting consistant nameing for all boxes :)
-    let container_name = util::generate_name();
+    // handle configs
+    if cli_args.image.starts_with("@") {
+        // allowed to be used in the config engine_args
+        let expand_environ: HashMap<String, String> = HashMap::from([
+            ("USER".into(), user.clone()),
+            ("PWD".into(), cwd.clone().to_string_lossy().to_string()),
+            ("HOME".into(), format!("/home/{}", user)),
+        ]);
+
+        // load all configs
+        let configs = match util::load_configs() {
+            Some(x) => x,
+            None => return ExitCode::FAILURE,
+        };
+
+        // find the config
+        let config = match configs.get(&cli_args.image[1..]) {
+            Some(x) => x,
+            None => {
+                eprintln!("Could not find config {}", cli_args.image);
+
+                return ExitCode::FAILURE;
+            }
+        };
+
+        // take image from config
+        cli_args.image = config.image.clone();
+
+        // prefer cli network
+        cli_args.network = cli_args.network.or(Some(config.network));
+
+        // prefer cli name
+        cli_args.name = cli_args.name.or_else(|| config.container_name.clone());
+
+        // prefer cli dotfiles
+        cli_args.dotfiles = cli_args.dotfiles.or_else(|| config.dotfiles.clone());
+
+        let engine_config = config.get_engine_config(&engine);
+
+        cli_args.capabilities.extend(config.default.capabilities.clone());
+        cli_args.capabilities.extend(engine_config.capabilities.clone());
+
+        // at the moment only engine_args have the vars expanded
+        cli_args.engine_args.extend(config.default.engine_args.iter().map(|x| expand_env(x.clone(), &expand_environ)));
+        cli_args.engine_args.extend(engine_config.engine_args.iter().map(|x| expand_env(x.clone(), &expand_environ)));
+
+        cli_args.env.extend(config.default.env.clone().iter().map(|(k, v)| format!("{k}={v}")));
+        cli_args.env.extend(engine_config.env.clone().iter().map(|(k, v)| format!("{k}={v}")));
+    }
+
+    // generate a name if not provided already
+    let container_name = match &cli_args.name {
+        Some(x) => x.clone(),
+        None => util::generate_name(),
+    };
+
+    // allow dry-run regardless if the container exists
+    if !dry_run {
+        // quit pre-emptively if container already exists
+        if util::get_container_status(&engine, &container_name).is_some() {
+            eprintln!("Container {} already exists", &container_name);
+            return ExitCode::FAILURE;
+        }
+    }
 
     // TODO set XDG_ env vars just in case
-    // TODO add env var with engine used (but only basename in case its a full path)
     let mut args: Vec<String> = vec![
         "run".into(), "-d".into(), "--rm".into(),
         "--security-opt".into(), "label=disable".into(),
@@ -23,18 +130,26 @@ pub fn start_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdStartAr
         "--label=box=box".into(),
         "--env".into(), "BOX=BOX".into(),
         "--env".into(), format!("BOX_VERSION={}", VERSION),
-        "--env".into(), format!("BOX_USER={}", util::get_user()),
-        "--volume".into(), format!("{}:/box:ro", executable_path.display()),
-        "--volume".into(), format!("{}:/ws:Z", &cwd.to_string_lossy()),
+        "--env".into(), format!("BOX_ENGINE={:?}", engine.kind),
+        "--env".into(), format!("BOX_USER={}", user),
+        "--volume".into(), format!("{}:/box:ro,nocopy", executable_path.display()),
+        "--volume".into(), format!("{}:/ws", &cwd.to_string_lossy()),
         "--hostname".into(), util::get_hostname(),
     ];
 
     match engine.kind {
         // TODO add docker equivalent
         EngineKind::Podman => {
-            args.push("--userns=keep-id".into())
+            args.extend(vec![
+                "--userns=keep-id".into(),
+
+                // the default ulimit is low
+                "--ulimit".into(), "host".into(),
+
+                // TODO should i add --annotation run.oci.keep_original_groups=1
+            ]);
         },
-        _ => {},
+        EngineKind::Docker => unreachable!(),
     }
 
     // add the env vars, TODO should this be checked for syntax?
@@ -44,84 +159,30 @@ pub fn start_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdStartAr
 
     // add remove capabilities easily
     for c in &cli_args.capabilities {
-        if c.starts_with("!") {
-            args.extend(vec!["--cap-drop".into(), c[1..].to_string()])
+        if let Some(stripped) = c.strip_prefix("!") {
+            args.extend(vec!["--cap-drop".into(), stripped.to_string()])
         } else {
             args.extend(vec!["--cap-add".into(), c.to_string()])
         }
     }
 
     // find all terminfo dirs, they differ mostly on debian...
-    {
-        let mut existing: Vec<String> = vec![];
-        for x in vec!["/usr/share/terminfo", "/usr/lib/terminfo", "/etc/terminfo"] {
-            if std::path::Path::new(x).exists() {
-                args.extend(vec!["--volume".into(), format!("{0}:/host{0}:ro", x)]);
-                existing.push(x.into());
-            }
-        }
-
-        let mut terminfo_env = "".to_string();
-
-        // add first the host ones as they are preferred
-        for x in &existing {
-            terminfo_env.push_str(format!("/host{}:", x).as_str());
-        }
-
-        // add container ones as fallback
-        for x in &existing {
-            terminfo_env.push_str(format!("{}:", x).as_str());
-        }
-
-        // remove leading ':'
-        if terminfo_env.chars().last().unwrap_or(' ') == ':' {
-            terminfo_env.pop();
-        }
-
-        // generate the env variable to find them all
-        args.extend(vec!["--env".into(), format!("TERMINFO_DIRS={}", terminfo_env)]);
-    }
-
-    // TODO change this to data_volume so its not confusing with the negation
-    if ! cli_args.no_data_volume {
-        let inspect_cmd = Command::new(&engine.path)
-            .args(&["volume", "inspect", DATA_VOLUME_NAME])
-            .output()
-            .expect("Could not execute engine");
-
-        // if it fails then volume is missing probably
-        if ! inspect_cmd.status.success() {
-            let create_vol_cmd = Command::new(&engine.path)
-                .args(&["volume", "create", DATA_VOLUME_NAME])
-                .output()
-                .expect("Could not execute engine");
-
-            // TODO maybe i should print stdout/stderr if it fails?
-            if ! create_vol_cmd.status.success() {
-                eprintln!("Failed to create data volume: {}", create_vol_cmd.status);
-                return create_vol_cmd.to_exitcode();
-            }
-        }
-
-        args.extend(vec![
-            "--volume".into(), format!("{}:/data:Z", DATA_VOLUME_NAME),
-        ]);
-    }
+    find_terminfo(&mut args);
 
     // disable network if requested
-    // TODO make it network and negate in --network/--no-network
-    if cli_args.no_network {
+    if ! cli_args.network.unwrap_or(true) {
         args.push("--network=none".into());
     }
 
     // mount dotfiles if provided
     if let Some(dotfiles) = &cli_args.dotfiles {
-        args.extend(vec!["--volume".into(), format!("{}:/etc/skel:ro", dotfiles.display())]);
+        args.extend(vec!["--volume".into(), format!("{}:/etc/skel:ro", dotfiles)]);
     }
 
+    // add the extra args verbatim
+    args.extend(cli_args.engine_args.clone());
+
     args.extend(vec![
-        // TODO add this as an option
-        // "--env".into(), "RUST_BACKTRACE=1".into(),
         "--entrypoint".into(), "/box".into(),
 
         // the container image
@@ -143,6 +204,5 @@ pub fn start_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdStartAr
     }
 
     // TODO add interactive version where i can see output from the container, maybe podman logs -f
-    // TODO print user friendly name
 }
 

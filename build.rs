@@ -6,22 +6,19 @@ use std::process::Command;
 fn main() {
     println!("cargo::rerun-if-changed=.git");
 
-    let is_tagged: bool = match Command::new("git").args(&["tag", "--points-at", "HEAD"]).output() {
-        Ok(output) => !String::from_utf8(output.stdout).unwrap().is_empty(),
-        // assume not tagged even though git may not exist
-        Err(_) => false,
+    // basically generate 'v0.1.1-4-gb9461f0d8e-dirty' if dirty and 4 commits after v0.1.1 tag
+    let git_hash = match Command::new("git").args(["describe", "--tags", "--abbrev=10", "--dirty"]).output() {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            format!(" ({})", stdout.trim())
+        },
+        // in case built without git, which shouldnt happen right?
+        // well.. cargo package does not have access to the git repo
+        Err(_) => {
+            println!("cargo::warning='Git not found, could not describe git'");
+            " ".to_string()
+        },
     };
 
-    let git_hash;
-    if is_tagged {
-        // nothing when its a release
-        git_hash = " ".to_string();
-    } else {
-        git_hash = match Command::new("git").args(&["rev-parse", "--short=10", "HEAD"]).output() {
-            Ok(output) => format!("-{}", String::from_utf8(output.stdout).unwrap()),
-            Err(_) => "-???".to_string(),
-        };
-    }
-
-    println!("cargo:rustc-env=GIT_HASH={}", git_hash);
+    println!("cargo::rustc-env=GIT_DESCRIBE={}", git_hash);
 }

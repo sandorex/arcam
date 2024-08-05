@@ -5,11 +5,11 @@ use std::process::{Command, ExitCode};
 /// Extracts default shell for user from /etc/passwd inside a container
 fn get_user_shell(engine: &Engine, container: &str, user: &str) -> String {
     let cmd_result = Command::new(&engine.path)
-        .args(&["exec", "--user", "root", "-it", &container, "getent", "passwd", user])
+        .args(["exec", "--user", "root", "-it", container, "getent", "passwd", user])
         .output()
         .expect("Could not execute engine");
 
-    const ERR: &'static str = "Failed to extract default shell from /etc/passwd";
+    const ERR: &str = "Failed to extract default shell from /etc/passwd";
     let stdout = String::from_utf8_lossy(&cmd_result.stdout);
     if ! cmd_result.status.success() || stdout.is_empty() {
         panic!("{}", ERR);
@@ -32,7 +32,7 @@ pub fn open_shell(engine: Engine, dry_run: bool, cli_args: &cli::CmdShellArgs) -
 
     let user = util::get_user();
     let user_shell = match &cli_args.shell {
-        Some(x) => &x,
+        Some(x) => x,
         None => &get_user_shell(&engine, &cli_args.name, user.as_str()),
     };
 

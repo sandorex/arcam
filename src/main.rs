@@ -1,14 +1,16 @@
 mod util;
 mod cli;
 mod commands;
+mod config;
 
 use clap::Parser;
+use cli::CliCommands;
+use cli::cli_config::ConfigCommands;
 use std::process::ExitCode;
-use util::{Engine, find_available_engine};
+use util::Engine;
 
-pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-pub const FULL_VERSION: &'static str = concat!(env!("CARGO_PKG_VERSION"), env!("GIT_HASH"));
-pub const DATA_VOLUME_NAME: &'static str = "box-data";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), env!("GIT_DESCRIBE"));
 
 fn main() -> ExitCode {
     let args = cli::Cli::parse();
@@ -23,10 +25,6 @@ fn main() -> ExitCode {
         return commands::container_init()
     }
 
-    if args.dry_run {
-        eprintln!("DRY RUN MODE");
-    }
-
     // find and detect engine
     let engine: Engine = if let Some(chosen) = args.engine {
         // test if engine exists in PATH or as a literal path
@@ -36,21 +34,34 @@ fn main() -> ExitCode {
         }
 
         Engine::detect(&chosen).expect("Failed to detect engine kind")
+    } else if let Some(found) = Engine::find_available_engine() {
+        found
     } else {
-        if let Some(found) = find_available_engine() {
-            found
-        } else {
-            eprintln!("No compatible container engine found in PATH");
-            return ExitCode::FAILURE;
-        }
+        eprintln!("No compatible container engine found in PATH");
+        return ExitCode::FAILURE;
     };
 
-    use cli::CliCommands;
+    // prevent running with docker for now
+    if let util::EngineKind::Docker = engine.kind {
+        eprintln!("Docker is not supported at the moment");
+        return ExitCode::FAILURE
+    }
+
+    // prevent running with docker for now
+    if let util::EngineKind::Docker = engine.kind {
+        eprintln!("Docker is not supported at the moment");
+        return ExitCode::FAILURE
+    }
+
     match args.cmd {
-        CliCommands::Start(x) => commands::start_container(engine, args.dry_run, &x),
+        CliCommands::Start(x) => commands::start_container(engine, args.dry_run, x),
         CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, &x),
         CliCommands::Exec(x) => commands::container_exec(engine, args.dry_run, &x),
         CliCommands::Exists(x) => commands::container_exists(engine, &x),
+        CliCommands::Config(subcmd) => match subcmd {
+            ConfigCommands::Extract(x) => commands::extract_config(engine, args.dry_run, &x),
+            ConfigCommands::Inspect(x) => commands::inspect_config(&x),
+        },
         CliCommands::List => commands::print_containers(engine, args.dry_run),
         CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, &x),
         CliCommands::Init => unreachable!(), // this is handled before

@@ -3,7 +3,7 @@
 use std::process::ExitCode;
 use crate::FULL_VERSION;
 
-pub const INIT_SCRIPT: &'static str = include_str!("box-init.sh");
+pub const INIT_SCRIPT: &str = include_str!("box-init.sh");
 
 pub fn container_init() -> ExitCode {
     use std::process::Command;
@@ -16,7 +16,11 @@ pub fn container_init() -> ExitCode {
     println!("box {}", FULL_VERSION);
 
     // open init file for rw
-    let mut file = fs::OpenOptions::new().write(true).create(true).open(Path::new("/init"))
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(Path::new("/init"))
         .expect("Error while creating /init");
 
     // set the correct permissions
@@ -27,7 +31,7 @@ pub fn container_init() -> ExitCode {
     // make it executable
     perms.set_mode(0o755);
 
-    let _ = file.set_permissions(perms)
+    file.set_permissions(perms)
         .expect("Error while setting permissions for /init");
 
     // write the init script to it
