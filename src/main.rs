@@ -10,7 +10,12 @@ use std::process::ExitCode;
 use util::Engine;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), env!("GIT_DESCRIBE"));
+// TODO add git commit to full version but in a more reliable way
+pub const FULL_VERSION: &str = if cfg!(debug_assertions) {
+    concat!(env!("CARGO_PKG_VERSION"), "-debug")
+} else {
+    env!("CARGO_PKG_VERSION")
+};
 
 fn main() -> ExitCode {
     let args = cli::Cli::parse();
