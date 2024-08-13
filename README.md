@@ -1,10 +1,12 @@
 ## box
 Fast pet container manager, designed for sandboxed dev environment using podman *(docker is currently not supported but will be in the future)*
 
-Currently experimental but i am using them personally
+Currently experimental but i am actively using it
 
 ### Installation
-Currently the easiest way to install it is using cargo, do not worry the binary builds quickly
+You can download binary for latest release [here](https://github.com/sandorex/box/releases/latest/download/box)
+
+Alternatively you can install it using cargo
 ```sh
 cargo install --git https://github.com/sandorex/box
 ```
@@ -15,8 +17,6 @@ git clone https://github.com/sandorex/box
 cd box
 podman run --rm --user "$(id -u)":"$(id -g)" -v "$PWD":/usr/src/ws -w /usr/src/ws rust:latest cargo build --release
 ```
-
-Github actions releases will come soon too
 
 ### Why Rust?
 I wanted a single binary that could be distributed easily, even kept inside the container for easier installation
