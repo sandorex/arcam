@@ -2,7 +2,7 @@ use crate::util::{self, get_container_ws, CommandOutputExt, Engine};
 use crate::cli;
 use std::process::{Command, ExitCode};
 
-fn gen_container_exec_cmd(shell: bool, ws_dir: String, container_name: &str, command: &Vec<String>) -> Vec<String> {
+fn gen_container_exec_cmd(shell: bool, ws_dir: String, container_name: &str, command: &[String]) -> Vec<String> {
     let user = util::get_user();
 
     let mut args: Vec<String> = vec![
@@ -22,7 +22,7 @@ fn gen_container_exec_cmd(shell: bool, ws_dir: String, container_name: &str, com
         ]);
     } else {
         // just execute verbatim
-        args.extend(command.clone());
+        args.extend(command.iter().cloned());
     }
 
     args

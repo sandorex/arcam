@@ -27,7 +27,7 @@ fn gen_open_shell_cmd(engine: &Engine, shell: &Option<String>, ws_dir: String, c
     let user = util::get_user();
     let user_shell = match shell {
         Some(x) => x,
-        None => &get_user_shell(&engine, container_name, user.as_str()),
+        None => &get_user_shell(engine, container_name, user.as_str()),
     };
 
     vec![
