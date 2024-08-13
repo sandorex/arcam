@@ -91,7 +91,8 @@ impl Engine {
 #[cfg(target_os = "linux")]
 pub fn executable_exists(cmd: &str) -> bool {
     let output = Command::new("sh")
-        .arg("-c").arg(format!("which {}", cmd))
+        .arg("-c")
+        .arg(format!("which {}", cmd))
         .output()
         .expect("Failed to execute 'which'");
 

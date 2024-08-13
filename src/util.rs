@@ -8,6 +8,8 @@ use std::process::{Command, ExitCode};
 use std::path::PathBuf;
 use std::collections::HashMap;
 
+// TODO clean this whole module up so its organized better
+
 /// Simple extension trait to avoid duplicating code, allow easy conversion to `ExitCode`
 pub trait CommandOutputExt {
     /// Convert into `std::process::ExitCode` easily consistantly
@@ -33,6 +35,12 @@ impl CommandOutputExt for std::process::Output {
 /// Get hostname from system using `hostname` command
 #[cfg(target_os = "linux")]
 pub fn get_hostname() -> String {
+    // try to get hostname from env var
+    if let Ok(env_hostname) = std::env::var("HOSTNAME") {
+        return env_hostname;
+    }
+
+    // then as a fallback use hostname executable
     let cmd = Command::new("hostname").output().expect("Could not call hostname");
     let hostname = String::from_utf8_lossy(&cmd.stdout);
 
@@ -66,6 +74,28 @@ pub fn generate_name() -> String {
 
 #[cfg(target_os = "linux")]
 pub fn get_user() -> String { std::env::var("USER").expect("Unable to get USER from env var") }
+
+pub fn get_container_ws(engine: &Engine, container: &str) -> Option<String> {
+    // {{if .. }} is added so that the stdout is empty if ws is none
+    let cmd = Command::new(&engine.path)
+        .args(["inspect", container, "--format", "{{if .Config.Labels.box_ws}}{{.Config.Labels.box_ws}}{{end}}"])
+        .output()
+        .expect("Could not execute engine");
+
+    if cmd.status.success() {
+        let stdout = String::from_utf8(cmd.stdout).unwrap();
+        let trimmed = stdout.trim();
+
+        // check if stdout is empty (will have some whitespace though!)
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    } else {
+        None
+    }
+}
 
 /// Prints command which would've been ran, pretty ugly but should properly quote things, keyword
 /// being SHOULD
@@ -117,6 +147,23 @@ pub fn load_configs() -> Option<HashMap<String, crate::config::Config>> {
 
             None
         },
+    }
+}
+
+#[link(name = "c")]
+extern "C" {
+    fn geteuid() -> u32;
+    fn getegid() -> u32;
+}
+
+/// Get user UID and GID
+pub fn get_user_uid_gid() -> (u32, u32) {
+    // TODO SAFETY is this unsafe just cause or?
+    unsafe {
+        (
+            geteuid(),
+            getegid(),
+        )
     }
 }
 

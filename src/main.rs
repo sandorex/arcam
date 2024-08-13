@@ -47,12 +47,6 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE
     }
 
-    // prevent running with docker for now
-    if let util::EngineKind::Docker = engine.kind {
-        eprintln!("Docker is not supported at the moment");
-        return ExitCode::FAILURE
-    }
-
     match args.cmd {
         CliCommands::Start(x) => commands::start_container(engine, args.dry_run, x),
         CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, &x),
@@ -63,6 +57,7 @@ fn main() -> ExitCode {
             ConfigCommands::Inspect(x) => commands::inspect_config(&x),
         },
         CliCommands::List => commands::print_containers(engine, args.dry_run),
+        CliCommands::Logs(x) => commands::print_logs(&x),
         CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, &x),
         CliCommands::Init => unreachable!(), // this is handled before
     }

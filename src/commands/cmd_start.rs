@@ -54,10 +54,14 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let executable_path = std::env::current_exe().expect("Failed to get executable path");
     let user = util::get_user();
+    let ws_dir: String = {
+        let cwd_dir_name = &cwd.file_name().unwrap().to_string_lossy();
+        format!("/home/{user}/ws/{cwd_dir_name}")
+    };
 
     // handle configs
     if cli_args.image.starts_with("@") {
-        // allowed to be used in the config engine_args
+        // allowed to be used in the config engine_args and dotfiles
         let expand_environ: HashMap<String, String> = HashMap::from([
             ("USER".into(), user.clone()),
             ("PWD".into(), cwd.clone().to_string_lossy().to_string()),
@@ -89,8 +93,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         // prefer cli name
         cli_args.name = cli_args.name.or_else(|| config.container_name.clone());
 
-        // prefer cli dotfiles
-        cli_args.dotfiles = cli_args.dotfiles.or_else(|| config.dotfiles.clone());
+        // prefer cli dotfiles and have env vars expanded in config
+        cli_args.dotfiles = cli_args.dotfiles.or_else(|| config.dotfiles.clone().map(|x| expand_env(x, &expand_environ)));
 
         let engine_config = config.get_engine_config(&engine);
 
@@ -107,8 +111,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
 
     // generate a name if not provided already
     let container_name = match &cli_args.name {
-        Some(x) => x.clone(),
-        None => util::generate_name(),
+        Some(x) if !x.is_empty() => x.clone(),
+        _ => util::generate_name(),
     };
 
     // allow dry-run regardless if the container exists
@@ -120,20 +124,25 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         }
     }
 
-    // TODO set XDG_ env vars just in case
+    let (uid, gid) = util::get_user_uid_gid();
+
     let mut args: Vec<String> = vec![
         "run".into(), "-d".into(), "--rm".into(),
-        "--security-opt".into(), "label=disable".into(),
+        "--security-opt=label=disable".into(),
         "--name".into(), container_name.clone(),
-        "--user".into(), "root".into(),
+        "--user=root".into(),
         "--label=manager=box".into(),
         "--label=box=box".into(),
-        "--env".into(), "BOX=BOX".into(),
-        "--env".into(), format!("BOX_VERSION={}", VERSION),
-        "--env".into(), format!("BOX_ENGINE={:?}", engine.kind),
-        "--env".into(), format!("BOX_USER={}", user),
+        format!("--label=box_ws={}", ws_dir),
+        "--env=BOX=BOX".into(),
+        format!("--env=BOX_VERSION={}", VERSION),
+        format!("--env=BOX_ENGINE={:?}", engine.kind),
+        format!("--env=BOX_USER={}", user),
+        format!("--env=BOX_USER_UID={}", uid),
+        format!("--env=BOX_USER_GID={}", gid),
+        format!("--env=BOX_NAME={}", container_name),
         "--volume".into(), format!("{}:/box:ro,nocopy", executable_path.display()),
-        "--volume".into(), format!("{}:/ws", &cwd.to_string_lossy()),
+        "--volume".into(), format!("{}:{}", &cwd.to_string_lossy(), ws_dir),
         "--hostname".into(), util::get_hostname(),
     ];
 
@@ -144,7 +153,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
                 "--userns=keep-id".into(),
 
                 // the default ulimit is low
-                "--ulimit".into(), "host".into(),
+                "--ulimit=host".into(),
 
                 // TODO should i add --annotation run.oci.keep_original_groups=1
             ]);
@@ -152,7 +161,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         EngineKind::Docker => unreachable!(),
     }
 
-    // add the env vars, TODO should this be checked for syntax?
+    // add the env vars
     for e in &cli_args.env {
         args.extend(vec!["--env".into(), e.into()]);
     }
@@ -196,13 +205,25 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
 
         ExitCode::SUCCESS
     } else {
-        Command::new(&engine.path)
+        // do i need stdout if it fails?
+        let cmd = Command::new(&engine.path)
             .args(args)
+            .output()
+            .expect("Could not execute engine");
+
+        if ! cmd.status.success() {
+            eprintln!("{}", String::from_utf8_lossy(&cmd.stderr));
+            return cmd.to_exitcode();
+        }
+
+        let id = String::from_utf8_lossy(&cmd.stdout);
+
+        // print the name instead of id
+        Command::new(&engine.path)
+            .args(["inspect", "--format", "{{.Name}}", id.trim()])
             .status()
             .expect("Could not execute engine")
             .to_exitcode()
     }
-
-    // TODO add interactive version where i can see output from the container, maybe podman logs -f
 }
 

@@ -8,7 +8,7 @@ pub fn extract_config(engine: Engine, dry_run: bool, cli_args: &cli::cli_config:
         .output()
         .expect("Could not execute engine");
 
-    if ! cmd.status.success() {
+    if !dry_run && !cmd.status.success() {
         eprintln!("Image {} does not exist", cli_args.image);
 
         return ExitCode::from(2);

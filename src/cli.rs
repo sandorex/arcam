@@ -23,7 +23,7 @@ pub struct Cli {
 #[derive(Args, Debug, Clone, Default)]
 pub struct CmdStartArgs {
     /// Name of the new container (if not set a randomly generated name will be used)
-    #[arg(long)]
+    #[arg(long, env = "BOX_CONTAINER")]
     pub name: Option<String>,
 
     /// Path to dotfiles which will be used as /etc/skel inside the container
@@ -60,7 +60,7 @@ pub struct CmdShellArgs {
     #[arg(env = "BOX_CONTAINER")]
     pub name: String,
 
-    // i feel like `shell --shell` looks awful so positional arg. it is
+    // i feel like `shell --shell` looks awful so i made into a position arg
     /// Use custom shell
     pub shell: Option<String>,
 }
@@ -72,10 +72,10 @@ pub struct CmdExecArgs {
     pub shell: bool,
 
     /// Name or the ID of the container
-    #[arg(env = "BOX_CONTAINER")]
+    #[arg(value_name = "CONTAINER", env = "BOX_CONTAINER")]
     pub name: String,
 
-    // command is required but also last so '--' can be used as name can be taken from environ
+    // NOTE command is required but last so that you can use name from environment
     #[arg(last = true, required = true)]
     pub command: Vec<String>,
 }
@@ -95,6 +95,16 @@ pub struct CmdKillArgs {
     /// How many seconds to wait before killing the containers forcibly
     #[arg(short, long, default_value_t = 20)]
     pub timeout: u32,
+
+    #[arg(env = "BOX_CONTAINER")]
+    pub container: String,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct CmdLogsArgs {
+    /// Follow the logs
+    #[arg(short, long)]
+    pub follow: bool,
 
     #[arg(env = "BOX_CONTAINER")]
     pub container: String,
@@ -124,18 +134,28 @@ pub enum CliCommands {
     Config(ConfigCommands),
 
     /// List running containers managed by box
-    // TODO see if its possible to stack the --filter podman
     List,
+
+    /// Show container logs in journalctl
+    Logs(CmdLogsArgs),
 
     /// Stop running containers managed by box
     #[command(arg_required_else_help = true)]
     Kill(CmdKillArgs),
 
-    // Push,
-    // Pull,
-
     /// Init command used to setup the container
     #[command(hide = true)]
     Init,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verify_cli() {
+        use clap::CommandFactory;
+        Cli::command().debug_assert()
+    }
 }
 

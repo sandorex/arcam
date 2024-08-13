@@ -4,7 +4,7 @@ use std::process::{Command, ExitCode};
 
 pub fn kill_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdKillArgs) -> ExitCode {
     if ! util::is_box_container(&engine, &cli_args.container) {
-        eprintln!("Container '{}' is not owned by box or does not exist", &cli_args.container);
+        eprintln!("Container {} is not owned by box or does not exist", &cli_args.container);
         return ExitCode::FAILURE;
     }
 
