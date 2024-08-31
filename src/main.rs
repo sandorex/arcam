@@ -7,7 +7,9 @@ use clap::Parser;
 use cli::CliCommands;
 use cli::cli_config::ConfigCommands;
 use std::process::ExitCode;
-use util::Engine;
+use util::{Engine, ExitResultExt};
+
+pub const ENGINE_ERR_MSG: &str = "Failed to execute engine";
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 // TODO add git commit to full version but in a more reliable way
@@ -16,6 +18,8 @@ pub const FULL_VERSION: &str = if cfg!(debug_assertions) {
 } else {
     env!("CARGO_PKG_VERSION")
 };
+
+pub use util::ExitResult;
 
 fn main() -> ExitCode {
     let args = cli::Cli::parse();
@@ -27,7 +31,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
 
-        return commands::container_init()
+        return commands::container_init().to_exitcode();
     }
 
     // find and detect engine
@@ -65,5 +69,5 @@ fn main() -> ExitCode {
         CliCommands::Logs(x) => commands::print_logs(&x),
         CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, &x),
         CliCommands::Init => unreachable!(), // this is handled before
-    }
+    }.to_exitcode()
 }

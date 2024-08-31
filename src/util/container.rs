@@ -53,3 +53,25 @@ pub fn is_in_container() -> bool {
         || env::var("container").is_ok()
 }
 
+pub fn get_container_ws(engine: &Engine, container: &str) -> Option<String> {
+    // {{if .. }} is added so that the stdout is empty if ws is none
+    let cmd = Command::new(&engine.path)
+        .args(["inspect", container, "--format", "{{if .Config.Labels.box_ws}}{{.Config.Labels.box_ws}}{{end}}"])
+        .output()
+        .expect("Could not execute engine");
+
+    if cmd.status.success() {
+        let stdout = String::from_utf8(cmd.stdout).unwrap();
+        let trimmed = stdout.trim();
+
+        // check if stdout is empty (will have some whitespace though!)
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    } else {
+        None
+    }
+}
+

@@ -1,20 +1,18 @@
-use std::process::{Command, ExitCode};
+use crate::util::command_extensions::*;
+use crate::{cli, ExitResult};
 
-use crate::{cli, util::CommandOutputExt};
-
-pub fn print_logs(cli_args: &cli::CmdLogsArgs) -> ExitCode {
+pub fn print_logs(cli_args: &cli::CmdLogsArgs) -> ExitResult {
     println!("The logs may be empty if the container name is not valid");
 
-    let mut args = vec!["-t", &cli_args.container];
+    let mut cmd = Command::new("journalctl");
+    cmd.args(["-t", &cli_args.container]);
 
     if cli_args.follow {
         // follow the output
-        args.push("--follow");
+        cmd.arg("--follow");
     }
 
-    Command::new("journalctl")
-        .args(args)
-        .status()
+    cmd.status()
         .expect("Failed to execute journalctl")
         .to_exitcode()
 }

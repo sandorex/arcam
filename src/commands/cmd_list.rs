@@ -1,19 +1,14 @@
-use std::process::{Command, ExitCode};
-use crate::util::{CommandOutputExt, Engine, print_cmd_dry_run};
+use crate::util::command_extensions::*;
+use crate::{util::Engine, ExitResult};
 
-pub fn print_containers(engine: Engine, dry_run: bool) -> ExitCode {
-    let args: Vec<String> = vec![
-        "container".into(), "ls".into(), "--filter".into(), "label=box".into()
-    ];
+pub fn print_containers(engine: Engine, dry_run: bool) -> ExitResult {
+    let mut cmd = Command::new(&engine.path);
+    cmd.args(["container", "ls", "--filter", "label=box"]);
 
     if dry_run {
-        print_cmd_dry_run(&engine, args);
-
-        ExitCode::SUCCESS
+        cmd.print_escaped_cmd()
     } else {
-        Command::new(&engine.path)
-            .args(args)
-            .status()
+        cmd.status()
             .expect("Could not execute engine")
             .to_exitcode()
     }

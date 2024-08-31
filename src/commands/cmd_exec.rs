@@ -1,6 +1,7 @@
-use crate::util::{self, get_container_ws, CommandOutputExt, Engine};
+use crate::util::{self, get_container_ws, Engine};
 use crate::cli;
-use std::process::{Command, ExitCode};
+use crate::util::command_extensions::*;
+use crate::ExitResult;
 
 fn gen_container_exec_cmd(shell: bool, ws_dir: String, container_name: &str, command: &[String]) -> Vec<String> {
     let user = util::get_user();
@@ -28,11 +29,11 @@ fn gen_container_exec_cmd(shell: bool, ws_dir: String, container_name: &str, com
     args
 }
 
-pub fn container_exec(engine: Engine, dry_run: bool, cli_args: &cli::CmdExecArgs) -> ExitCode {
+pub fn container_exec(engine: Engine, dry_run: bool, cli_args: &cli::CmdExecArgs) -> ExitResult {
     // check if container is owned (ignore it if dry_run)
     if !dry_run && !util::is_box_container(&engine, &cli_args.name) {
         eprintln!("Container {} is not owned by box or does not exist", &cli_args.name);
-        return ExitCode::FAILURE;
+        return Err(1);
     }
 
     let ws_dir = match get_container_ws(&engine, &cli_args.name) {
@@ -41,21 +42,20 @@ pub fn container_exec(engine: Engine, dry_run: bool, cli_args: &cli::CmdExecArgs
         None => {
             eprintln!("Could not get container workspace from container {:#?}", &cli_args.name);
 
-            return ExitCode::FAILURE;
+            return Err(1);
         },
     };
 
     let args = gen_container_exec_cmd(cli_args.shell, ws_dir, &cli_args.name, &cli_args.command);
+    let mut cmd = Command::new(&engine.path);
+    cmd.args(args);
 
     if dry_run {
-        util::print_cmd_dry_run(&engine, args);
-
-        ExitCode::SUCCESS
+        cmd.print_escaped_cmd()
     } else {
-        Command::new(&engine.path)
-            .args(args)
+        cmd
             .status()
-            .expect("Could not execute engine")
+            .expect(crate::ENGINE_ERR_MSG)
             .to_exitcode()
     }
 }

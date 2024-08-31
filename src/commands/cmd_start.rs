@@ -1,8 +1,65 @@
-use crate::VERSION;
-use crate::util::{self, CommandOutputExt, Engine, EngineKind};
+use crate::{ExitResult, VERSION};
+use crate::util::{self, Engine, EngineKind};
+use crate::util::command_extensions::*;
 use crate::cli;
 use std::collections::HashMap;
-use std::process::{Command, ExitCode};
+
+/// Get hostname from system using `hostname` command
+#[cfg(target_os = "linux")]
+fn get_hostname() -> String {
+    // try to get hostname from env var
+    if let Ok(env_hostname) = std::env::var("HOSTNAME") {
+        return env_hostname;
+    }
+
+    // then as a fallback use hostname executable
+    let cmd = Command::new("hostname").output().expect("Could not call hostname");
+    let hostname = String::from_utf8_lossy(&cmd.stdout);
+
+    if ! cmd.status.success() || hostname.is_empty() {
+        panic!("Unable to get hostname from host");
+    }
+
+    hostname.trim().into()
+}
+
+/// Generates random name using adjectives list
+///
+/// Uses system time so its not really random cause im stingy about dependencies
+fn generate_name() -> String {
+    const ADJECTIVES_ENGLISH: &str = include_str!("adjectives.txt");
+
+    // NOTE: pseudo-random without crates!
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos: usize = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos()
+        .try_into()
+        .unwrap();
+
+    let adjectives: Vec<&str> = ADJECTIVES_ENGLISH.lines().collect();
+    let adjective = adjectives.get(nanos % adjectives.len()).unwrap();
+
+    format!("{}-box", adjective)
+}
+
+#[link(name = "c")]
+extern "C" {
+    fn geteuid() -> u32;
+    fn getegid() -> u32;
+}
+
+/// Get user UID and GID
+fn get_user_uid_gid() -> (u32, u32) {
+    // TODO SAFETY is this unsafe just cause or?
+    unsafe {
+        (
+            geteuid(),
+            getegid(),
+        )
+    }
+}
 
 // Finds all terminfo directories on host so they can be mounted in the container so no terminfo
 // installing is required
@@ -50,7 +107,7 @@ fn expand_env(mut string: String, environ: &HashMap<String, String>) -> String {
     string
 }
 
-pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStartArgs) -> ExitCode {
+pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStartArgs) -> ExitResult {
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let executable_path = std::env::current_exe().expect("Failed to get executable path");
     let user = util::get_user();
@@ -71,7 +128,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         // load all configs
         let configs = match util::load_configs() {
             Some(x) => x,
-            None => return ExitCode::FAILURE,
+            None => return Err(1),
         };
 
         // find the config
@@ -80,7 +137,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             None => {
                 eprintln!("Could not find config {}", cli_args.image);
 
-                return ExitCode::FAILURE;
+                return Err(1);
             }
         };
 
@@ -112,7 +169,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     // generate a name if not provided already
     let container_name = match &cli_args.name {
         Some(x) if !x.is_empty() => x.clone(),
-        _ => util::generate_name(),
+        _ => generate_name(),
     };
 
     // allow dry-run regardless if the container exists
@@ -120,11 +177,11 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         // quit pre-emptively if container already exists
         if util::get_container_status(&engine, &container_name).is_some() {
             eprintln!("Container {} already exists", &container_name);
-            return ExitCode::FAILURE;
+            return Err(1);
         }
     }
 
-    let (uid, gid) = util::get_user_uid_gid();
+    let (uid, gid) = get_user_uid_gid();
 
     let mut args: Vec<String> = vec![
         "run".into(), "-d".into(), "--rm".into(),
@@ -143,7 +200,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         format!("--env=BOX_NAME={}", container_name),
         "--volume".into(), format!("{}:/box:ro,nocopy", executable_path.display()),
         "--volume".into(), format!("{}:{}", &cwd.to_string_lossy(), ws_dir),
-        "--hostname".into(), util::get_hostname(),
+        format!("--hostname={}", get_hostname()),
     ];
 
     match engine.kind {
@@ -200,23 +257,23 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         "init".into(),
     ]);
 
-    if dry_run {
-        util::print_cmd_dry_run(&engine, args);
+    let mut cmd = Command::new(&engine.path);
+    cmd.args(args);
 
-        ExitCode::SUCCESS
+    if dry_run {
+        cmd.print_escaped_cmd()
     } else {
         // do i need stdout if it fails?
-        let cmd = Command::new(&engine.path)
-            .args(args)
+        let output = cmd
             .output()
-            .expect("Could not execute engine");
+            .expect(crate::ENGINE_ERR_MSG);
 
-        if ! cmd.status.success() {
-            eprintln!("{}", String::from_utf8_lossy(&cmd.stderr));
-            return cmd.to_exitcode();
+        if ! output.status.success() {
+            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            return output.to_exitcode();
         }
 
-        let id = String::from_utf8_lossy(&cmd.stdout);
+        let id = String::from_utf8_lossy(&output.stdout);
 
         // print the name instead of id
         Command::new(&engine.path)

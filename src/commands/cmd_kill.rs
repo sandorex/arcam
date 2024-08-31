@@ -1,11 +1,11 @@
-use crate::cli;
-use crate::util::{self, CommandOutputExt, Engine};
-use std::process::{Command, ExitCode};
+use crate::{ExitResult, cli};
+use crate::util::command_extensions::*;
+use crate::util::{self, Engine};
 
-pub fn kill_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdKillArgs) -> ExitCode {
+pub fn kill_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdKillArgs) -> ExitResult {
     if ! util::is_box_container(&engine, &cli_args.container) {
         eprintln!("Container {} is not owned by box or does not exist", &cli_args.container);
-        return ExitCode::FAILURE;
+        return Err(1);
     }
 
     // simple shitty prompt
@@ -23,23 +23,21 @@ pub fn kill_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdKillArgs
 
         match s.to_lowercase().as_str() {
             "y"|"yes" => {},
-            _ => return ExitCode::FAILURE,
+            _ => return Err(1),
         }
     }
 
-    let args: Vec<String> = vec![
-        "container".into(), "stop".into(), "--time".into(), cli_args.timeout.to_string(), cli_args.container.clone(),
-    ];
+    let timeout = cli_args.timeout.to_string();
+
+    let mut cmd = Command::new(&engine.path);
+    cmd.args(["container", "stop", "--time", &timeout, &cli_args.container]);
 
     if dry_run {
-        util::print_cmd_dry_run(&engine, args);
-
-        ExitCode::SUCCESS
+        cmd.print_escaped_cmd()
     } else {
-        Command::new(&engine.path)
-            .args(args)
+        cmd
             .status()
-            .expect("Could not execute engine")
+            .expect(crate::ENGINE_ERR_MSG)
             .to_exitcode()
     }
 }

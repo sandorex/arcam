@@ -1,11 +1,10 @@
 /// Contains all code that should run inside the container as the init
 
-use std::process::ExitCode;
-use crate::FULL_VERSION;
+use crate::{ExitResult, FULL_VERSION};
 
 pub const INIT_SCRIPT: &str = include_str!("box-init.sh");
 
-pub fn container_init() -> ExitCode {
+pub fn container_init() -> ExitResult {
     use std::process::Command;
     use std::os::unix::process::CommandExt;
     use std::os::unix::fs::PermissionsExt;
@@ -49,5 +48,5 @@ pub fn container_init() -> ExitCode {
 
     eprintln!("Error while executing /init: {:?}", cmd);
 
-    ExitCode::FAILURE
+    Err(1)
 }

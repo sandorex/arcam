@@ -1,46 +1,48 @@
-use crate::util::{self, Engine};
-use crate::cli;
-use std::process::{Command, ExitCode};
+use crate::ExitResult;
+use crate::util::Engine;
+use crate::cli::cli_config::CmdConfigExtractArgs;
+use crate::util::command_extensions::*;
 
-pub fn extract_config(engine: Engine, dry_run: bool, cli_args: &cli::cli_config::CmdConfigExtractArgs) -> ExitCode {
-    let cmd = Command::new(&engine.path)
-        .args(["image", "exists", &cli_args.image])
-        .output()
-        .expect("Could not execute engine");
+pub fn extract_config(engine: Engine, dry_run: bool, cli_args: &CmdConfigExtractArgs) -> ExitResult {
+    // allow dry run to run always
+    if !dry_run {
+        let cmd = Command::new(&engine.path)
+            .args(["image", "exists", &cli_args.image])
+            .output()
+            .expect(crate::ENGINE_ERR_MSG);
 
-    if !dry_run && !cmd.status.success() {
-        eprintln!("Image {} does not exist", cli_args.image);
+        if !cmd.status.success() {
+            eprintln!("Image {} does not exist", cli_args.image);
 
-        return ExitCode::from(2);
+            return Err(2);
+        }
     }
 
-    // basically just cat the file, should be pretty portable
-    let args = vec![
-        "run".into(), "--rm".into(), "-it".into(),
-        "--entrypoint".into(), "cat".into(),
-        cli_args.image.clone(),
-        "/config.toml".into()
-    ];
+    let mut cmd = Command::new(&engine.path);
+    cmd.args([
+        "run", "--rm", "-it",
+        // basically just cat the file, should be pretty portable
+        "--entrypoint", "cat",
+        &cli_args.image,
+        "/config.toml"
+    ]);
 
     if dry_run {
-        util::print_cmd_dry_run(&engine, args);
-
-        ExitCode::SUCCESS
+        cmd.print_escaped_cmd()
     } else {
-        let cmd = Command::new(&engine.path)
-            .args(args)
+        let output = cmd
             .output()
-            .expect("Could not execute engine");
+            .expect(crate::ENGINE_ERR_MSG);
 
         // only print output if command succeds
-        if cmd.status.success() {
-            println!("{}", String::from_utf8_lossy(&cmd.stdout));
+        if output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
 
-            ExitCode::SUCCESS
+            Ok(())
         } else {
             eprintln!("Failed to extract config from image {}", cli_args.image);
 
-            ExitCode::FAILURE
+            Err(1)
         }
     }
 }
