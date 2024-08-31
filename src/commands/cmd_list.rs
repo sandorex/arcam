@@ -9,7 +9,7 @@ pub fn print_containers(engine: Engine, dry_run: bool) -> ExitResult {
         cmd.print_escaped_cmd()
     } else {
         cmd.status()
-            .expect("Could not execute engine")
+            .expect(crate::ENGINE_ERR_MSG)
             .to_exitcode()
     }
 }

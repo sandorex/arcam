@@ -6,6 +6,7 @@ mod config;
 use clap::Parser;
 use cli::CliCommands;
 use cli::cli_config::ConfigCommands;
+use cli::cli_image::ImageCommands;
 use std::process::ExitCode;
 use util::{Engine, ExitResultExt};
 
@@ -65,6 +66,10 @@ fn main() -> ExitCode {
             ConfigCommands::Extract(x) => commands::extract_config(engine, args.dry_run, &x),
             ConfigCommands::Inspect(x) => commands::inspect_config(&x),
         },
+        CliCommands::Image(subcmd) => match subcmd {
+            ImageCommands::Build(x) => commands::build_image(&engine, args.dry_run, x),
+        },
+        // CliCommands::Image(subcmd) => { dbg!(subcmd); ExitCode::SUCCESS },
         CliCommands::List => commands::print_containers(engine, args.dry_run),
         CliCommands::Logs(x) => commands::print_logs(&x),
         CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, &x),

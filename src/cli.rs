@@ -1,6 +1,8 @@
 pub mod cli_config;
+pub mod cli_image;
 
 use cli_config::ConfigCommands;
+use cli_image::ImageCommands;
 use clap::{Parser, Subcommand, Args};
 use crate::FULL_VERSION;
 
@@ -87,6 +89,16 @@ pub struct CmdExistsArgs {
 }
 
 #[derive(Args, Debug, Clone)]
+pub struct CmdLogsArgs {
+    /// Follow the logs
+    #[arg(short, long)]
+    pub follow: bool,
+
+    #[arg(env = "BOX_CONTAINER")]
+    pub container: String,
+}
+
+#[derive(Args, Debug, Clone)]
 pub struct CmdKillArgs {
     /// Do not ask for confirmation
     #[arg(short, long)]
@@ -100,28 +112,15 @@ pub struct CmdKillArgs {
     pub container: String,
 }
 
-#[derive(Args, Debug, Clone)]
-pub struct CmdLogsArgs {
-    /// Follow the logs
-    #[arg(short, long)]
-    pub follow: bool,
-
-    #[arg(env = "BOX_CONTAINER")]
-    pub container: String,
-}
-
 #[derive(Subcommand, Debug)]
 pub enum CliCommands {
     /// Start a container in current directory, mounting it as the rw workspace
-    #[command(arg_required_else_help = true)]
     Start(CmdStartArgs),
 
     /// Enter the shell inside a running box container
-    #[command(arg_required_else_help = true)]
     Shell(CmdShellArgs),
 
     /// Execute a command inside a running box container
-    #[command(arg_required_else_help = true)]
     Exec(CmdExecArgs),
 
     /// Check if container exists
@@ -133,6 +132,10 @@ pub enum CliCommands {
     #[command(subcommand)]
     Config(ConfigCommands),
 
+    /// Image related commands
+    #[command(subcommand)]
+    Image(ImageCommands),
+
     /// List running containers managed by box
     List,
 
@@ -140,7 +143,6 @@ pub enum CliCommands {
     Logs(CmdLogsArgs),
 
     /// Stop running containers managed by box
-    #[command(arg_required_else_help = true)]
     Kill(CmdKillArgs),
 
     /// Init command used to setup the container
