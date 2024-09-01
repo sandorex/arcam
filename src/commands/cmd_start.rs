@@ -3,6 +3,7 @@ use crate::util::{self, Engine, EngineKind};
 use crate::util::command_extensions::*;
 use crate::cli;
 use std::collections::HashMap;
+use std::path::Path;
 
 /// Get hostname from system using `hostname` command
 #[cfg(target_os = "linux")]
@@ -70,7 +71,7 @@ fn find_terminfo(args: &mut Vec<String>) {
     let mut existing: Vec<String> = vec![];
     for x in ["/usr/share/terminfo", "/usr/lib/terminfo", "/etc/terminfo"] {
         if std::path::Path::new(x).exists() {
-            args.extend(vec!["--volume".into(), format!("{0}:/host{0}:ro", x)]);
+            args.push(format!("--volume={0}:/host{0}:ro", x));
             existing.push(x.into());
         }
     }
@@ -93,7 +94,7 @@ fn find_terminfo(args: &mut Vec<String>) {
     }
 
     // generate the env variable to find them all
-    args.extend(vec!["--env".into(), format!("TERMINFO_DIRS={}", terminfo_env)]);
+    args.push(format!("--env=TERMINFO_DIRS={}", terminfo_env));
 }
 
 /// Highly inefficient expansion of env vars in string
@@ -112,6 +113,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     let executable_path = std::env::current_exe().expect("Failed to get executable path");
     let user = util::get_user();
     let ws_dir: String = {
+        // NOTE /ws/ prefix is used so it does not clash with home dirs like ~/.config
         let cwd_dir_name = &cwd.file_name().unwrap().to_string_lossy();
         format!("/home/{user}/ws/{cwd_dir_name}")
     };
@@ -144,10 +146,10 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         // take image from config
         cli_args.image = config.image.clone();
 
-        // prefer cli network
+        // prefer options from cli
         cli_args.network = cli_args.network.or(Some(config.network));
-
-        // prefer cli name
+        cli_args.audio = cli_args.audio.or(Some(config.audio));
+        cli_args.gui = cli_args.gui.or(Some(config.gui));
         cli_args.name = cli_args.name.or_else(|| config.container_name.clone());
 
         // prefer cli dotfiles and have env vars expanded in config
@@ -186,7 +188,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     let mut args: Vec<String> = vec![
         "run".into(), "-d".into(), "--rm".into(),
         "--security-opt=label=disable".into(),
-        "--name".into(), container_name.clone(),
+        format!("--name={}", container_name),
         "--user=root".into(),
         "--label=manager=box".into(),
         "--label=box=box".into(),
@@ -198,8 +200,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         format!("--env=BOX_USER_UID={}", uid),
         format!("--env=BOX_USER_GID={}", gid),
         format!("--env=BOX_NAME={}", container_name),
-        "--volume".into(), format!("{}:/box:ro,nocopy", executable_path.display()),
-        "--volume".into(), format!("{}:{}", &cwd.to_string_lossy(), ws_dir),
+        format!("--volume={}:/box:ro,nocopy", executable_path.display()),
+        format!("--volume={}:{}", &cwd.to_string_lossy(), ws_dir),
         format!("--hostname={}", get_hostname()),
     ];
 
@@ -220,15 +222,15 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
 
     // add the env vars
     for e in &cli_args.env {
-        args.extend(vec!["--env".into(), e.into()]);
+        args.push(format!("--env={}", e));
     }
 
     // add remove capabilities easily
     for c in &cli_args.capabilities {
         if let Some(stripped) = c.strip_prefix("!") {
-            args.extend(vec!["--cap-drop".into(), stripped.to_string()])
+            args.push(format!("--cap-drop={}", stripped));
         } else {
-            args.extend(vec!["--cap-add".into(), c.to_string()])
+            args.push(format!("--cap-add={}", c));
         }
     }
 
@@ -240,9 +242,30 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         args.push("--network=none".into());
     }
 
+    // try to pass audio
+    if cli_args.audio.unwrap_or(false) {
+        // TODO see if passing pipewire or alsa is possible too
+        let socket_path = format!("/run/user/{}/pulse/native", uid);
+        if Path::new(&socket_path).exists() {
+            args.extend(vec![
+                format!("--volume={0}:{0}", socket_path),
+                format!("--env=PULSE_SERVER=unix:{}", socket_path),
+            ]);
+        } else {
+            eprintln!("Could not find pulseaudio socket to pass to the container");
+            return Err(1);
+        }
+    }
+
+    // try to enable gui
+    // TODO
+    if cli_args.gui.unwrap_or(false) {
+        todo!("--gui is not yet implemented");
+    }
+
     // mount dotfiles if provided
     if let Some(dotfiles) = &cli_args.dotfiles {
-        args.extend(vec!["--volume".into(), format!("{}:/etc/skel:ro", dotfiles)]);
+        args.push(format!("--volume={}:/etc/skel:ro", dotfiles));
     }
 
     // add the extra args verbatim

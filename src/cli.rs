@@ -32,10 +32,19 @@ pub struct CmdStartArgs {
     #[arg(long, env = "BOX_DOTFILES")]
     pub dotfiles: Option<String>,
 
-    // TODO network should be --network/--no-network (https://github.com/clap-rs/clap/issues/815)
     /// Set network access permission for the container
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub network: Option<bool>,
+
+    /// Try to pass audio into the the container
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
+    pub audio: Option<bool>,
+
+    /// Open a compositor to allow wayland and xorg windows to be ran in the container
+    ///
+    /// Requires Weston to be installed on the host
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
+    pub gui: Option<bool>,
 
     /// Add or drop capabilities by prefixing them with '!'
     ///
@@ -83,6 +92,16 @@ pub struct CmdExecArgs {
 }
 
 #[derive(Args, Debug, Clone)]
+pub struct CmdGuiRunArgs {
+    /// Environment variables to set inside the container
+    #[arg(short, long, value_name = "VAR=VALUE")]
+    pub env: Vec<String>,
+
+    #[arg(last = true, required = true)]
+    pub command: Vec<String>,
+}
+
+#[derive(Args, Debug, Clone)]
 pub struct CmdExistsArgs {
     #[arg(env = "BOX_CONTAINER")]
     pub container: String,
@@ -122,6 +141,11 @@ pub enum CliCommands {
 
     /// Execute a command inside a running box container
     Exec(CmdExecArgs),
+
+    /// Execute command inside compositor for the containers
+    ///
+    /// Basically just sets WAYLAND_DISPLAY and DISPLAY to correct values
+    GuiRun(CmdGuiRunArgs),
 
     /// Check if container exists
     ///

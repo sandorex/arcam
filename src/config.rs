@@ -93,6 +93,14 @@ pub struct Config {
     #[serde(default)]
     pub network: bool,
 
+    /// Try to pass audio into the container
+    #[serde(default)]
+    pub audio: bool,
+
+    /// Open a compositor to allow wayland and xorg applications to work
+    #[serde(default)]
+    pub gui: bool,
+
     /// Default setting used regardless of the engine
     #[serde(default)]
     pub default: EngineConfig,

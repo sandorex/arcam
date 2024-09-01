@@ -61,6 +61,7 @@ fn main() -> ExitCode {
         CliCommands::Start(x) => commands::start_container(engine, args.dry_run, x),
         CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, &x),
         CliCommands::Exec(x) => commands::container_exec(engine, args.dry_run, &x),
+        CliCommands::GuiRun(x) => todo!("gui-run is not yet implemented"),
         CliCommands::Exists(x) => commands::container_exists(engine, &x),
         CliCommands::Config(subcmd) => match subcmd {
             ConfigCommands::Extract(x) => commands::extract_config(engine, args.dry_run, &x),
