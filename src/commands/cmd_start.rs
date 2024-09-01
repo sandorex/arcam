@@ -45,23 +45,6 @@ fn generate_name() -> String {
     format!("{}-box", adjective)
 }
 
-#[link(name = "c")]
-extern "C" {
-    fn geteuid() -> u32;
-    fn getegid() -> u32;
-}
-
-/// Get user UID and GID
-fn get_user_uid_gid() -> (u32, u32) {
-    // TODO SAFETY is this unsafe just cause or?
-    unsafe {
-        (
-            geteuid(),
-            getegid(),
-        )
-    }
-}
-
 // Finds all terminfo directories on host so they can be mounted in the container so no terminfo
 // installing is required
 //
@@ -183,7 +166,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         }
     }
 
-    let (uid, gid) = get_user_uid_gid();
+    let (uid, gid) = util::get_user_uid_gid();
 
     let mut args: Vec<String> = vec![
         "run".into(), "-d".into(), "--rm".into(),

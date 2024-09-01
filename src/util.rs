@@ -28,6 +28,13 @@ impl ExitResultExt for ExitResult {
 #[cfg(target_os = "linux")]
 pub fn get_user() -> String { std::env::var("USER").expect("Unable to get USER from env var") }
 
+/// Get app runtime directory
+pub fn app_runtime_dir() -> PathBuf {
+    let (uid, _) = get_user_uid_gid();
+
+    PathBuf::from(format!("/run/user/{}/box", uid))
+}
+
 /// Get app configuration directory
 pub fn app_dir() -> PathBuf {
     const BOX_DIR: &str = "box";
@@ -68,6 +75,23 @@ pub fn load_configs() -> Option<HashMap<String, crate::config::Config>> {
 
             None
         },
+    }
+}
+
+#[link(name = "c")]
+extern "C" {
+    fn geteuid() -> u32;
+    fn getegid() -> u32;
+}
+
+/// Get user UID and GID
+pub fn get_user_uid_gid() -> (u32, u32) {
+    // TODO SAFETY is this unsafe just cause or?
+    unsafe {
+        (
+            geteuid(),
+            getegid(),
+        )
     }
 }
 

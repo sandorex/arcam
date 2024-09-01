@@ -2,6 +2,7 @@ mod util;
 mod cli;
 mod commands;
 mod config;
+mod gui;
 
 use clap::Parser;
 use cli::CliCommands;
@@ -61,7 +62,7 @@ fn main() -> ExitCode {
         CliCommands::Start(x) => commands::start_container(engine, args.dry_run, x),
         CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, &x),
         CliCommands::Exec(x) => commands::container_exec(engine, args.dry_run, &x),
-        CliCommands::GuiRun(x) => todo!("gui-run is not yet implemented"),
+        CliCommands::GuiRun(x) => commands::gui_run(args.dry_run, x),
         CliCommands::Exists(x) => commands::container_exists(engine, &x),
         CliCommands::Config(subcmd) => match subcmd {
             ConfigCommands::Extract(x) => commands::extract_config(engine, args.dry_run, &x),

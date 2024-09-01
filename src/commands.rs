@@ -1,6 +1,7 @@
 mod cmd_start;
 mod cmd_shell;
 mod cmd_exec;
+mod cmd_gui_run;
 mod cmd_exists;
 mod cmd_config;
 mod cmd_image;
@@ -12,6 +13,7 @@ mod cmd_init;
 pub use cmd_start::start_container;
 pub use cmd_shell::open_shell;
 pub use cmd_exec::container_exec;
+pub use cmd_gui_run::gui_run;
 pub use cmd_exists::container_exists;
 pub use cmd_config::*;
 pub use cmd_image::*;
