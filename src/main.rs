@@ -13,12 +13,7 @@ use util::{Engine, ExitResultExt};
 pub const ENGINE_ERR_MSG: &str = "Failed to execute engine";
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-// TODO add git commit to full version but in a more reliable way
-pub const FULL_VERSION: &str = if cfg!(debug_assertions) {
-    concat!(env!("CARGO_PKG_VERSION"), "-debug")
-} else {
-    env!("CARGO_PKG_VERSION")
-};
+pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_DESCRIBE"));
 
 pub use util::ExitResult;
 

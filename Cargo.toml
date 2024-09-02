@@ -18,3 +18,7 @@ chrono = "0.4.38"
 clap = { version = "4.5.11", features = ["derive", "env"] }
 serde = { version = "1.0.204", features = ["derive"] }
 toml = "0.8.19"
+
+[build-dependencies]
+anyhow = "1.0.86"
+vergen-git2 = { version = "1.0.0", features = ["build"] }
