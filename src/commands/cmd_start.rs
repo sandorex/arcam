@@ -132,7 +132,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         // prefer options from cli
         cli_args.network = cli_args.network.or(Some(config.network));
         cli_args.audio = cli_args.audio.or(Some(config.audio));
-        cli_args.gui = cli_args.gui.or(Some(config.gui));
+        cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
         cli_args.name = cli_args.name.or_else(|| config.container_name.clone());
 
         // prefer cli dotfiles and have env vars expanded in config
@@ -183,6 +183,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         format!("--env=BOX_USER_UID={}", uid),
         format!("--env=BOX_USER_GID={}", gid),
         format!("--env=BOX_NAME={}", container_name),
+        // TODO explore all the XDG dirs and set them properly
+        format!("--env=XDG_RUNTIME_DIR=/run/user/{}", uid),
         format!("--volume={}:/box:ro,nocopy", executable_path.display()),
         format!("--volume={}:{}", &cwd.to_string_lossy(), ws_dir),
         format!("--hostname={}", get_hostname()),
@@ -240,10 +242,24 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         }
     }
 
-    // try to enable gui
-    // TODO
-    if cli_args.gui.unwrap_or(false) {
-        todo!("--gui is not yet implemented");
+    // try to pass through wayland socket
+    if cli_args.wayland.unwrap_or(false) {
+        if let Ok(wayland_display) = std::env::var("WAYLAND_DISPLAY") {
+            let socket_path = format!("/run/user/{}/{}", uid, wayland_display);
+            if Path::new(&socket_path).exists() {
+                // TODO pass XDG_CURRENT_DESKTOP XDG_SESSION_TYPE
+                args.extend(vec![
+                    format!("--volume={0}:{0}", socket_path),
+                    format!("--env=WAYLAND_DISPLAY={}", wayland_display),
+                ]);
+            } else {
+                eprintln!("Could not find the wayland socket to pass to the container");
+                return Err(1);
+            }
+        } else {
+            eprintln!("Could not pass through wayland socket as WAYLAND_DISPLAY is not defined");
+            return Err(1);
+        }
     }
 
     // mount dotfiles if provided

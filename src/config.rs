@@ -97,9 +97,9 @@ pub struct Config {
     #[serde(default)]
     pub audio: bool,
 
-    /// Open a compositor to allow wayland and xorg applications to work
+    /// Passes wayland compositor through
     #[serde(default)]
-    pub gui: bool,
+    pub wayland: bool,
 
     /// Default setting used regardless of the engine
     #[serde(default)]

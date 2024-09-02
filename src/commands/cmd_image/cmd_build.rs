@@ -34,7 +34,7 @@ pub fn build_image(engine: &Engine, dry_run: bool, cli_args: CmdImageBuildArgs) 
     // exist
     let file: &str = {
         if let Some(x) = &cli_args.containerfile {
-            &x
+            x
         } else if std::path::Path::new("Containerfile").exists() {
             "Containerfile"
         } else if std::path::Path::new("Dockerfile").exists() {
@@ -49,7 +49,7 @@ pub fn build_image(engine: &Engine, dry_run: bool, cli_args: CmdImageBuildArgs) 
     cmd.args([
         "build",
         "--security-opt", "label=disable",
-        "--file", &file,
+        "--file", file,
     ]);
 
     if let Some(x) = &tag {
@@ -71,7 +71,7 @@ pub fn build_image(engine: &Engine, dry_run: bool, cli_args: CmdImageBuildArgs) 
 
     // if provided set context directory
     // NOTE podman allows '.' as the context directory
-    cmd.arg(&cli_args.build_dir.unwrap_or_else(|| ".".to_string()));
+    cmd.arg(cli_args.build_dir.unwrap_or_else(|| ".".to_string()));
 
     if dry_run {
         cmd.print_escaped_cmd()
