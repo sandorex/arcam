@@ -36,11 +36,11 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub network: Option<bool>,
 
-    /// Try to pass audio into the the container
+    /// Try to pass audio into the the container, security impact is unknown
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub audio: Option<bool>,
 
-    /// Passes wayland compositor through, pokes holes in sandbox detailed impact unknown
+    /// Passes wayland compositor through, pokes holes in sandbox, allows r/w access to clipboard
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub wayland: Option<bool>,
 

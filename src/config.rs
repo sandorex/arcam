@@ -93,11 +93,11 @@ pub struct Config {
     #[serde(default)]
     pub network: bool,
 
-    /// Try to pass audio into the container
+    /// Try to pass audio into the the container, security impact is unknown
     #[serde(default)]
     pub audio: bool,
 
-    /// Passes wayland compositor through
+    /// Passes wayland compositor through, pokes holes in sandbox, allows r/w access to clipboard
     #[serde(default)]
     pub wayland: bool,
 

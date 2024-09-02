@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::{ExitResult, VERSION};
 use crate::util::{self, Engine, EngineKind};
 use crate::util::command_extensions::*;
