@@ -199,7 +199,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
                 // the default ulimit is low
                 "--ulimit=host".into(),
 
-                // TODO should i add --annotation run.oci.keep_original_groups=1
+                // use same timezone as host
+                "--tz=local".into(),
             ]);
         },
         EngineKind::Docker => unreachable!(),
