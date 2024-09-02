@@ -78,8 +78,10 @@ do
     fi
 done < <(cd /etc/skel && find . \( -type f -o -type l \) -printf '%P\0')
 
-# only do it if there is sudo installed
-if [[ -f /usr/bin/sudo ]]; then
+HAS_SUDO=0
+
+if command -v sudo &>/dev/null; then
+    # rootless sudo
     echo "Enabling rootless sudo for all"
 
     # disable hostname resolving
@@ -87,9 +89,11 @@ if [[ -f /usr/bin/sudo ]]; then
 
     # allow everything without a password
     echo 'ALL ALL = (ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+    HAS_SUDO=1
 else
-    # set root passwd just in case so you can use `su`
-    chpasswd <<< "root:root"
+    # alternatively rootless su
+    passwd -d root
 fi
 
 # run user scripts
@@ -97,8 +101,12 @@ echo "Running /init.d/ scripts"
 if [[ -d /init.d ]]; then
     for script in /init.d/*; do
         if [[ -x "$script" ]]; then
-            # run each script as user
-            sudo -u "$BOX_USER" "$script"
+            # run each script as the user
+            if [[ "$HAS_SUDO" -eq 1 ]]; then
+                sudo -u "$BOX_USER" "$script"
+            else
+                su - "$BOX_USER" -c "$script"
+            fi
         fi
     done
 fi

@@ -300,7 +300,6 @@ bonded
 bone-crushing
 boneheaded
 bonnetless
-boobyish
 bookable
 bookish
 boolean
@@ -357,8 +356,6 @@ breadthless
 breakable
 breakaway
 breakneck
-breasted
-breastless
 breathable
 breathless
 breathtaking
