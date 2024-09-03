@@ -296,13 +296,54 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             return output.to_exitcode();
         }
 
-        let id = String::from_utf8_lossy(&output.stdout);
+        let id_raw = String::from_utf8_lossy(&output.stdout);
+        let id = id_raw.trim();
+
+        // as the initialization can take a second or two this prevents broken dotfiles with shell
+        // command when you type quickly
+        let is_initialized = || -> bool {
+            let cmd = Command::new(&engine.path)
+                .arg("exec")
+                .arg(id)
+                .args(["sh", "-c", "test -f /initialized"])
+                .output()
+                .expect(crate::ENGINE_ERR_MSG);
+
+            match cmd.to_exitcode() {
+                Ok(()) => true,
+                Err(1) => false,
+                // this really should not happen unless something breaks
+                Err(x) => panic!("Error while checking container initialization ({})", x),
+            }
+        };
+
+        let mut counter = 0;
+        loop {
+            if is_initialized() {
+                break;
+            }
+
+            counter += 1;
+
+            // basically try for 15 seconds
+            if counter > 15 {
+                eprintln!("Container initialization timeout was reached, killing the container");
+
+                // kill the container
+                return Command::new(&engine.path)
+                    .args(["container", "stop", "--time", "5", id])
+                    .status()
+                    .expect(crate::ENGINE_ERR_MSG)
+                    .to_exitcode();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
 
         // print the name instead of id
         Command::new(&engine.path)
-            .args(["inspect", "--format", "{{.Name}}", id.trim()])
+            .args(["inspect", "--format", "{{.Name}}", id])
             .status()
-            .expect("Could not execute engine")
+            .expect(crate::ENGINE_ERR_MSG)
             .to_exitcode()
     }
 }

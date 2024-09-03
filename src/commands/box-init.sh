@@ -113,6 +113,9 @@ fi
 
 echo "Starting infinite loop (use SIGTERM to stop the container)"
 
+# signal that init is finished
+touch /initialized
+
 # make sure the container stays alive
 sleep infinity &
 
