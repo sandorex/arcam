@@ -101,6 +101,10 @@ pub struct Config {
     #[serde(default)]
     pub wayland: bool,
 
+    /// Pass ssh-agent socket through
+    #[serde(default)]
+    pub ssh_agent: bool,
+
     /// Default setting used regardless of the engine
     #[serde(default)]
     pub default: EngineConfig,

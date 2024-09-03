@@ -10,8 +10,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::io::prelude::*;
 
-// pub const INIT_SCRIPT: &str = include_str!("box-init.sh");
-
 fn find_preferred_shell() -> &'static str {
     const SHELLS: [&str; 3] = [
         "/bin/fish",
@@ -163,7 +161,7 @@ fn initialization() -> ExitResult {
     // clone all the files including symlinks
     for file in &files {
         let source = Path::new("/etc/skel").join(file);
-        let dest = Path::new(&home).join(&file);
+        let dest = Path::new(&home).join(file);
 
         // NOTE fs::copy fails on broken symlinks
         if source.is_symlink() {
@@ -184,7 +182,6 @@ fn initialization() -> ExitResult {
         println!("Enabling passwordless sudo for everyone");
 
         let mut file = OpenOptions::new()
-            .write(true)
             .append(true)
             .open("/etc/sudoers")
             .unwrap();
@@ -209,38 +206,36 @@ fn initialization() -> ExitResult {
 
     let init_dir = Path::new("/init.d");
     if init_dir.exists() {
-        for i in init_dir.read_dir().unwrap() {
-            if let Ok(entry) = i {
-                // make sure its executable
-                if !entry.metadata().is_ok_and(|x| x.permissions().mode() & 0o111 != 0) {
-                    continue;
-                }
+        for entry in init_dir.read_dir().unwrap().flatten() {
+            // make sure its executable
+            if !entry.metadata().is_ok_and(|x| x.permissions().mode() & 0o111 != 0) {
+                continue;
+            }
 
-                // accept both files and symlinks
-                if !entry.file_type().is_ok_and(|x| x.is_file() || x.is_symlink()) {
-                    continue;
-                }
+            // accept both files and symlinks
+            if !entry.file_type().is_ok_and(|x| x.is_file() || x.is_symlink()) {
+                continue;
+            }
 
-                println!("Executing script {:?}", entry.path());
+            println!("Executing script {:?}", entry.path());
 
-                // use sudo if available
-                let cmd = if has_sudo {
-                    Command::new("sudo")
-                        .args(["-u", &user])
-                        .arg(entry.path())
-                        .status()
-                        .unwrap()
-                } else {
-                    Command::new("su")
-                        .args([&user, "-c"])
-                        .arg(entry.path())
-                        .status()
-                        .unwrap()
-                };
+            // use sudo if available
+            let cmd = if has_sudo {
+                Command::new("sudo")
+                    .args(["-u", &user])
+                    .arg(entry.path())
+                    .status()
+                    .unwrap()
+            } else {
+                Command::new("su")
+                    .args([&user, "-c"])
+                    .arg(entry.path())
+                    .status()
+                    .unwrap()
+            };
 
-                if ! cmd.success() {
-                    eprintln!("Script {:?} has failed with exit code {}", entry.path(), cmd.to_exitcode().unwrap_err());
-                }
+            if ! cmd.success() {
+                eprintln!("Script {:?} has failed with exit code {}", entry.path(), cmd.to_exitcode().unwrap_err());
             }
         }
     }

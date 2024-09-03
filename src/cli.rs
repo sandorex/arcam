@@ -44,11 +44,19 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub wayland: Option<bool>,
 
+    /// Pass ssh-agent socket through
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
+    pub ssh_agent: Option<bool>,
+
     /// Add or drop capabilities by prefixing them with '!'
     ///
     /// For more details about capabilities read `man 7 capabilities` or box wiki
     #[arg(long = "cap")]
     pub capabilities: Vec<String>,
+
+    /// Mount additional paths inside workspace
+    #[arg(short, long, value_name = "PATH")]
+    pub mount: Vec<String>,
 
     /// Environment variables to set inside the container
     #[arg(short, long, value_name = "VAR=VALUE")]

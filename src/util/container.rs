@@ -56,7 +56,7 @@ pub fn is_in_container() -> bool {
 pub fn get_container_ws(engine: &Engine, container: &str) -> Option<String> {
     // {{if .. }} is added so that the stdout is empty if ws is none
     let cmd = Command::new(&engine.path)
-        .args(["inspect", container, "--format", "{{if .Config.Labels.box_ws}}{{.Config.Labels.box_ws}}{{end}}"])
+        .args(["inspect", container, "--format", "{{if .Config.Labels.box_proj}}{{.Config.Labels.box_proj}}{{end}}"])
         .output()
         .expect("Could not execute engine");
 

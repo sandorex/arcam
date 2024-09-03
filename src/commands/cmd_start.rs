@@ -95,11 +95,15 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let executable_path = std::env::current_exe().expect("Failed to get executable path");
     let user = util::get_user();
-    let ws_dir: String = {
-        // NOTE /ws/ prefix is used so it does not clash with home dirs like ~/.config
-        let cwd_dir_name = &cwd.file_name().unwrap().to_string_lossy();
-        format!("/home/{user}/ws/{cwd_dir_name}")
-    };
+
+    // NOTE /ws/ prefix is used so it does not clash with home dirs like ~/.config
+    //
+    // this is the general workspace dir where the main project and additional mountpoints are
+    // mounted to
+    let ws_dir: String = format!("/home/{user}/ws");
+
+    // this is the main project where box was started
+    let main_project_dir: String = format!("{}/{}", ws_dir, &cwd.file_name().unwrap().to_string_lossy());
 
     // handle configs
     if cli_args.image.starts_with("@") {
@@ -133,6 +137,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cli_args.network = cli_args.network.or(Some(config.network));
         cli_args.audio = cli_args.audio.or(Some(config.audio));
         cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
+        cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
         cli_args.name = cli_args.name.or_else(|| config.container_name.clone());
 
         // prefer cli dotfiles and have env vars expanded in config
@@ -175,7 +180,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         "--user=root".into(),
         "--label=manager=box".into(),
         "--label=box=box".into(),
-        format!("--label=box_ws={}", ws_dir),
+        format!("--label=box_proj={}", main_project_dir),
         "--env=BOX=BOX".into(),
         format!("--env=BOX_VERSION={}", VERSION),
         format!("--env=BOX_ENGINE={:?}", engine.kind),
@@ -186,7 +191,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         // TODO explore all the XDG dirs and set them properly
         format!("--env=XDG_RUNTIME_DIR=/run/user/{}", uid),
         format!("--volume={}:/box:ro,nocopy", executable_path.display()),
-        format!("--volume={}:{}", &cwd.to_string_lossy(), ws_dir),
+        format!("--volume={}:{}", &cwd.to_string_lossy(), main_project_dir),
         format!("--hostname={}", get_hostname()),
     ];
 
@@ -217,6 +222,29 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             args.push(format!("--cap-drop={}", stripped));
         } else {
             args.push(format!("--cap-add={}", c));
+        }
+    }
+
+    for m in &cli_args.mount {
+        // i have to canonicalize path so that '../somedir' works always
+        let mount = match Path::new(m).canonicalize() {
+            Ok(x) => x,
+            Err(err) => {
+                eprintln!("Error while parsing path {:?}: {}", m, err);
+                return Err(1);
+            },
+        };
+
+        if mount.exists() {
+            if ! mount.is_dir() {
+                eprintln!("Mountpoint {:?} is not a directory", mount);
+                return Err(1);
+            }
+
+            args.push(format!("--volume={}:{}/{}", mount.to_string_lossy(), ws_dir, mount.file_name().unwrap().to_string_lossy()))
+        } else {
+            eprintln!("Mountpoint {:?} does not exist", mount);
+            return Err(1);
         }
     }
 
@@ -259,6 +287,23 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             }
         } else {
             eprintln!("Could not pass through wayland socket as WAYLAND_DISPLAY is not defined");
+            return Err(1);
+        }
+    }
+
+    if cli_args.ssh_agent.unwrap_or(false) {
+        if let Ok(ssh_sock) = std::env::var("SSH_AUTH_SOCK") {
+            if Path::new(&ssh_sock).exists() {
+                args.extend(vec![
+                    format!("--volume={}:/run/user/{}/ssh-auth", ssh_sock, uid),
+                    format!("--env=SSH_AUTH_SOCK=/run/user/{}/ssh-auth", uid),
+                ]);
+            } else {
+                eprintln!("Could not find the ssh-agent socket to pass to the container");
+                return Err(1);
+            }
+        } else {
+            println!("Could not pass through ssh-agent as SSH_AUTH_SOCK is not defined");
             return Err(1);
         }
     }
