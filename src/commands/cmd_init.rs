@@ -179,7 +179,8 @@ fn initialization() -> ExitResult {
             .unwrap();
     }
 
-    if Path::new("/bin/sudo").exists() {
+    let has_sudo = Path::new("/bin/sudo").exists();
+    if has_sudo {
         println!("Enabling passwordless sudo for everyone");
 
         let mut file = OpenOptions::new()
@@ -206,22 +207,43 @@ fn initialization() -> ExitResult {
             .to_exitcode()?;
     }
 
-    // TODO run scripts somehow?
+    let init_dir = Path::new("/init.d");
+    if init_dir.exists() {
+        for i in init_dir.read_dir().unwrap() {
+            if let Ok(entry) = i {
+                // make sure its executable
+                if !entry.metadata().is_ok_and(|x| x.permissions().mode() & 0o111 != 0) {
+                    continue;
+                }
 
-    // # run user scripts
-    // echo "Running /init.d/ scripts"
-    // if [[ -d /init.d ]]; then
-    //     for script in /init.d/*; do
-    //         if [[ -x "$script" ]]; then
-    //             # run each script as the user
-    //             if [[ "$HAS_SUDO" -eq 1 ]]; then
-    //                 sudo -u "$BOX_USER" "$script"
-    //             else
-    //                 su - "$BOX_USER" -c "$script"
-    //             fi
-    //         fi
-    //     done
-    // fi
+                // accept both files and symlinks
+                if !entry.file_type().is_ok_and(|x| x.is_file() || x.is_symlink()) {
+                    continue;
+                }
+
+                println!("Executing script {:?}", entry.path());
+
+                // use sudo if available
+                let cmd = if has_sudo {
+                    Command::new("sudo")
+                        .args(["-u", &user])
+                        .arg(entry.path())
+                        .status()
+                        .unwrap()
+                } else {
+                    Command::new("su")
+                        .args([&user, "-c"])
+                        .arg(entry.path())
+                        .status()
+                        .unwrap()
+                };
+
+                if ! cmd.success() {
+                    eprintln!("Script {:?} has failed with exit code {}", entry.path(), cmd.to_exitcode().unwrap_err());
+                }
+            }
+        }
+    }
 
     // signalize that init is done
     fs::write("/initialized", "y")
@@ -232,12 +254,33 @@ fn initialization() -> ExitResult {
     Ok(())
 }
 
+/// Gets PIDs of all root processes inside the container as they all share PPID of 0
+fn get_root_processes() -> Result<Vec<String>, u8> {
+    let cmd = Command::new("pgrep")
+        .args(["-P", "0"])
+        .output()
+        .expect("Failed to execute pgrep");
+
+    cmd.to_exitcode()?;
+
+    let stdout = String::from_utf8_lossy(&cmd.stdout);
+
+    let lines: Vec<String> = stdout
+        .trim()
+        .lines()
+        .filter(|x| *x != "1") // box is pid 1
+        .map(|x| x.to_string())
+        .collect();
+
+    Ok(lines)
+}
+
 pub fn container_init() -> ExitResult {
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
 
     ctrlc::set_handler(move || {
-        println!("Caught termination signal..");
+        println!("Termination signal received");
 
         // stop the loop
         r.store(false, Ordering::SeqCst);
@@ -251,9 +294,21 @@ pub fn container_init() -> ExitResult {
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
-    // TODO kill children
+    let pids = get_root_processes()?;
 
-    println!("Terminating..");
+    println!("Propagating signal to processes");
+
+    // to avoid more crates just use kill command
+    Command::new("kill")
+        // be verbose
+        // send TERM then KILL after 10s
+        .args(["--verbose", "--timeout", "10000", "KILL", "--signal", "TERM"])
+        .args(&pids)
+        .status()
+        .expect("Failed to execute kill")
+        .to_exitcode()?;
+
+    println!("Goodbye!");
 
     Ok(())
 }

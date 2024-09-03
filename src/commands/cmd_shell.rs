@@ -66,10 +66,17 @@ pub fn open_shell(engine: Engine, dry_run: bool, cli_args: &cli::CmdShellArgs) -
     if dry_run {
         cmd.print_escaped_cmd()
     } else {
-        cmd
+        let cmd = cmd
             .status()
-            .expect(crate::ENGINE_ERR_MSG)
-            .to_exitcode()
+            .expect(crate::ENGINE_ERR_MSG);
+
+        // code 137 usually means SIGKILL and that messes up the terminal so reset it afterwards
+        if cmd.code().is_some_and(|x| x == 137) {
+            // i do not care if it failed
+            let _ = Command::new("reset").status();
+        }
+
+        cmd.to_exitcode()
     }
 }
 
