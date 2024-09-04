@@ -14,7 +14,7 @@ pub struct CmdImageBuildArgs {
     #[arg(long)]
     pub build_dir: Option<String>,
 
-    /// Copy dotfiles inside the container as /etc/skel
+    /// Mount dotfiles inside the container as /etc/skel
     ///
     /// Note that this option just mounts the dotfiles at `/dotfiles` and the containerfile must
     /// copy them into /etc/skel

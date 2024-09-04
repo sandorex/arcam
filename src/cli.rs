@@ -44,9 +44,13 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub wayland: Option<bool>,
 
-    /// Pass ssh-agent socket through
+    /// Pass through ssh-agent socket
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub ssh_agent: Option<bool>,
+
+    /// Pass through session dbus socket, allows command execution on host!
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
+    pub session_bus: Option<bool>,
 
     /// Add or drop capabilities by prefixing them with '!'
     ///

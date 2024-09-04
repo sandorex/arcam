@@ -138,6 +138,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cli_args.audio = cli_args.audio.or(Some(config.audio));
         cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
         cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
+        cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
         cli_args.name = cli_args.name.or_else(|| config.container_name.clone());
 
         // prefer cli dotfiles and have env vars expanded in config
@@ -304,6 +305,29 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             }
         } else {
             println!("Could not pass through ssh-agent as SSH_AUTH_SOCK is not defined");
+            return Err(1);
+        }
+    }
+
+    if cli_args.session_bus.unwrap_or(false) {
+        if let Ok(dbus_addr) = std::env::var("DBUS_SESSION_BUS_ADDRESS") {
+            if let Some(dbus_sock) = dbus_addr.strip_prefix("unix:path=") {
+                if Path::new(&dbus_sock).exists() {
+                    args.extend(vec![
+                        format!("--volume={}:/run/user/{}/bus", dbus_sock, uid),
+                        format!("--env=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{}/bus", uid),
+                    ]);
+                } else {
+                    eprintln!("Could not find the session bus socket to pass to the container");
+                    return Err(1);
+                }
+            } else {
+                eprintln!("Invalid format for DBUS_SESSION_BUS_ADDRESS={}", dbus_addr);
+                return Err(1);
+            }
+
+        } else {
+            println!("Could not pass through session bus as DBUS_SESSION_BUS_ADDRESS is not defined");
             return Err(1);
         }
     }
