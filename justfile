@@ -16,6 +16,9 @@ git-tag:
     #!/usr/bin/env bash
     set -e
 
+    # test just in case
+    cargo test
+
     version="$(just get-version)"
     if [[ -z "$version" ]]; then
         echo "Could not read the cargo version"
@@ -27,12 +30,10 @@ git-tag:
         exit 1
     fi
 
-    if [[ -n "$(git status --porcelain)" ]]; then
+    if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
         echo "There are uncommited git changes"
         exit 1
     fi
-
-    just test
 
     echo "Tagging v${version}"
     git tag "v${version}"
