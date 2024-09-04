@@ -1,7 +1,22 @@
 ## box
-Fast pet container manager, designed for sandboxed dev environment using podman *(docker is currently not supported but will be in the future)*
+Fast sandboxed development container manager using podman, you poke holes in the sandboxed, minimal permissions by default
 
-Currently experimental but i am actively using it
+Experimental but and all code since `v0.1.1` was written within a box container
+
+### Features
+- Sandboxed ephemeral container by default (podman defaults with network turned on)
+- Pass through audio, wayland, ssh-agent easily on demand with flags or config
+- Customize your experience per language, even per project
+- Switch machines often? Just make the CI build your container with your dotfiles preincluded!
+- Use different local dotfiles on demand (so you don't have to rebuild your container to update dotfiles)
+- Automatic passwordless sudo (or `su` if not installed)
+
+## Planned Features
+These are features that are planned but the details are debatable
+
+- Provide partial support for devcontainer.json
+- Provide support for devcontainer features
+- Partial docker support (i do not know if im able to support both docker and podman)
 
 ### Installation
 You can download binary for latest release [here](https://github.com/sandorex/box/releases/latest/download/box)
@@ -11,34 +26,17 @@ Alternatively you can install it using cargo
 cargo install --git https://github.com/sandorex/box
 ```
 
-If you dont have cargo installed you can use a container to build it too
-```sh
-git clone https://github.com/sandorex/box
-cd box
-podman run --rm --user "$(id -u)":"$(id -g)" -v "$PWD":/usr/src/ws -w /usr/src/ws rust:latest cargo build --release
-```
+### Custom Container Image
+Making a custom container image is same as for any other container, to take full advantage of box keep following things in mind:
+- Install `sudo` for nicer experience
+- Any executable files in `/init.d` will be executed on start of the container as the user, you can use `sudo` (may not be installed in some images) or `su` for root access
+- Put dotfiles in `/etc/skel` which will be copied to user home on start, note that it will not be used if `--dotfiles` flag is used
+- All data inside the container (not counting mounts) will be deleted when container stops, to add caching or presistant data use a named volume
 
-### Why Rust?
-I wanted a single binary that could be distributed easily, even kept inside the container for easier installation
-
-Current binary as of time of writing (30-07-2024) is around 1 megabyte, so im pretty happy with it
-
-Original prototype was written in bash and while it was fine i did not feel like maintaining a growing complicated bash script split into multiple files
+For inspiration, or just an example take a look at [my container](https://github.com/sandorex/config/tree/master/boxes) with all languages i use and neovim preinstalled with my dotfiles
 
 ### Comparison to Other Tools
 #### Toolbox / Distrobox
-Both are quite good at what they do, providing integrated experience with the host, but the goal of this project is to provide a opposite experience a sandbox! While you can poke holes in it if you want, the default experience is pretty barebones
+Both are great at their job, to provide a seamless integration with the host but not sandboxing
 
-And no, you cannot make toolbox or distrobox sandboxed (at least at the moment of writing), i personally have nothing against either of them and use them myself but i always wanted a simple-ish system for specialized images to be used in sandboxed environment
-
-### The Goal
-Hackable "framework" to create your comfy containerized workflow, be it fully airtight container with no network, or container with RW access of your Home directory and SSH keys, **you choose the balance between security and comfort**
-
-#### How Will It Work?
-Well it kinda works already, but i plan to write documentation how to do specific things, customizations and such so you can build your own perfect environment
-
-As writing all the tooling to change containers at runtime is plain stupid, i will focus on building customized container images
-
-### Examples
-- My own containers can be found in my [Dotfiles](https://github.com/sandorex/config) under [boxes](https://github.com/sandorex/config/tree/master/boxes)
-
+Box provides sandbox by default approach where you choose where to sacrifice sandboxing for convenience
