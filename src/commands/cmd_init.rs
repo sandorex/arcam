@@ -177,6 +177,29 @@ fn initialization() -> ExitResult {
             .unwrap();
     }
 
+    // create the runtime dir whatever it is
+    {
+        let dest = std::env::var("XDG_RUNTIME_DIR").unwrap();
+
+        // create all the dirs required
+        fs::create_dir_all(&dest)
+            .unwrap();
+
+        // make sure user owns it
+        chown(&dest, Some(uid_u), Some(gid_u))
+            .unwrap();
+
+        // set permission
+        let mut perm = fs::symlink_metadata(&dest)
+            .unwrap()
+            .permissions();
+
+        perm.set_mode(0o700);
+
+        fs::set_permissions(&dest, perm)
+            .unwrap();
+    }
+
     let has_sudo = Path::new("/bin/sudo").exists();
     if has_sudo {
         println!("Enabling passwordless sudo for everyone");
