@@ -325,7 +325,6 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
                 eprintln!("Invalid format for DBUS_SESSION_BUS_ADDRESS={}", dbus_addr);
                 return Err(1);
             }
-
         } else {
             println!("Could not pass through session bus as DBUS_SESSION_BUS_ADDRESS is not defined");
             return Err(1);

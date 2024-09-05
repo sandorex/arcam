@@ -6,9 +6,14 @@ use cli_image::ImageCommands;
 use clap::{Parser, Subcommand, Args};
 use crate::FULL_VERSION;
 
+const AFTER_HELP: &str = concat!(
+    "For documentation for this version go to following url\n",
+    "https://github.com/sandorex/box/tree/", env!("VERGEN_GIT_SHA"), "/docs", "\n"
+);
+
 /// Sandboxed pet container manager
 #[derive(Parser, Debug)]
-#[command(name = "box", author, version = FULL_VERSION, about)]
+#[command(name = "box", author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
 pub struct Cli {
     /// Explicitly set container engine to use
     #[arg(long, env = "BOX_ENGINE")]

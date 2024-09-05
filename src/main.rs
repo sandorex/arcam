@@ -64,7 +64,6 @@ fn main() -> ExitCode {
         CliCommands::Image(subcmd) => match subcmd {
             ImageCommands::Build(x) => commands::build_image(&engine, args.dry_run, x),
         },
-        // CliCommands::Image(subcmd) => { dbg!(subcmd); ExitCode::SUCCESS },
         CliCommands::List => commands::print_containers(engine, args.dry_run),
         CliCommands::Logs(x) => commands::print_logs(&x),
         CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, &x),
