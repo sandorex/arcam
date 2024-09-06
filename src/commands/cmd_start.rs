@@ -155,14 +155,17 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
 
     let container_name: String;
 
-    // TODO is there any reason to put multiple containers in same directory?
-    // check if container is already running in current directory
+    // get containers in this cwd, i do not care if it fails
     if let Some(x) = util::find_containers_by_cwd(&engine) {
-        eprintln!("Container(s) are already running in current directory:");
-        for container in &x {
-            eprintln!("   {container}");
+        // check if any are running
+        if !x.is_empty() {
+            eprintln!("Container(s) are already running in current directory:");
+            for container in &x {
+                eprintln!("   {container}");
+            }
+
+            return Err(1);
         }
-        return Err(1);
     }
 
     // handle configs
