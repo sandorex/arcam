@@ -1,7 +1,9 @@
-## box
+## arcam
 Fast sandboxed development container manager using podman, you poke holes in the sandboxed, minimal permissions by default
 
-Experimental but and all code since `v0.1.1` was written within a box container
+Experimental but all code since `v0.1.1` was written within a box container
+
+*Originally named `box`, changed to `arcam` meaning `The Box` in ancient latin*
 
 ### Features
 - Sandboxed ephemeral container by default (podman defaults with network turned on)
@@ -19,11 +21,11 @@ These are features that are planned but the details are debatable
 - Partial docker support (i do not know if im able to support both docker and podman)
 
 ### Installation
-You can download binary for latest release [here](https://github.com/sandorex/box/releases/latest/download/box)
+You can download binary for latest release [here](https://github.com/sandorex/arcam/releases/latest/download/arcam)
 
 Alternatively you can install it using cargo
 ```sh
-cargo install --git https://github.com/sandorex/box
+cargo install --git https://github.com/sandorex/arcam
 ```
 
 ### Custom Container Image
