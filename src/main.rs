@@ -15,19 +15,32 @@ pub const ENGINE_ERR_MSG: &str = "Failed to execute engine";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_DESCRIBE"));
 
+pub const BIN_NAME: &str = env!("CARGO_BIN_NAME");
+
+// TODO find a way to uppercase bin name at compile time
+pub const BIN_NAME_UPPERCASE: &str = "ARCAM";
+
+/// Prefix env var name with proper prefix
+#[macro_export]
+macro_rules! ENV_VAR_PREFIX {
+    ($($args:literal),*) => {
+        concat!("ARCAM_", $($args),*)
+    };
+}
+
 pub use util::ExitResult;
 
 fn main() -> ExitCode {
     let args = cli::Cli::parse();
 
     // init does not need engine, just get it from environment if needed
-    if let CliCommands::Init = args.cmd {
+    if let CliCommands::Init(x) = args.cmd {
         if !util::is_in_container() {
             eprintln!("Running init outside a container is dangerous, qutting..");
             return ExitCode::FAILURE;
         }
 
-        return commands::container_init().to_exitcode();
+        return commands::container_init(x).to_exitcode();
     }
 
     // find and detect engine
@@ -54,9 +67,9 @@ fn main() -> ExitCode {
 
     match args.cmd {
         CliCommands::Start(x) => commands::start_container(engine, args.dry_run, x),
-        CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, &x),
-        CliCommands::Exec(x) => commands::container_exec(engine, args.dry_run, &x),
-        CliCommands::Exists(x) => commands::container_exists(engine, &x),
+        CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, x),
+        CliCommands::Exec(x) => commands::container_exec(engine, args.dry_run, x),
+        CliCommands::Exists(x) => commands::container_exists(engine, x),
         CliCommands::Config(subcmd) => match subcmd {
             ConfigCommands::Extract(x) => commands::extract_config(engine, args.dry_run, &x),
             ConfigCommands::Inspect(x) => commands::inspect_config(&x),
@@ -65,8 +78,8 @@ fn main() -> ExitCode {
             ImageCommands::Build(x) => commands::build_image(&engine, args.dry_run, x),
         },
         CliCommands::List => commands::print_containers(engine, args.dry_run),
-        CliCommands::Logs(x) => commands::print_logs(&x),
-        CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, &x),
-        CliCommands::Init => unreachable!(), // this is handled before
+        CliCommands::Logs(x) => commands::print_logs(engine, x),
+        CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, x),
+        CliCommands::Init(_) => unreachable!(), // this is handled before
     }.to_exitcode()
 }

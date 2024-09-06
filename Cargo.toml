@@ -1,17 +1,13 @@
 [package]
-name = "box-rs"
+name = "arcam"
 version = "0.1.5"
 description = "Sandboxed development containers at your fingertips"
 edition = "2021"
 license = "GPL-2.0-or-later"
 keywords = ["container", "podman", "docker"]
 categories = ["command-line-utilities", "virtualization"]
-repository = "https://github.com/sandorex/box"
+repository = "https://github.com/sandorex/arcam"
 readme = "README.md"
-
-[[bin]]
-name = "box"
-path = "src/main.rs"
 
 [dependencies]
 chrono = "0.4.38"

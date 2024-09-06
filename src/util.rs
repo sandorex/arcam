@@ -25,15 +25,10 @@ impl ExitResultExt for ExitResult {
     }
 }
 
-#[cfg(target_os = "linux")]
-pub fn get_user() -> String { std::env::var("USER").expect("Unable to get USER from env var") }
-
 /// Get app configuration directory
 pub fn app_dir() -> PathBuf {
-    const BOX_DIR: &str = "box";
-
     // prefer custom path from environment
-    match std::env::var("BOX_DIR") {
+    match std::env::var(crate::ENV_VAR_PREFIX!("DIR")) {
         Ok(x) => PathBuf::from(x),
         Err(_) => {
             // respect XDG standard
@@ -47,7 +42,8 @@ pub fn app_dir() -> PathBuf {
                 },
             };
 
-            PathBuf::from(xdg_config_home).join(BOX_DIR)
+            // use bin name for dir name
+            PathBuf::from(xdg_config_home).join(crate::BIN_NAME)
         },
     }
 }
@@ -58,15 +54,15 @@ pub fn config_dir() -> PathBuf {
 }
 
 /// Loads all configs while also handling all errors
-pub fn load_configs() -> Option<HashMap<String, crate::config::Config>> {
+pub fn load_configs() -> Result<HashMap<String, crate::config::Config>, u8> {
     use crate::config;
 
     match config::load_from_dir(config_dir().to_str().unwrap()) {
-        Ok(x) => Some(x),
+        Ok(x) => Ok(x),
         Err(err) => {
             eprintln!("{}\n", err);
 
-            None
+            Err(1)
         },
     }
 }
@@ -79,12 +75,54 @@ extern "C" {
 
 /// Get user UID and GID
 pub fn get_user_uid_gid() -> (u32, u32) {
-    // TODO SAFETY is this unsafe just cause or?
     unsafe {
         (
             geteuid(),
             getegid(),
         )
+    }
+}
+
+/// Generate random number using `/dev/urandom`
+pub fn rand() -> u32 {
+    use std::io::Read;
+
+    const ERR_MSG: &str = "Error reading /dev/urandom";
+
+    let mut rng = std::fs::File::open("/dev/urandom")
+        .expect(ERR_MSG);
+
+    let mut buffer = [0u8; 4];
+    rng.read_exact(&mut buffer)
+        .expect(ERR_MSG);
+
+    u32::from_be_bytes(buffer)
+}
+
+/// Simple yes/no prompt
+pub fn prompt(prompt: &str) -> bool {
+    use std::io::Write;
+    let mut s = String::new();
+
+    // if not yes then yes, but if yes then no yes
+    print!("{} [y/N] ", prompt);
+
+    let _ = std::io::stdout().flush();
+
+    std::io::stdin().read_line(&mut s).expect("Could not read stdin");
+    s = s.trim().to_string();
+
+    matches!(s.to_lowercase().as_str(), "y"|"yes")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rand;
+
+    #[test]
+    fn test_rand() {
+        // just a sanity test
+        assert_ne!(rand(), rand());
     }
 }
 

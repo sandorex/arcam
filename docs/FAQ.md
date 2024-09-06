@@ -7,7 +7,7 @@ One of annoying side effects of ephemeral containers is the install at each star
 
 Add a named volume as engine args
 ```
-box start -- --volume box-data:/data
+arcam start -- --volume data:/data
 ```
 
 And then setup the neovim in container init script `/init.d/90-neovim.sh`:

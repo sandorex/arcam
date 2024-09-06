@@ -2,35 +2,41 @@ use crate::{ExitResult, cli};
 use crate::util::command_extensions::*;
 use crate::util::{self, Engine};
 
-pub fn kill_container(engine: Engine, dry_run: bool, cli_args: &cli::CmdKillArgs) -> ExitResult {
-    if ! util::is_box_container(&engine, &cli_args.container) {
-        eprintln!("Container {} is not owned by box or does not exist", &cli_args.container);
-        return Err(1);
+pub fn kill_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdKillArgs) -> ExitResult {
+    // try to find container in current directory
+    if cli_args.name.is_empty() {
+        if let Some(containers) = util::find_containers_by_cwd(&engine) {
+            if containers.is_empty() {
+                eprintln!("Could not find a running container in current directory");
+                return Err(1);
+            }
+
+            cli_args.name = containers.first().unwrap().clone();
+        }
+
+        // i do not need to test container if it was found by cwd
+    } else if !dry_run {
+        if !util::container_exists(&engine, &cli_args.name) {
+            eprintln!("Container {:?} does not exist", &cli_args.name);
+            return Err(1);
+        }
+
+        // check if container is owned
+        if util::get_container_ws(&engine, &cli_args.name).is_none() {
+            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::BIN_NAME);
+
+            return Err(1);
+        }
     }
 
-    // simple shitty prompt
-    // if not yes then yes, but if yes then no yes
-    if ! cli_args.yes {
-        use std::io::Write;
-        let mut s = String::new();
-
-        print!("Are you sure you want to kill container {:?} ? [y/N] ", &cli_args.container);
-
-        let _ = std::io::stdout().flush();
-
-        std::io::stdin().read_line(&mut s).expect("Could not read stdin");
-        s = s.trim().to_string();
-
-        match s.to_lowercase().as_str() {
-            "y"|"yes" => {},
-            _ => return Err(1),
-        }
+    if !cli_args.yes && !util::prompt(format!("Are you sure you want to kill container {:?} ?", &cli_args.name).as_str()) {
+        return Err(1);
     }
 
     let timeout = cli_args.timeout.to_string();
 
     let mut cmd = Command::new(&engine.path);
-    cmd.args(["container", "stop", "--time", &timeout, &cli_args.container]);
+    cmd.args(["container", "stop", "--time", &timeout, &cli_args.name]);
 
     if dry_run {
         cmd.print_escaped_cmd()

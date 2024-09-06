@@ -1,4 +1,4 @@
-use crate::util::{self, get_container_ws, Engine};
+use crate::util::{self, Engine};
 use crate::{cli, ExitResult};
 use crate::util::command_extensions::*;
 
@@ -24,7 +24,7 @@ fn get_user_shell(engine: &Engine, container: &str, user: &str) -> String {
 }
 
 fn gen_open_shell_cmd(engine: &Engine, shell: &Option<String>, ws_dir: String, container_name: &str) -> Vec<String> {
-    let user = util::get_user();
+    let user = std::env::var("USER").expect("Unable to get USER from env var");
     let user_shell = match shell {
         Some(x) => x,
         None => &get_user_shell(engine, container_name, user.as_str()),
@@ -42,21 +42,32 @@ fn gen_open_shell_cmd(engine: &Engine, shell: &Option<String>, ws_dir: String, c
     ]
 }
 
-pub fn open_shell(engine: Engine, dry_run: bool, cli_args: &cli::CmdShellArgs) -> ExitResult {
-    // check if container is owned
-    if !dry_run && !util::is_box_container(&engine, &cli_args.name) {
-        eprintln!("Container {} is not owned by box or does not exist", &cli_args.name);
+pub fn open_shell(engine: Engine, dry_run: bool, mut cli_args: cli::CmdShellArgs) -> ExitResult {
+    // try to find container in current directory
+    if cli_args.name.is_empty() {
+        if let Some(containers) = util::find_containers_by_cwd(&engine) {
+            if containers.is_empty() {
+                eprintln!("Could not find a running container in current directory");
+                return Err(1);
+            }
+
+            cli_args.name = containers.first().unwrap().clone();
+        }
+    } else if !dry_run && !util::container_exists(&engine, &cli_args.name) {
+        eprintln!("Container {:?} does not exist", &cli_args.name);
         return Err(1);
     }
 
-    let ws_dir = match get_container_ws(&engine, &cli_args.name) {
+    // check if container is owned
+    let ws_dir = match util::get_container_ws(&engine, &cli_args.name) {
         Some(x) => x,
-        None if dry_run => "/ws/dry_run".to_string(), // NOTE just so it does not fail in dry_run
+        // allow dry_run to work
+        None if dry_run => "/ws/dry_run".to_string(),
         None => {
-            eprintln!("Could not get container workspace from container {:#?}", &cli_args.name);
+            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::BIN_NAME);
 
             return Err(1);
-        },
+        }
     };
 
     let args = gen_open_shell_cmd(&engine, &cli_args.shell, ws_dir, &cli_args.name);

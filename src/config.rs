@@ -109,6 +109,14 @@ pub struct Config {
     #[serde(default)]
     pub session_bus: bool,
 
+    /// Run command on init (ran using `/bin/sh`)
+    #[serde(default)]
+    pub on_init: Vec<String>,
+
+    /// Copies files to container as init scripts (places them in `/init.d/`)
+    #[serde(default)]
+    pub on_init_file: Vec<String>,
+
     /// Default setting used regardless of the engine
     #[serde(default)]
     pub default: EngineConfig,

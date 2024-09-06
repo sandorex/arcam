@@ -4,19 +4,19 @@ pub mod cli_image;
 use cli_config::ConfigCommands;
 use cli_image::ImageCommands;
 use clap::{Parser, Subcommand, Args};
-use crate::FULL_VERSION;
+use crate::{FULL_VERSION, ENV_VAR_PREFIX};
 
 const AFTER_HELP: &str = concat!(
-    "For documentation for this version go to following url\n",
-    "https://github.com/sandorex/box/tree/", env!("VERGEN_GIT_SHA"), "/docs", "\n"
+    "For documentation for this particular version go to following url\n",
+    env!("CARGO_PKG_REPOSITORY"), "/tree/", env!("VERGEN_GIT_SHA"), "/docs"
 );
 
-/// Sandboxed pet container manager
+/// Sandboxed development container manager, with focus on security by default
 #[derive(Parser, Debug)]
-#[command(name = "box", author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
+#[command(name = crate::BIN_NAME, author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
 pub struct Cli {
     /// Explicitly set container engine to use
-    #[arg(long, env = "BOX_ENGINE")]
+    #[arg(long, env = ENV_VAR_PREFIX!("ENGINE"))]
     pub engine: Option<String>,
 
     /// Just print engine commands that would've been ran, do not execute
@@ -30,11 +30,11 @@ pub struct Cli {
 #[derive(Args, Debug, Clone, Default)]
 pub struct CmdStartArgs {
     /// Name of the new container (if not set a randomly generated name will be used)
-    #[arg(long, env = "BOX_CONTAINER")]
+    #[arg(long, env = ENV_VAR_PREFIX!("CONTAINER"))]
     pub name: Option<String>,
 
     /// Path to dotfiles which will be used as /etc/skel inside the container
-    #[arg(long, env = "BOX_DOTFILES")]
+    #[arg(long, env = ENV_VAR_PREFIX!("DOTFILES"))]
     pub dotfiles: Option<String>,
 
     /// Set network access permission for the container
@@ -57,14 +57,22 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub session_bus: Option<bool>,
 
+    /// Run command on init (ran using `/bin/sh`)
+    #[arg(long, value_name = "SCRIPT")]
+    pub on_init: Vec<String>,
+
+    /// Copies files to container as init scripts (places them in `/init.d/`)
+    #[arg(long, value_name = "FILE")]
+    pub on_init_file: Vec<String>,
+
     /// Add or drop capabilities by prefixing them with '!'
     ///
-    /// For more details about capabilities read `man 7 capabilities` or box wiki
+    /// For more details about capabilities read `man 7 capabilities`
     #[arg(long = "cap")]
     pub capabilities: Vec<String>,
 
     /// Mount additional paths inside workspace
-    #[arg(short, long, value_name = "PATH")]
+    #[arg(short, long, value_name = "DIRECTORY")]
     pub mount: Vec<String>,
 
     /// Environment variables to set inside the container
@@ -72,7 +80,7 @@ pub struct CmdStartArgs {
     pub env: Vec<String>,
 
     /// Container image to use or @config
-    #[arg(env = "BOX_IMAGE")]
+    #[arg(env = ENV_VAR_PREFIX!("IMAGE"))]
     pub image: String,
 
     /// Pass rest of args to engine verbatim
@@ -83,7 +91,7 @@ pub struct CmdStartArgs {
 #[derive(Args, Debug, Clone)]
 pub struct CmdShellArgs {
     /// Name or the ID of the container
-    #[arg(env = "BOX_CONTAINER")]
+    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
     pub name: String,
 
     // i feel like `shell --shell` looks awful so i made into a position arg
@@ -98,7 +106,7 @@ pub struct CmdExecArgs {
     pub shell: bool,
 
     /// Name or the ID of the container
-    #[arg(value_name = "CONTAINER", env = "BOX_CONTAINER")]
+    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
     pub name: String,
 
     // NOTE command is required but last so that you can use name from environment
@@ -108,8 +116,8 @@ pub struct CmdExecArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdExistsArgs {
-    #[arg(env = "BOX_CONTAINER")]
-    pub container: String,
+    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    pub name: String,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -118,8 +126,8 @@ pub struct CmdLogsArgs {
     #[arg(short, long)]
     pub follow: bool,
 
-    #[arg(env = "BOX_CONTAINER")]
-    pub container: String,
+    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    pub name: String,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -132,8 +140,15 @@ pub struct CmdKillArgs {
     #[arg(short, long, default_value_t = 20)]
     pub timeout: u32,
 
-    #[arg(env = "BOX_CONTAINER")]
-    pub container: String,
+    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    pub name: String,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct CmdInitArgs {
+    /// Execute commands on init
+    #[arg(last = true)]
+    pub on_init: Vec<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -141,10 +156,10 @@ pub enum CliCommands {
     /// Start a container in current directory, mounting it as the rw workspace
     Start(CmdStartArgs),
 
-    /// Enter the shell inside a running box container
+    /// Enter the shell inside a running an owned container
     Shell(CmdShellArgs),
 
-    /// Execute a command inside a running box container
+    /// Execute a command inside a running an owned container
     Exec(CmdExecArgs),
 
     /// Check if container exists
@@ -160,18 +175,18 @@ pub enum CliCommands {
     #[command(subcommand)]
     Image(ImageCommands),
 
-    /// List running containers managed by box
+    /// List running owned containers
     List,
 
     /// Show container logs in journalctl
     Logs(CmdLogsArgs),
 
-    /// Stop running containers managed by box
+    /// Stop running owned container
     Kill(CmdKillArgs),
 
     /// Init command used to setup the container
     #[command(hide = true)]
-    Init,
+    Init(CmdInitArgs),
 }
 
 #[cfg(test)]
@@ -182,6 +197,13 @@ mod tests {
     fn verify_cli() {
         use clap::CommandFactory;
         Cli::command().debug_assert()
+    }
+
+    #[test]
+    fn verify_env_var_prefix() {
+        // just for my sanity check if i forgot to update them
+        assert_eq!(ENV_VAR_PREFIX!("A"), format!("{}_A", crate::BIN_NAME_UPPERCASE));
+        assert_eq!(crate::BIN_NAME.to_uppercase(), crate::BIN_NAME_UPPERCASE);
     }
 }
 

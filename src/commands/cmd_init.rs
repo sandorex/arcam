@@ -1,7 +1,7 @@
 //! Contains all code that should run inside the container as the init
 
 use crate::util::command_extensions::*;
-use crate::{ExitResult, FULL_VERSION};
+use crate::{cli, ExitResult, FULL_VERSION};
 use std::fs::OpenOptions;
 use std::{env, fs};
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
@@ -68,15 +68,27 @@ fn clone_perm(source: &Path, dest: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn initialization() -> ExitResult {
-    println!("box {}", FULL_VERSION);
+/// Basically does same thing as `chmod +x`
+fn make_executable(path: &Path) -> Result<(), std::io::Error> {
+    let mut perm = path.metadata()?.permissions();
 
-    let user = std::env::var("BOX_USER")
-        .expect("BOX_USER is undefined");
-    let uid = std::env::var("BOX_USER_UID")
-        .expect("BOX_USER_UID is undefined");
-    let gid = std::env::var("BOX_USER_GID")
-        .expect("BOX_USER_GID is undefined");
+    // make file executable
+    perm.set_mode(perm.mode() | 0o111);
+
+    fs::set_permissions(path, perm)?;
+
+    Ok(())
+}
+
+fn initialization() -> ExitResult {
+    println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
+
+    let user = std::env::var("HOST_USER")
+        .expect("HOST_USER is undefined");
+    let uid = std::env::var("HOST_USER_UID")
+        .expect("HOST_USER_UID is undefined");
+    let gid = std::env::var("HOST_USER_GID")
+        .expect("HOST_USER_GID is undefined");
 
     let uid_u: u32 = uid.parse().unwrap();
     let gid_u: u32 = gid.parse().unwrap();
@@ -232,7 +244,7 @@ fn initialization() -> ExitResult {
         for entry in init_dir.read_dir().unwrap().flatten() {
             // make sure its executable
             if !entry.metadata().is_ok_and(|x| x.permissions().mode() & 0o111 != 0) {
-                continue;
+                make_executable(&entry.path()).unwrap();
             }
 
             // accept both files and symlinks
@@ -286,14 +298,14 @@ fn get_root_processes() -> Result<Vec<String>, u8> {
     let lines: Vec<String> = stdout
         .trim()
         .lines()
-        .filter(|x| *x != "1") // box is pid 1
+        .filter(|x| *x != "1") // this binary is is pid 1
         .map(|x| x.to_string())
         .collect();
 
     Ok(lines)
 }
 
-pub fn container_init() -> ExitResult {
+pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
 
@@ -304,27 +316,41 @@ pub fn container_init() -> ExitResult {
         r.store(false, Ordering::SeqCst);
     }).expect("Error while setting signal handler");
 
+    if !cli_args.on_init.is_empty() {
+        let path = Path::new("/init.d/99_on_init.sh");
+        // write the init commands to single file
+        fs::write(path, "#!/bin/sh").unwrap();
+        fs::write(path, cli_args.on_init.join("\n")).unwrap();
+
+        make_executable(path).unwrap();
+    }
+
     initialization()?;
 
+    // simply wait until container gets killed
     while running.load(Ordering::SeqCst) {
         // from my testing the delay from this does not really matter but an empty while generated
         // a high cpu usage which is not ideal in the slightest
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
+    // find leftover processes
     let pids = get_root_processes()?;
 
-    println!("Propagating signal to processes");
+    // do not run kill if there are no processes to kill
+    if !pids.is_empty() {
+        println!("Propagating signal to processes");
 
-    // to avoid more crates just use kill command
-    Command::new("kill")
-        // be verbose
-        // send TERM then KILL after 10s
-        .args(["--verbose", "--timeout", "10000", "KILL", "--signal", "TERM"])
-        .args(&pids)
-        .status()
-        .expect("Failed to execute kill")
-        .to_exitcode()?;
+        // to avoid more crates just use kill command
+        Command::new("kill")
+            // be verbose
+            // send TERM then KILL after 10s
+            .args(["--verbose", "--timeout", "10000", "KILL", "--signal", "TERM"])
+            .args(&pids)
+            .status()
+            .expect("Failed to execute kill")
+            .to_exitcode()?;
+    }
 
     println!("Goodbye!");
 

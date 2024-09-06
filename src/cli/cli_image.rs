@@ -31,10 +31,7 @@ pub struct CmdImageBuildArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum ImageCommands {
-    /// Build image for box
-    ///
-    /// This is not strictly necessary as all images are useable with box, its more of a helper
-    /// than build system
+    /// Macro to build customized images with less boilerplate
     Build(CmdImageBuildArgs),
 
     // TODO clean command that cleans up old images
