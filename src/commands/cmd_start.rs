@@ -159,7 +159,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     if let Some(x) = util::find_containers_by_cwd(&engine) {
         // check if any are running
         if !x.is_empty() {
-            eprintln!("Container(s) are already running in current directory:");
+            eprintln!("There are containers running in current directory:");
             for container in &x {
                 eprintln!("   {container}");
             }
