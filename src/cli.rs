@@ -1,8 +1,6 @@
 pub mod cli_config;
-pub mod cli_image;
 
 use cli_config::ConfigCommands;
-use cli_image::ImageCommands;
 use clap::{Parser, Subcommand, Args};
 use crate::{FULL_VERSION, ENV_VAR_PREFIX};
 
@@ -170,10 +168,6 @@ pub enum CliCommands {
     /// Config related commands
     #[command(subcommand)]
     Config(ConfigCommands),
-
-    /// Image related commands
-    #[command(subcommand)]
-    Image(ImageCommands),
 
     /// List running owned containers
     List,
