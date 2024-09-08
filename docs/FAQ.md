@@ -1,7 +1,7 @@
 ## Frequently Asked Questions
 
 ### Data Persistance
-**NOTE: This makes also breaks sandboxing a bit if you share the volume between containers**
+**NOTE: This also breaks sandboxing a bit if you share the volume between containers**
 
 One of annoying side effects of ephemeral containers is the install at each startup, so to mitigate it with neovim plugins in this case you can use following:
 
