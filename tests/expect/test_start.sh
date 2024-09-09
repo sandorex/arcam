@@ -12,7 +12,7 @@ export ARCAM_DIR="$(pwd)"
 "$EXE" --version
 
 run_test "start with random name" - <<'EOF'
-    spawn arcam start
+    spawn $env(EXE) start
     expect {
         -re {^([A-Za-z\-]+)\r\n$} { }
         "already running" { exit 2 }
@@ -34,7 +34,7 @@ EOF
 export ARCAM_CONTAINER='arcam-test'
 
 run_test "plain start" - <<'EOF'
-    spawn arcam start
+    spawn $env(EXE) start
     expect {
         -ex "$env(ARCAM_CONTAINER)\r\n" {}
         "already running" { exit 2 }
@@ -47,7 +47,7 @@ EOF
 podman stop "$ARCAM_CONTAINER" >/dev/null
 
 run_test "start with config @test" - <<'EOF'
-    spawn arcam start @test
+    spawn $env(EXE) start @test
     expect {
         -ex "$env(ARCAM_CONTAINER)\r\n" {}
         "already running" { exit 2 }
@@ -58,4 +58,3 @@ run_test "start with config @test" - <<'EOF'
 EOF
 
 podman stop "$ARCAM_CONTAINER" >/dev/null
-

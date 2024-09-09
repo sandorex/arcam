@@ -4,10 +4,12 @@
 FAILED=0
 for file in ./*test_*.sh; do
     if [[ -x "$file" ]]; then
-        if ! "$file"; then
-            FAILED=1
+        "$file" "$@"
+        ret=$?
+
+        if [[ $ret -gt $FAILED ]]; then
+            FAILED=$?
         fi
-        echo
     fi
 done
 

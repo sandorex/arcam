@@ -15,7 +15,7 @@ run - <<'EOF'
 EOF
 
 run_test "plain shell" - <<'EOF'
-spawn arcam shell
+spawn $env(EXE) shell
 expect {
     -re {$ *} { }
     timeout { exit 1 }
@@ -43,7 +43,7 @@ wait
 EOF
 
 run_test "shell with explicit shell" - <<'EOF'
-spawn arcam shell $env(ARCAM_CONTAINER) /bin/sh
+spawn $env(EXE) shell --shell /bin/sh $env(ARCAM_CONTAINER)
 expect {
     -re {$ *} { }
     timeout { exit 1 }
