@@ -3,32 +3,6 @@ use crate::cli;
 use crate::util::command_extensions::*;
 use crate::ExitResult;
 
-fn gen_container_exec_cmd(shell: bool, ws_dir: String, container_name: &str, command: &[String]) -> Vec<String> {
-    let user = std::env::var("USER").expect("Unable to get USER from env var");
-
-    let mut args: Vec<String> = vec![
-        "exec".into(),
-        "-it".into(),
-        "--workdir".into(), ws_dir,
-        "--user".into(), user,
-        format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
-        container_name.to_string(),
-    ];
-
-    if shell {
-        // run the command as one big concatenated script
-        args.extend(vec![
-            "--env=SHELL=/usr/bin/bash".into(),
-            "bash".into(), "-c".into(), command.join(" "),
-        ]);
-    } else {
-        // just execute verbatim
-        args.extend(command.iter().cloned());
-    }
-
-    args
-}
-
 pub fn container_exec(engine: Engine, dry_run: bool, mut cli_args: cli::CmdExecArgs) -> ExitResult {
     // try to find container in current directory
     if cli_args.name.is_empty() {
@@ -57,9 +31,31 @@ pub fn container_exec(engine: Engine, dry_run: bool, mut cli_args: cli::CmdExecA
         }
     };
 
-    let args = gen_container_exec_cmd(cli_args.shell, ws_dir, &cli_args.name, &cli_args.command);
+    let user = std::env::var("USER").expect("Unable to get USER from env var");
+
     let mut cmd = Command::new(&engine.path);
-    cmd.args(args);
+    cmd.args(["exec", "-it"]);
+    cmd.args([
+        format!("--workdir={}", ws_dir),
+        format!("--user={}", user),
+        format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
+    ]);
+
+    if let Some(shell) = &cli_args.shell {
+        cmd.arg(format!("--env=SHELL={}", shell));
+        cmd.args([
+            &cli_args.name,
+            shell, "-c"
+        ]);
+
+        // run the command as one big concatenated string
+        cmd.arg(&cli_args.command.join(" "));
+    } else {
+        cmd.arg(&cli_args.name);
+
+        // just execute verbatim
+        cmd.args(&cli_args.command);
+    }
 
     if dry_run {
         cmd.print_escaped_cmd()

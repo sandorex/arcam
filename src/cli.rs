@@ -99,9 +99,11 @@ pub struct CmdShellArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdExecArgs {
-    /// Execute command using bash shell (avoids bash -c '..')
-    #[arg(long)]
-    pub shell: bool,
+    /// Execute command using a shell
+    ///
+    /// The shell will be used like `<shell> -c '<command..>'` so it must be compatible
+    #[arg(long, default_missing_value = "/bin/sh", require_equals = true, num_args = 0..=1)]
+    pub shell: Option<String>,
 
     /// Name or the ID of the container
     #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
