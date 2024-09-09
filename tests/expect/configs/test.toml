@@ -1,0 +1,4 @@
+[[config]]
+name = "test"
+image = "docker.io/library/debian:bookworm-slim"
+
