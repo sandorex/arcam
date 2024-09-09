@@ -88,13 +88,15 @@ pub struct CmdStartArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdShellArgs {
+    // NOTE: this used to be a positional argument but it prevented the command from be being used
+    // when the name of container was not provided
+    /// Use a specific shell
+    #[arg(long)]
+    pub shell: Option<String>,
+
     /// Name or the ID of the container
     #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
     pub name: String,
-
-    // i feel like `shell --shell` looks awful so i made into a position arg
-    /// Use custom shell
-    pub shell: Option<String>,
 }
 
 #[derive(Args, Debug, Clone)]
