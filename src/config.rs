@@ -87,7 +87,7 @@ pub struct Config {
     pub container_name: Option<String>,
 
     /// Dotfiles directory to use as /etc/skel
-    pub dotfiles: Option<String>,
+    pub skel: Option<String>,
 
     /// Should the container have access to internet
     #[serde(default)]

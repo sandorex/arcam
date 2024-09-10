@@ -31,9 +31,11 @@ pub struct CmdStartArgs {
     #[arg(long, env = ENV_VAR_PREFIX!("CONTAINER"))]
     pub name: Option<String>,
 
-    /// Path to dotfiles which will be used as /etc/skel inside the container
-    #[arg(long, env = ENV_VAR_PREFIX!("DOTFILES"))]
-    pub dotfiles: Option<String>,
+    /// Path to directory which will be used as /etc/skel inside the container
+    ///
+    /// Used for static dotfiles that can be copied verbatim
+    #[arg(long)]
+    pub skel: Option<String>,
 
     /// Set network access permission for the container
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]

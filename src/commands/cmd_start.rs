@@ -89,8 +89,8 @@ fn expand_env(input: &mut String, environ: &HashMap<&str, &str>) {
 
 fn merge_config(engine: &Engine, mut config: Config, cli_args: &mut cli::CmdStartArgs, environ: &HashMap<&str, &str>) {
     // expand config properties only
-    if let Some(dotfiles) = config.dotfiles.as_mut() {
-        expand_env(dotfiles, environ);
+    if let Some(skel) = config.skel.as_mut() {
+        expand_env(skel, environ);
     }
 
     for i in config.default.engine_args.iter_mut() {
@@ -125,8 +125,8 @@ fn merge_config(engine: &Engine, mut config: Config, cli_args: &mut cli::CmdStar
     cli_args.on_init_file.extend_from_slice(&config.on_init_file);
 
     // prefer cli dotfiles and have env vars expanded in config
-    if cli_args.dotfiles.is_none() {
-        cli_args.dotfiles = config.dotfiles;
+    if cli_args.skel.is_none() {
+        cli_args.skel = config.skel;
     }
 
     cli_args.capabilities.extend_from_slice(&config.default.capabilities);
@@ -383,9 +383,9 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cmd.arg(format!("--volume={}:/init.d/99_{}:copy", file.canonicalize().unwrap().to_string_lossy(), util::rand()));
     }
 
-    // mount dotfiles if provided
-    if let Some(dotfiles) = &cli_args.dotfiles {
-        cmd.arg(format!("--volume={}:/etc/skel:ro", dotfiles));
+    // mount skel if provided
+    if let Some(skel) = &cli_args.skel {
+        cmd.arg(format!("--volume={}:/etc/skel:ro", skel));
     }
 
     // add the extra args verbatim
