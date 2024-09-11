@@ -443,29 +443,9 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             }
         };
 
-        // wait for container to be initialized
-        let mut counter = 0;
-        loop {
-            if is_initialized() {
-                break;
-            }
-
-            counter += 1;
-
-            // basically try for 15 seconds
-            if counter > 15 {
-                eprintln!("Container initialization timeout was reached, killing the container");
-
-                // kill the container
-                return Command::new(&engine.path)
-                    .args(["container", "stop", "--time", "5", id])
-                    .status()
-                    .expect(crate::ENGINE_ERR_MSG)
-                    .to_exitcode();
-            }
-
-            // sleep for 100ms
-            std::thread::sleep(std::time::Duration::from_millis(100));
+        // wait until container finishes
+        while !is_initialized() {
+            std::thread::sleep(std::time::Duration::from_millis(1000));
         }
 
         // print the name instead of id
