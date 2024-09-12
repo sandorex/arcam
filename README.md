@@ -5,7 +5,7 @@ Fast sandboxed development container manager using podman, you poke holes in the
 
 **NOTE: Version 0.1.X is considered alpha and may break compatability at any time**
 
-Experimental but all code since `v0.1.1` was written within a box container
+Experimental but all code since `v0.1.1` was written within itself
 
 *Originally named `box`, renamed to `arcam`*
 
@@ -27,8 +27,13 @@ These are features that are planned but the details are debatable
 ### Installation
 You can download binary for latest release [here](https://github.com/sandorex/arcam/releases/latest/download/arcam)
 
-Alternatively you can install it using cargo
+Alternatively you can install it from crates.io
 ```sh
+cargo install arcam
+```
+
+You can also install straight from git
+```
 cargo install --git https://github.com/sandorex/arcam
 ```
 
