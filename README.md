@@ -1,6 +1,8 @@
 ## arcam
 Fast sandboxed development container manager using podman, you poke holes in the sandboxed, minimal permissions by default
 
+![Demo GIF](arcam-demo.gif)
+
 **NOTE: Version 0.1.X is considered alpha and may break compatability at any time**
 
 Experimental but all code since `v0.1.1` was written within a box container
