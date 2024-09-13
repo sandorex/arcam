@@ -1,5 +1,5 @@
 ## arcam
-Fast sandboxed development container manager using podman, you poke holes in the sandboxed, minimal permissions by default
+Fast sandboxed development container manager using podman, minimal permissions by default choose balance between security and convenience
 
 ![Demo GIF](arcam-demo.gif)
 
