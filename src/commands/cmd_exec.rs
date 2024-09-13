@@ -25,7 +25,7 @@ pub fn container_exec(engine: Engine, dry_run: bool, mut cli_args: cli::CmdExecA
         // allow dry_run to work
         None if dry_run => "/ws/dry_run".to_string(),
         None => {
-            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::BIN_NAME);
+            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME);
 
             return Err(1);
         }
@@ -49,7 +49,7 @@ pub fn container_exec(engine: Engine, dry_run: bool, mut cli_args: cli::CmdExecA
         ]);
 
         // run the command as one big concatenated string
-        cmd.arg(&cli_args.command.join(" "));
+        cmd.arg(cli_args.command.join(" "));
     } else {
         cmd.arg(&cli_args.name);
 

@@ -5,7 +5,7 @@ pub fn print_containers(engine: Engine, dry_run: bool) -> ExitResult {
     let mut cmd = Command::new(&engine.path);
     cmd.args([
         "container", "ls",
-        "--filter", format!("label={}", crate::BIN_NAME).as_str(),
+        "--filter", format!("label={}", crate::APP_NAME).as_str(),
         "--format", "{{.Names}}|{{.Image}}|{{.Labels.host_dir}}|{{.Ports}}"
     ]);
 

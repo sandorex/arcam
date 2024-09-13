@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::{ExitResult, VERSION, ENV_VAR_PREFIX, BIN_NAME};
+use crate::{ExitResult, VERSION, ENV_VAR_PREFIX, APP_NAME};
 use crate::util::{self, Engine, EngineKind};
 use crate::util::command_extensions::*;
 use crate::cli;
@@ -33,7 +33,7 @@ fn generate_name() -> String {
 
     // allow custom container suffix but default to bin name
     let suffix = std::env::var(ENV_VAR_PREFIX!("CONTAINER_SUFFIX"))
-        .unwrap_or_else(|_| BIN_NAME.to_string());
+        .unwrap_or_else(|_| APP_NAME.to_string());
 
     format!("{}-{}", adjective, suffix)
 }
@@ -220,9 +220,9 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     cmd.args([
         // TODO add display for engine so that its prints lowercase
         format!("--label=manager={:?}", engine.kind),
-        format!("--label={}={}", BIN_NAME, main_project_dir),
+        format!("--label={}={}", APP_NAME, main_project_dir),
         format!("--label=host_dir={}", cwd.to_string_lossy()),
-        format!("--env={0}={0}", BIN_NAME),
+        format!("--env={0}={0}", APP_NAME),
         format!("--name={}", container_name),
         format!("--env={}={}", ENV_VAR_PREFIX!("VERSION"), VERSION),
         format!("--env=manager={:?}", engine.kind),

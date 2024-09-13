@@ -23,7 +23,7 @@ pub fn kill_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdKillA
 
         // check if container is owned
         if util::get_container_ws(&engine, &cli_args.name).is_none() {
-            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::BIN_NAME);
+            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME);
 
             return Err(1);
         }

@@ -14,10 +14,8 @@ pub const ENGINE_ERR_MSG: &str = "Failed to execute engine";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_DESCRIBE"));
 
-pub const BIN_NAME: &str = env!("CARGO_BIN_NAME");
-
-// TODO find a way to uppercase bin name at compile time
-pub const BIN_NAME_UPPERCASE: &str = "ARCAM";
+pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
+pub const APP_NAME_UPPERCASE: &str = env!("CARGO_PKG_NAME_UPPERCASE");
 
 /// Prefix env var name with proper prefix
 #[macro_export]

@@ -43,7 +43,7 @@ pub fn app_dir() -> PathBuf {
             };
 
             // use bin name for dir name
-            PathBuf::from(xdg_config_home).join(crate::BIN_NAME)
+            PathBuf::from(xdg_config_home).join(crate::APP_NAME)
         },
     }
 }

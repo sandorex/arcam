@@ -11,7 +11,7 @@ const AFTER_HELP: &str = concat!(
 
 /// Sandboxed development container manager, with focus on security by default
 #[derive(Parser, Debug)]
-#[command(name = crate::BIN_NAME, author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
+#[command(name = crate::APP_NAME, author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
 pub struct Cli {
     /// Explicitly set container engine to use
     #[arg(long, env = ENV_VAR_PREFIX!("ENGINE"))]
@@ -202,8 +202,8 @@ mod tests {
     #[test]
     fn verify_env_var_prefix() {
         // just for my sanity check if i forgot to update them
-        assert_eq!(ENV_VAR_PREFIX!("A"), format!("{}_A", crate::BIN_NAME_UPPERCASE));
-        assert_eq!(crate::BIN_NAME.to_uppercase(), crate::BIN_NAME_UPPERCASE);
+        assert_eq!(ENV_VAR_PREFIX!("A"), format!("{}_A", crate::APP_NAME_UPPERCASE));
+        assert_eq!(crate::APP_NAME.to_uppercase(), crate::APP_NAME_UPPERCASE);
     }
 }
 

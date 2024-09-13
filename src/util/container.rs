@@ -52,7 +52,7 @@ pub fn container_exists(engine: &Engine, container: &str) -> bool {
 }
 
 pub fn get_container_ws(engine: &Engine, container: &str) -> Option<String> {
-    let key = format!(".Config.Labels.{}", crate::BIN_NAME);
+    let key = format!(".Config.Labels.{}", crate::APP_NAME);
 
     // this looks like a mess as i need to escape curly braces
     //
