@@ -5,24 +5,24 @@ Fast sandboxed development container manager using podman, minimal permissions b
 
 **NOTE: Version 0.1.X is considered alpha and may break compatability at any time**
 
-Experimental but all code since `v0.1.1` was written within itself
+Experimental but all code since `v0.1.1` was written inside arcam container
 
-*Originally named `box`, renamed to `arcam`*
+*Originally named `box`*
 
 ### Features
 - Sandboxed ephemeral container by default (podman defaults with network turned on)
 - Pass through audio, wayland, ssh-agent easily on demand with flags or config
 - Customize your experience per language, even per project
-- Switch machines often? Just make the CI build your container with your dotfiles preincluded!
-- Use different local dotfiles on demand (so you don't have to rebuild your container to update dotfiles)
-- Automatic passwordless sudo (or `su` if not installed)
+- Override dotfiles locally on demand, so you don't have to rebuild image to update dotfiles
+- Automatic passwordless sudo *(or `su` if not installed)*
+- Consistant development environment on any distro, especially useful on immutable distros like fedora atomic
+- Offline use, container initialization process does not require internet connection *(image has to be downloaded of course)*
 
 ## Planned Features
 These are features that are planned but the details are debatable
 
-- Provide partial support for devcontainer.json
 - Provide support for devcontainer features
-- Partial docker support (i do not know if im able to support both docker and podman)
+- Docker support
 
 ### Installation
 You can download binary for latest release [here](https://github.com/sandorex/arcam/releases/latest/download/arcam)
@@ -40,11 +40,11 @@ cargo install --git https://github.com/sandorex/arcam
 ### Custom Container Image
 Making a custom container image is same as for any other container, to take full advantage of box keep following things in mind:
 - Install `sudo` for nicer experience
-- Any executable files in `/init.d` will be executed on start of the container as the user, you can use `sudo` (may not be installed in some images) or `su` for root access
-- Put dotfiles in `/etc/skel` which will be copied to user home on start, note that it will not be used if `--dotfiles` flag is used
+- Any executable files in `/init.d` will be executed on start of the container as the user, you can use `sudo` or `su` for root access
+- Put dotfiles in `/etc/skel` which will be copied to user home on start, note that it may be overriden at runtime using flags
 - All data inside the container (not counting mounts) will be deleted when container stops, to add caching or presistant data use a named volume
 
-For inspiration, or just an example take a look at [my container](https://github.com/sandorex/config/tree/master/boxes) with all languages i use and neovim preinstalled with my dotfiles
+For examples you can take a look at [my container](https://github.com/sandorex/config/tree/master/boxes) with neovim and all LSPs preinstalled
 
 ### Comparison to Other Tools
 #### Toolbox / Distrobox
