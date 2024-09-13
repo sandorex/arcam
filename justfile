@@ -3,7 +3,7 @@ default:
 
 # get cargo package version
 get-version:
-    @cargo pkgid | cut -d "@" -f2
+    @cargo pkgid | perl -pe '($_)=/([0-9]+([.][0-9]+)+)/'
 
 # run cargo check test and clippy
 test:
@@ -12,7 +12,7 @@ test:
     cargo clippy
 
 # tag current package version in git
-git-tag:
+tag:
     #!/usr/bin/env bash
     set -e
 
