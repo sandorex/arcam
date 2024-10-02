@@ -6,7 +6,7 @@ set -eu -o pipefail
 source common.sh
 
 # using env vars to set everything as it requires less code
-export ARCAM_IMAGE="docker.io/library/debian:bookworm-slim"
+export ARCAM_IMAGE="docker.io/library/debian:trixie-slim"
 export ARCAM_CONTAINER="arcam-test"
 
 # if not killed succesfully then use fail and clean up

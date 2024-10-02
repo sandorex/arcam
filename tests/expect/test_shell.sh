@@ -5,7 +5,7 @@ set -e -o pipefail
 
 source common.sh
 
-export ARCAM_IMAGE="docker.io/library/debian:bookworm-slim"
+export ARCAM_IMAGE="docker.io/library/debian:trixie-slim"
 export ARCAM_CONTAINER="arcam-test"
 
 "$EXE" --version

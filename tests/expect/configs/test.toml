@@ -1,4 +1,4 @@
 [[config]]
 name = "test"
-image = "docker.io/library/debian:bookworm-slim"
+image = "docker.io/library/debian:trixie-slim"
 

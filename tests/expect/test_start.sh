@@ -6,7 +6,7 @@ set -eu -o pipefail
 source common.sh
 
 # using env vars to set everything as it requires less code
-export ARCAM_IMAGE="docker.io/library/debian:bookworm-slim"
+export ARCAM_IMAGE="docker.io/library/debian:trixie-slim"
 export ARCAM_DIR="$(pwd)"
 
 "$EXE" --version
