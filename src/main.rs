@@ -7,7 +7,7 @@ use clap::Parser;
 use cli::CliCommands;
 use cli::cli_config::ConfigCommands;
 use std::process::ExitCode;
-use util::{Engine, ExitResultExt};
+use util::Engine;
 
 pub const ENGINE_ERR_MSG: &str = "Failed to execute engine";
 
@@ -56,16 +56,6 @@ fn get_engine(args: &cli::Cli) -> Result<Engine, ExitCode> {
 fn main() -> ExitCode {
     let args = cli::Cli::parse();
 
-    // init does not need engine, just get it from environment if needed
-    if let CliCommands::Init(x) = args.cmd {
-        if !util::is_in_container() {
-            eprintln!("Running init outside a container is dangerous, qutting..");
-            return ExitCode::FAILURE;
-        }
-
-        return commands::container_init(x).to_exitcode();
-    }
-
     match command(&args) {
         Ok(_) => ExitCode::SUCCESS,
         Err(x) => x,
@@ -87,6 +77,13 @@ fn command(args: &cli::Cli) -> Result<(), ExitCode> {
         CliCommands::List => commands::print_containers(get_engine(&args)?, args.dry_run),
         CliCommands::Logs(x) => commands::print_logs(get_engine(&args)?, x.clone()),
         CliCommands::Kill(x) => commands::kill_container(get_engine(&args)?, args.dry_run, x.clone()),
-        CliCommands::Init(_) => unreachable!(), // this is handled before
+        CliCommands::Init(x) => {
+            if !util::is_in_container() {
+                eprintln!("Running init outside a container is dangerous, qutting..");
+                return Err(ExitCode::FAILURE);
+            }
+
+            commands::container_init(x.clone())
+        },
     }.map_err(|x| ExitCode::from(x))
 }

@@ -6,24 +6,10 @@ pub use container::*;
 pub use engine::*;
 pub use command::*;
 
-use std::process::ExitCode;
 use std::path::PathBuf;
 use std::collections::HashMap;
 
-pub trait ExitResultExt {
-    fn to_exitcode(&self) -> ExitCode;
-}
-
 pub type ExitResult = Result<(), u8>;
-impl ExitResultExt for ExitResult {
-    fn to_exitcode(&self) -> ExitCode {
-        // convert u8 to ExitCode
-        match self {
-            Ok(_) => ExitCode::SUCCESS,
-            Err(x) => ExitCode::from(*x),
-        }
-    }
-}
 
 /// Get app configuration directory
 pub fn app_dir() -> PathBuf {
