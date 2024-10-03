@@ -293,8 +293,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cmd.args(args);
     }
 
-    // disable network if requested
-    if ! cli_args.network.unwrap_or(true) {
+    // set network if requested
+    if ! cli_args.network.unwrap_or(false) {
         cmd.arg("--network=none");
     }
 
