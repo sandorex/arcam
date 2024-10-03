@@ -21,7 +21,7 @@ pub const APP_NAME_UPPERCASE: &str = env!("CARGO_PKG_NAME_UPPERCASE");
 #[macro_export]
 macro_rules! ENV_VAR_PREFIX {
     ($($args:literal),*) => {
-        concat!("ARCAM_", $($args),*)
+        concat!(env!("CARGO_PKG_NAME_UPPERCASE"), "_", $($args),*)
     };
 }
 
