@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{fmt::Display, process::Command};
 
 #[derive(Debug, Clone)]
 pub enum EngineKind {
@@ -26,6 +26,12 @@ pub struct Engine {
 
     /// See `EngineKind`
     pub kind: EngineKind,
+}
+
+impl Display for Engine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format!("{:?}", self.kind).to_lowercase())
+    }
 }
 
 #[allow(dead_code)]

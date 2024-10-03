@@ -1,12 +1,10 @@
-use crate::config::Config;
 use crate::{ExitResult, VERSION, ENV_VAR_PREFIX, APP_NAME};
 use crate::util::{self, Engine, EngineKind};
 use crate::util::command_extensions::*;
 use crate::cli;
+use super::cmd_init::InitArgs;
 use std::collections::HashMap;
 use std::path::Path;
-
-use super::cmd_init::InitArgs;
 
 /// Get hostname from system using `hostname` command
 fn get_hostname() -> String {
@@ -19,7 +17,7 @@ fn get_hostname() -> String {
     let cmd = Command::new("hostname").output().expect("Could not call hostname");
     let hostname = String::from_utf8_lossy(&cmd.stdout);
 
-    if ! cmd.status.success() || hostname.is_empty() {
+    if !cmd.status.success() || hostname.is_empty() {
         panic!("Unable to get hostname from host");
     }
 
@@ -79,52 +77,6 @@ fn find_terminfo() -> Vec<String> {
     args
 }
 
-// TODO expand actual environ vars
-/// Highly inefficient expansion of env vars in string
-fn expand_env(input: &mut String, environ: &HashMap<&str, &str>) {
-    if input.contains("$") {
-        let mut result = input.to_string();
-        for (k, v) in environ.iter() {
-            result = result.replace(format!("${}", k).as_str(), v);
-        }
-    }
-}
-
-fn merge_config(engine: &Engine, mut config: Config, cli_args: &mut cli::CmdStartArgs, environ: &HashMap<&str, &str>) {
-    for i in config.engine_args.iter_mut() {
-        expand_env(i, environ);
-    }
-
-    for i in config.get_engine_args(engine).iter_mut() {
-        expand_env(i, environ);
-    }
-
-    cli_args.engine_args.extend(config.engine_args.clone());
-    cli_args.engine_args.extend(config.get_engine_args(engine).clone());
-
-    // take image from config
-    cli_args.image = config.image;
-
-    // prefer options from cli
-    cli_args.network = cli_args.network.or(Some(config.network));
-    cli_args.audio = cli_args.audio.or(Some(config.audio));
-    cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
-    cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
-    cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
-    cli_args.on_init.extend_from_slice(&config.on_init);
-    cli_args.on_init_file.extend_from_slice(&config.on_init_file);
-
-    // TODO skel should have different environ as it is host path
-    // prefer cli dotfiles and have env vars expanded in config
-    if let Some(skel) = config.skel.as_mut() {
-        expand_env(skel, environ);
-
-        cli_args.skel = Some(skel.clone());
-    }
-
-    cli_args.env.extend(config.env.clone().iter().map(|(k, v)| format!("{k}={v}")));
-}
-
 pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStartArgs) -> ExitResult {
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let user = std::env::var("USER").expect("Unable to get USER from env var");
@@ -168,12 +120,10 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         };
 
         container_name = cli_args.name
-            .clone()
             .or_else(|| config.container_name.clone())
             .unwrap_or_else(generate_name);
 
-        // TODO expand this to all environ args as well
-        // allowed to be used in the config engine_args and dotfiles
+        // expand vars
         let cwd = cwd.to_string_lossy();
         let environ: HashMap<&str, &str> = HashMap::from([
             ("USER", user.as_str()),
@@ -182,7 +132,46 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             ("CONTAINER", container_name.as_str()),
         ]);
 
-        merge_config(&engine, config, &mut cli_args, &environ);
+        let context_getter = |input: &str| -> Option<String> {
+            // prioritize the environ map above then get actual environ vars
+            environ.get(input)
+                .map(|x| x.to_string())
+                .or(std::env::var(input).ok())
+        };
+
+        // expand vars in engine args and append to cli args
+        for i in config.engine_args.iter().chain(config.get_engine_args(&engine).iter()) {
+            let expanded = shellexpand::env_with_context_no_errors(&i, context_getter);
+            cli_args.engine_args.push(expanded.to_string());
+        }
+
+        // cli skel takes priority
+        if cli_args.skel.is_none() {
+            if let Some(skel) = config.skel {
+                let expanded = shellexpand::env_with_context_no_errors(&skel, context_getter);
+
+                cli_args.skel = Some(expanded.to_string());
+            }
+        }
+
+        // expand env as well for some fun dynamic shennanigans
+        for (k, v) in &config.env {
+            let mapped = format!("{k}={v}");
+            let expanded = shellexpand::env_with_context_no_errors(&mapped, context_getter);
+            cli_args.env.push(expanded.to_string());
+        }
+
+        // take image from config
+        cli_args.image = config.image;
+
+        // prefer options from cli
+        cli_args.network = cli_args.network.or(Some(config.network));
+        cli_args.audio = cli_args.audio.or(Some(config.audio));
+        cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
+        cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
+        cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
+        cli_args.on_init.extend_from_slice(&config.on_init);
+        cli_args.on_init_file.extend_from_slice(&config.on_init_file);
     } else {
         container_name = cli_args.name.unwrap_or_else(generate_name);
     }
@@ -206,15 +195,14 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     ]);
 
     cmd.args([
-        // TODO add display for engine so that its prints lowercase
-        format!("--label=manager={:?}", engine.kind),
+        format!("--label=manager={}", engine),
         format!("--label={}={}", APP_NAME, main_project_dir),
         format!("--label=host_dir={}", cwd.to_string_lossy()),
         format!("--env={0}={0}", APP_NAME),
         format!("--name={}", container_name),
         format!("--env={}={}", ENV_VAR_PREFIX!("VERSION"), VERSION),
-        format!("--env=manager={:?}", engine.kind),
-        format!("--env=CONTAINER_ENGINE={:?}", engine.kind),
+        format!("--env=manager={}", engine),
+        format!("--env=CONTAINER_ENGINE={}", engine),
         format!("--env=CONTAINER_NAME={}", container_name),
         format!("--env=HOST_USER={}", user),
         format!("--env=HOST_USER_UID={}", uid),

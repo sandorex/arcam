@@ -98,7 +98,7 @@ fn make_executable(path: &Path) -> Result<(), std::io::Error> {
 }
 
 // TODO create /tmp/.X11-unix just so its properly owned by root? and has correct permissions?
-fn initialization(args: &InitArgs) -> ExitResult {
+fn initialization(_args: &InitArgs) -> ExitResult {
     println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
 
     let user = std::env::var("HOST_USER")

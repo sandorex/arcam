@@ -90,6 +90,8 @@ pub struct Config {
     pub container_name: Option<String>,
 
     /// Dotfiles directory to use as /etc/skel
+    ///
+    /// Environ vars are expanded
     pub skel: Option<String>,
 
     /// Should the container have access to internet
@@ -125,28 +127,36 @@ pub struct Config {
     pub persist: Vec<(String, String)>,
 
     /// Environment variables to set
+    ///
+    /// Environ vars are expanded
     #[serde(default)]
     pub env: HashMap<String, String>,
 
     /// Args passed to the engine
+    ///
+    /// Environ vars are expanded
     #[serde(default)]
     pub engine_args: Vec<String>,
 
     /// Args passed to the engine, if its podman
+    ///
+    /// Environ vars are expanded
     #[serde(default)]
     pub engine_args_podman: Vec<String>,
 
     /// Args passed to the engine, if its docker
+    ///
+    /// Environ vars are expanded
     #[serde(default)]
     pub engine_args_docker: Vec<String>,
 }
 
 impl Config {
     /// Get engine args for specific engine
-    pub fn get_engine_args(&mut self, engine: &Engine) -> &mut Vec<String> {
+    pub fn get_engine_args(&self, engine: &Engine) -> &Vec<String> {
         match engine.kind {
-            crate::util::EngineKind::Podman => &mut self.engine_args_podman,
-            crate::util::EngineKind::Docker => &mut self.engine_args_docker,
+            crate::util::EngineKind::Podman => &self.engine_args_podman,
+            crate::util::EngineKind::Docker => &self.engine_args_docker,
         }
     }
 }
