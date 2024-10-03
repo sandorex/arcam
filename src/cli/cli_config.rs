@@ -19,5 +19,8 @@ pub enum ConfigCommands {
 
     /// Inspect a config, can be used to check if syntax is correct
     Inspect(CmdConfigInspectArgs),
+
+    /// Show all options useable in a config
+    Options,
 }
 

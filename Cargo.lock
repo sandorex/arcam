@@ -94,6 +94,7 @@ dependencies = [
  "bson",
  "chrono",
  "clap",
+ "code-docs-rs",
  "ctrlc",
  "serde",
  "shellexpand",
@@ -246,6 +247,11 @@ name = "clap_lex"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
+
+[[package]]
+name = "code-docs-rs"
+version = "0.1.0"
+source = "git+https://github.com/sandorex/code-docs-rs.git?rev=94b08b23c623658f5bf94979167fccab11ff7b5c#94b08b23c623658f5bf94979167fccab11ff7b5c"
 
 [[package]]
 name = "colorchoice"

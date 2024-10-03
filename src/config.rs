@@ -1,6 +1,7 @@
-/// Contains everything related to container configuration
+//! Contains everything related to container configuration
 
-use serde::Deserialize;
+use code_docs::{code_docs_struct, DocumentedStruct};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -56,6 +57,8 @@ const fn default_version() -> u64 { 1 }
 impl ConfigFile {
     /// Loads config from str, path is just for error message and can be anything
     pub fn load_from_str(text: &str) -> Result<Self, ConfigError> {
+        // TODO load a table first and get the version then try parsing appropriate struct
+
         let obj = toml::from_str::<ConfigFile>(text)
             .map_err(|err| ConfigError::Generic(Box::new(err)) )?;
 
@@ -74,81 +77,80 @@ impl ConfigFile {
     }
 }
 
-/// Single configuration for a container, contains default settings and optional settings per
-/// engine that get applied over the default settings
-#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Config {
-    // TODO figure out rules for local containers that need to be built
-    /// Name of the configuration
-    pub name: String,
+// save all the fields and docs so they can be printed as always up-to-date documentation
+code_docs_struct! {
+    /// Single configuration for a container, contains default settings and optional settings per
+    /// engine that get applied over the default settings
+    #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Config {
+        // TODO redo these comments so they are easy to understand even for non-rust programmers
+        /// Name of the configuration
+        pub name: String,
 
-    /// Image used for the container
-    pub image: String,
+        /// Image used for the container
+        pub image: String,
 
-    /// Optional name to set for the container, otherwise randomly generated
-    pub container_name: Option<String>,
+        /// Optional name to set for the container, otherwise randomly generated
+        pub container_name: Option<String>,
 
-    /// Dotfiles directory to use as /etc/skel
-    ///
-    /// Environ vars are expanded
-    pub skel: Option<String>,
+        /// Dotfiles directory to use as /etc/skel
+        ///
+        /// Environ vars are expanded
+        pub skel: Option<String>,
 
-    /// Should the container have access to internet
-    #[serde(default)]
-    pub network: bool,
+        /// Should the container have access to internet
+        #[serde(default)]
+        pub network: bool,
 
-    /// Try to pass audio into the the container, security impact is unknown
-    #[serde(default)]
-    pub audio: bool,
+        /// Try to pass audio into the the container, security impact is unknown
+        #[serde(default)]
+        pub audio: bool,
 
-    /// Passes wayland compositor through, pokes holes in sandbox, allows r/w access to clipboard
-    #[serde(default)]
-    pub wayland: bool,
+        /// Passes wayland compositor through, pokes holes in sandbox, allows r/w access to clipboard
+        #[serde(default)]
+        pub wayland: bool,
 
-    /// Pass through ssh-agent socket
-    #[serde(default)]
-    pub ssh_agent: bool,
+        /// Pass through ssh-agent socket
+        #[serde(default)]
+        pub ssh_agent: bool,
 
-    /// Pass through session dbus socket
-    #[serde(default)]
-    pub session_bus: bool,
+        /// Pass through session dbus socket
+        #[serde(default)]
+        pub session_bus: bool,
 
-    /// Run command on init (ran using `/bin/sh`)
-    #[serde(default)]
-    pub on_init: Vec<String>,
+        /// Run command on init (ran using `/bin/sh`)
+        #[serde(default)]
+        pub on_init: Vec<String>,
 
-    /// Copies files to container as init scripts (places them in `/init.d/`)
-    #[serde(default)]
-    pub on_init_file: Vec<String>,
+        /// Copies files to container as init scripts (places them in `/init.d/`)
+        #[serde(default)]
+        pub on_init_file: Vec<String>,
 
-    /// Paths to persist between container invocation by mounting a volume
-    #[serde(default)]
-    pub persist: Vec<(String, String)>,
+        /// Environment variables to set
+        ///
+        /// Environ vars are expanded
+        #[serde(default)]
+        pub env: HashMap<String, String>,
 
-    /// Environment variables to set
-    ///
-    /// Environ vars are expanded
-    #[serde(default)]
-    pub env: HashMap<String, String>,
+        /// Args passed to the engine
+        ///
+        /// Environ vars are expanded
+        #[serde(default)]
+        pub engine_args: Vec<String>,
 
-    /// Args passed to the engine
-    ///
-    /// Environ vars are expanded
-    #[serde(default)]
-    pub engine_args: Vec<String>,
+        /// Args passed to the engine, if its podman
+        ///
+        /// Environ vars are expanded
+        #[serde(default)]
+        pub engine_args_podman: Vec<String>,
 
-    /// Args passed to the engine, if its podman
-    ///
-    /// Environ vars are expanded
-    #[serde(default)]
-    pub engine_args_podman: Vec<String>,
-
-    /// Args passed to the engine, if its docker
-    ///
-    /// Environ vars are expanded
-    #[serde(default)]
-    pub engine_args_docker: Vec<String>,
+        /// Args passed to the engine, if its docker
+        ///
+        /// Environ vars are expanded
+        #[serde(default)]
+        pub engine_args_docker: Vec<String>,
+    }
 }
 
 impl Config {

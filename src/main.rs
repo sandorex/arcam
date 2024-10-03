@@ -27,6 +27,32 @@ macro_rules! ENV_VAR_PREFIX {
 
 pub use util::ExitResult;
 
+fn get_engine(args: &cli::Cli) -> Result<Engine, ExitCode> {
+    // find and detect engine
+    let engine: Engine = if let Some(chosen) = &args.engine {
+        // test if engine exists in PATH or as a literal path
+        if !(util::executable_exists(chosen) || std::path::Path::new(chosen).exists()) {
+            eprintln!("Engine '{}' not found in PATH or filesystem", chosen);
+            return Err(ExitCode::FAILURE);
+        }
+
+        Engine::detect(chosen).expect("Failed to detect engine kind")
+    } else if let Some(found) = Engine::find_available_engine() {
+        found
+    } else {
+        eprintln!("No compatible container engine found in PATH");
+        return Err(ExitCode::FAILURE);
+    };
+
+    // prevent running with docker for now
+    if let util::EngineKind::Docker = engine.kind {
+        eprintln!("Docker is not supported at the moment");
+        return Err(ExitCode::FAILURE);
+    }
+
+    Ok(engine)
+}
+
 fn main() -> ExitCode {
     let args = cli::Cli::parse();
 
@@ -40,40 +66,27 @@ fn main() -> ExitCode {
         return commands::container_init(x).to_exitcode();
     }
 
-    // find and detect engine
-    let engine: Engine = if let Some(chosen) = args.engine {
-        // test if engine exists in PATH or as a literal path
-        if !(util::executable_exists(&chosen) || std::path::Path::new(&chosen).exists()) {
-            eprintln!("Engine '{}' not found in PATH or filesystem", &chosen);
-            return ExitCode::FAILURE;
-        }
-
-        Engine::detect(&chosen).expect("Failed to detect engine kind")
-    } else if let Some(found) = Engine::find_available_engine() {
-        found
-    } else {
-        eprintln!("No compatible container engine found in PATH");
-        return ExitCode::FAILURE;
-    };
-
-    // prevent running with docker for now
-    if let util::EngineKind::Docker = engine.kind {
-        eprintln!("Docker is not supported at the moment");
-        return ExitCode::FAILURE
+    match command(&args) {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(x) => x,
     }
+}
 
-    match args.cmd {
-        CliCommands::Start(x) => commands::start_container(engine, args.dry_run, x),
-        CliCommands::Shell(x) => commands::open_shell(engine, args.dry_run, x),
-        CliCommands::Exec(x) => commands::container_exec(engine, args.dry_run, x),
-        CliCommands::Exists(x) => commands::container_exists(engine, x),
+fn command(args: &cli::Cli) -> Result<(), ExitCode> {
+    // TODO there is a bit too much cloning here, not that it matters much
+    match &args.cmd {
+        CliCommands::Start(x) => commands::start_container(get_engine(&args)?, args.dry_run, x.clone()),
+        CliCommands::Shell(x) => commands::open_shell(get_engine(&args)?, args.dry_run, x.clone()),
+        CliCommands::Exec(x) => commands::container_exec(get_engine(&args)?, args.dry_run, x.clone()),
+        CliCommands::Exists(x) => commands::container_exists(get_engine(&args)?, x.clone()),
         CliCommands::Config(subcmd) => match subcmd {
-            ConfigCommands::Extract(x) => commands::extract_config(engine, args.dry_run, &x),
+            ConfigCommands::Extract(x) => commands::extract_config(get_engine(&args)?, args.dry_run, &x),
             ConfigCommands::Inspect(x) => commands::inspect_config(&x),
+            ConfigCommands::Options => { commands::show_config_options(); Ok(()) },
         },
-        CliCommands::List => commands::print_containers(engine, args.dry_run),
-        CliCommands::Logs(x) => commands::print_logs(engine, x),
-        CliCommands::Kill(x) => commands::kill_container(engine, args.dry_run, x),
+        CliCommands::List => commands::print_containers(get_engine(&args)?, args.dry_run),
+        CliCommands::Logs(x) => commands::print_logs(get_engine(&args)?, x.clone()),
+        CliCommands::Kill(x) => commands::kill_container(get_engine(&args)?, args.dry_run, x.clone()),
         CliCommands::Init(_) => unreachable!(), // this is handled before
-    }.to_exitcode()
+    }.map_err(|x| ExitCode::from(x))
 }
