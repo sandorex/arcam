@@ -166,6 +166,11 @@ pub struct EngineConfig {
 pub fn load_from_dir(path: &str) -> Result<HashMap<String, Config>, ConfigError> {
     let mut configs: HashMap<String, Config> = HashMap::new();
 
+    // the directory does not exist just exit quietly
+    if !std::path::Path::new(path).exists() {
+        return Ok(configs);
+    }
+
     let toml_files: Vec<std::path::PathBuf> = std::path::Path::new(path)
         .read_dir()
         .map_err(|err| ConfigError::Message(format!("Error reading config directory {}: {}", path, err)))?
