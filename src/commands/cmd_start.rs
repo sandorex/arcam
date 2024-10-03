@@ -79,6 +79,7 @@ fn find_terminfo() -> Vec<String> {
     args
 }
 
+// TODO expand actual environ vars
 /// Highly inefficient expansion of env vars in string
 fn expand_env(input: &mut String, environ: &HashMap<&str, &str>) {
     if input.contains("$") {
@@ -90,29 +91,16 @@ fn expand_env(input: &mut String, environ: &HashMap<&str, &str>) {
 }
 
 fn merge_config(engine: &Engine, mut config: Config, cli_args: &mut cli::CmdStartArgs, environ: &HashMap<&str, &str>) {
-    // expand config properties only
-    if let Some(skel) = config.skel.as_mut() {
-        expand_env(skel, environ);
-    }
-
-    for i in config.default.engine_args.iter_mut() {
+    for i in config.engine_args.iter_mut() {
         expand_env(i, environ);
     }
 
-    for (_, i) in config.default.env.iter_mut() {
+    for i in config.get_engine_args(engine).iter_mut() {
         expand_env(i, environ);
     }
 
-    // get the engine specific config
-    let mut engine_config = config.get_engine_config(engine).clone();
-
-    for i in engine_config.engine_args.iter_mut() {
-        expand_env(i, environ);
-    }
-
-    for (_, i) in engine_config.env.iter_mut() {
-        expand_env(i, environ);
-    }
+    cli_args.engine_args.extend(config.engine_args.clone());
+    cli_args.engine_args.extend(config.get_engine_args(engine).clone());
 
     // take image from config
     cli_args.image = config.image;
@@ -126,18 +114,15 @@ fn merge_config(engine: &Engine, mut config: Config, cli_args: &mut cli::CmdStar
     cli_args.on_init.extend_from_slice(&config.on_init);
     cli_args.on_init_file.extend_from_slice(&config.on_init_file);
 
+    // TODO skel should have different environ as it is host path
     // prefer cli dotfiles and have env vars expanded in config
-    if cli_args.skel.is_none() {
-        cli_args.skel = config.skel;
+    if let Some(skel) = config.skel.as_mut() {
+        expand_env(skel, environ);
+
+        cli_args.skel = Some(skel.clone());
     }
 
-    cli_args.capabilities.extend_from_slice(&config.default.capabilities);
-    cli_args.engine_args.extend(config.default.engine_args);
-    cli_args.env.extend(config.default.env.clone().iter().map(|(k, v)| format!("{k}={v}")));
-
-    cli_args.capabilities.extend_from_slice(&engine_config.capabilities);
-    cli_args.engine_args.extend(engine_config.engine_args);
-    cli_args.env.extend(engine_config.env.clone().iter().map(|(k, v)| format!("{k}={v}")));
+    cli_args.env.extend(config.env.clone().iter().map(|(k, v)| format!("{k}={v}")));
 }
 
 pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStartArgs) -> ExitResult {
@@ -187,6 +172,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             .or_else(|| config.container_name.clone())
             .unwrap_or_else(generate_name);
 
+        // TODO expand this to all environ args as well
         // allowed to be used in the config engine_args and dotfiles
         let cwd = cwd.to_string_lossy();
         let environ: HashMap<&str, &str> = HashMap::from([

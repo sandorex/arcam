@@ -1,9 +1,10 @@
 /// Contains everything related to container configuration
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+use crate::util::Engine;
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -119,47 +120,35 @@ pub struct Config {
     #[serde(default)]
     pub on_init_file: Vec<String>,
 
-    /// Default setting used regardless of the engine
+    /// Paths to persist between container invocation by mounting a volume
     #[serde(default)]
-    pub default: EngineConfig,
-
-    /// Override default settings if the engine is podman
-    #[serde(default)]
-    pub podman: EngineConfig,
-
-    /// Override default settings if the engine is docker
-    #[serde(default)]
-    pub docker: EngineConfig,
-}
-
-impl Config {
-    pub fn get_engine_config(&self, engine: &crate::util::Engine) -> &EngineConfig {
-        match &engine.kind {
-            crate::util::EngineKind::Podman => &self.podman,
-            crate::util::EngineKind::Docker => &self.docker,
-        }
-    }
-}
-
-// TODO create conversion between cli args and this, so one could generate it from cmd args
-/// Container arguments for specific engine
-#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
-pub struct EngineConfig {
-    // NOTE keep it simple, do not add unecessary wrappers for arguments
-
-    /// Arguments to pass to the engine, some $VARS are expanded
-    #[serde(default)]
-    pub engine_args: Vec<String>,
-
-    /// Capabilties to add / remove for the container
-    ///
-    /// For example `!cap_net_broadcast` disables the capability
-    #[serde(default)]
-    pub capabilities: Vec<String>,
+    pub persist: Vec<(String, String)>,
 
     /// Environment variables to set
     #[serde(default)]
-    pub env: HashMap<String, String>
+    pub env: HashMap<String, String>,
+
+    /// Args passed to the engine
+    #[serde(default)]
+    pub engine_args: Vec<String>,
+
+    /// Args passed to the engine, if its podman
+    #[serde(default)]
+    pub engine_args_podman: Vec<String>,
+
+    /// Args passed to the engine, if its docker
+    #[serde(default)]
+    pub engine_args_docker: Vec<String>,
+}
+
+impl Config {
+    /// Get engine args for specific engine
+    pub fn get_engine_args(&mut self, engine: &Engine) -> &mut Vec<String> {
+        match engine.kind {
+            crate::util::EngineKind::Podman => &mut self.engine_args_podman,
+            crate::util::EngineKind::Docker => &mut self.engine_args_docker,
+        }
+    }
 }
 
 /// Load and merge configs from directory (loads *.toml file)
@@ -201,19 +190,14 @@ mod tests {
 
     #[test]
     fn from_str() {
+        // TODO write all the keys here to preserve compatability in the future
         let cfg_text = r#"
 [[config]]
 name = "first"
 image = "fedora"
-
-[config.default]
 engine_args = [ "default" ]
-
-[config.podman]
-engine_args = [ "podman" ]
-
-[config.docker]
-engine_args = [ "docker" ]
+engine_args_podman = [ "podman" ]
+engine_args_docker = [ "docker" ]
 "#;
 
         let result = ConfigFile::load_from_str(cfg_text);
@@ -221,26 +205,14 @@ engine_args = [ "docker" ]
         let result_ok = result.unwrap();
 
         assert_eq!(result_ok, ConfigFile {
-            version: None,
+            version: default_version(),
             config: Some(vec![
                 Config {
                     name: "first".into(),
                     image: "fedora".into(),
-
-                    default: EngineConfig {
-                        engine_args: vec!["default".into()],
-                        ..Default::default()
-                    },
-
-                    podman: EngineConfig {
-                        engine_args: vec!["podman".into()],
-                        ..Default::default()
-                    },
-
-                    docker: EngineConfig {
-                        engine_args: vec!["docker".into()],
-                        ..Default::default()
-                    },
+                    engine_args: vec!["default".into()],
+                    engine_args_podman: vec!["podman".into()],
+                    engine_args_docker: vec!["docker".into()],
 
                     ..Default::default()
                 },
