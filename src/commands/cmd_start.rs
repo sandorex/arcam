@@ -172,6 +172,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
         cli_args.on_init_pre.extend_from_slice(&config.on_init_pre);
         cli_args.on_init_post.extend_from_slice(&config.on_init_post);
+        cli_args.capabilities.extend_from_slice(&config.capabilities);
     } else {
         container_name = cli_args.name.unwrap_or_else(generate_name);
     }
@@ -237,12 +238,25 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cmd.arg(format!("--env={}", e));
     }
 
-    // add remove capabilities easily
-    for c in &cli_args.capabilities {
-        if let Some(stripped) = c.strip_prefix("!") {
-            cmd.arg(format!("--cap-drop={}", stripped));
-        } else {
-            cmd.arg(format!("--cap-add={}", c));
+    // NOTE podman does not support drop and add at the same time, once dropped its dropped so i
+    // want to extend that so config can overwrite it and then cli can overwrite the overwritten
+    {
+        // list of all capabilities mentioned, true => add, false => drop
+        let mut caps = HashMap::<&str, bool>::new();
+
+        for i in &cli_args.capabilities {
+            match i.strip_prefix("!") {
+                Some(x) => caps.insert(x, false),
+                None => caps.insert(&i, true),
+            };
+        }
+
+        for (cap, val) in caps {
+            if val {
+                cmd.arg(format!("--cap-add={}", cap));
+            } else {
+                cmd.arg(format!("--cap-drop={}", cap));
+            }
         }
     }
 

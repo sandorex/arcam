@@ -28,7 +28,7 @@ pub struct Cli {
 #[derive(Args, Debug, Clone, Default)]
 pub struct CmdStartArgs {
     /// Name of the new container (if not set a randomly generated name will be used)
-    #[arg(long, env = ENV_VAR_PREFIX!("CONTAINER"))]
+    #[arg(long, value_name = "IMAGE|@CONFIG", env = ENV_VAR_PREFIX!("CONTAINER"))]
     pub name: Option<String>,
 
     /// Path to directory which will be used as /etc/skel inside the container
@@ -65,7 +65,7 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "SCRIPT")]
     pub on_init_post: Vec<String>,
 
-    /// Add or drop capabilities by prefixing them with '!'
+    /// Add capabilities, or drop them with by prefixing `!cap`
     ///
     /// For more details about capabilities read `man 7 capabilities`
     #[arg(long = "cap")]

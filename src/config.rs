@@ -133,6 +133,12 @@ code_docs_struct! {
         #[serde(default)]
         pub env: HashMap<String, String>,
 
+        /// Add capabilities, or drop them with by prefixing `!cap`
+        ///
+        /// For more details about capabilities read `man 7 capabilities`
+        #[serde(default)]
+        pub capabilities: Vec<String>,
+
         /// Args passed to the engine
         ///
         /// Environ vars are expanded
