@@ -6,6 +6,8 @@ use crate::cli;
 use std::collections::HashMap;
 use std::path::Path;
 
+use super::cmd_init::InitArgs;
+
 /// Get hostname from system using `hostname` command
 fn get_hostname() -> String {
     // try to get hostname from env var
@@ -244,6 +246,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         EngineKind::Podman => {
             cmd.args([
                 "--userns=keep-id",
+                "--group-add=keep-groups",
 
                 // the default ulimit is low
                 "--ulimit=host",
@@ -391,6 +394,24 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     // add the extra args verbatim
     cmd.args(cli_args.engine_args.clone());
 
+    let encoded_init_args = {
+        // pass all the args here
+        let init_args = InitArgs {
+            on_init: cli_args.on_init,
+
+            // take only the paths
+            persist: cli_args.persist.iter().map(|x| x.0.clone()).collect(),
+        };
+
+        match init_args.encode() {
+            Ok(x) => x,
+            Err(err) => {
+                eprintln!("Error while encoding init args: {}", err);
+                return Err(1);
+            },
+        }
+    };
+
     cmd.args([
         // detaching breaks things
         "--detach-keys=",
@@ -402,12 +423,9 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
 
         "init",
 
-        // rest after this are on_init scripts
-        "--",
+        // pass the init args as encoded string
+        &encoded_init_args,
     ]);
-
-    // add on_init commands to init
-    cmd.args(cli_args.on_init);
 
     if dry_run {
         cmd.print_escaped_cmd()
@@ -438,12 +456,13 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             match cmd.to_exitcode() {
                 Ok(()) => true,
                 Err(1) => false,
+                // TODO write a better error message if container quits early
                 // this really should not happen unless something breaks
                 Err(x) => panic!("Error while checking container initialization ({})", x),
             }
         };
 
-        // wait until container finishes
+        // wait until container finishes initialization
         while !is_initialized() {
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }

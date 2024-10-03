@@ -9,6 +9,24 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::io::prelude::*;
+use base64::prelude::*;
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+pub struct InitArgs {
+    /// Commands to run on init
+    pub on_init: Vec<String>,
+}
+
+impl InitArgs {
+    pub fn decode(input: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let decoded = BASE64_STANDARD.decode(input)?;
+        Ok(bson::from_slice(&decoded)?)
+    }
+
+    pub fn encode(&self) -> Result<String, Box<dyn std::error::Error>> {
+        Ok(BASE64_STANDARD.encode(bson::to_vec(self)?))
+    }
+}
 
 fn find_preferred_shell() -> &'static str {
     const SHELLS: [&str; 3] = [
@@ -55,7 +73,6 @@ fn walk_dir(dir: &Path, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {
     }
 }
 
-
 /// Clone permissions between two paths, specificially `mode`
 fn clone_perm(source: &Path, dest: &Path) -> Result<(), std::io::Error> {
     let source_perm = source.symlink_metadata()?.permissions();
@@ -80,7 +97,8 @@ fn make_executable(path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn initialization() -> ExitResult {
+// TODO create /tmp/.X11-unix just so its properly owned by root? and has correct permissions?
+fn initialization(args: &InitArgs) -> ExitResult {
     println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
 
     let user = std::env::var("HOST_USER")
@@ -306,6 +324,15 @@ fn get_root_processes() -> Result<Vec<String>, u8> {
 }
 
 pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
+    // decode the encoded args
+    let args = match InitArgs::decode(&cli_args.args) {
+        Ok(x) => x,
+        Err(err) => {
+            eprintln!("Error decoding encoded args {:?}: {}", cli_args.args, err);
+            return Err(1);
+        }
+    };
+
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
 
@@ -316,16 +343,16 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
         r.store(false, Ordering::SeqCst);
     }).expect("Error while setting signal handler");
 
-    if !cli_args.on_init.is_empty() {
+    if !args.on_init.is_empty() {
         let path = Path::new("/init.d/99_on_init.sh");
         // write the init commands to single file
         fs::write(path, "#!/bin/sh").unwrap();
-        fs::write(path, cli_args.on_init.join("\n")).unwrap();
+        fs::write(path, args.on_init.join("\n")).unwrap();
 
         make_executable(path).unwrap();
     }
 
-    initialization()?;
+    initialization(&args)?;
 
     // simply wait until container gets killed
     while running.load(Ordering::SeqCst) {

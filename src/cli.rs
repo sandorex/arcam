@@ -150,9 +150,8 @@ pub struct CmdKillArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdInitArgs {
-    /// Execute commands on init
-    #[arg(last = true)]
-    pub on_init: Vec<String>,
+    /// BASE64 encoded BSON data
+    pub args: String,
 }
 
 #[derive(Subcommand, Debug)]
