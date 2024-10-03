@@ -38,14 +38,19 @@ impl Error for ConfigError {
 }
 
 /// Whole config file
-#[derive(Debug, Clone, PartialEq, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigFile {
     /// Version of the configuration
-    pub version: Option<u64>,
+    #[serde(default = "default_version")]
+    pub version: u64,
 
     /// All container configs
     pub config: Option<Vec<Config>>,
 }
+
+// version 1 is gonna be default for now
+const fn default_version() -> u64 { 1 }
 
 impl ConfigFile {
     /// Loads config from str, path is just for error message and can be anything
@@ -53,14 +58,10 @@ impl ConfigFile {
         let obj = toml::from_str::<ConfigFile>(text)
             .map_err(|err| ConfigError::Generic(Box::new(err)) )?;
 
-        let version = obj.version.unwrap_or(1);
-        if version != 1 {
-            return Err(
-                ConfigError::Message(format!("Invalid schema version {}", version)),
-            )
+        match obj.version {
+            1 => Ok(obj),
+            _ => Err(ConfigError::Message(format!("Invalid schema version {}", obj.version))),
         }
-
-        Ok(obj)
     }
 
     pub fn load_from_file(path: &str) -> Result<Self, ConfigError> {
@@ -74,7 +75,8 @@ impl ConfigFile {
 
 /// Single configuration for a container, contains default settings and optional settings per
 /// engine that get applied over the default settings
-#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     // TODO figure out rules for local containers that need to be built
     /// Name of the configuration
