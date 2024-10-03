@@ -363,8 +363,6 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         }
     }
 
-    }
-
     // mount skel if provided
     if let Some(skel) = &cli_args.skel {
         cmd.arg(format!("--volume={}:/etc/skel:ro", skel));
