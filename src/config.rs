@@ -119,13 +119,13 @@ code_docs_struct! {
         #[serde(default)]
         pub session_bus: bool,
 
-        /// Run command on init (ran using `/bin/sh`)
+        /// Run command before all other scripts (ran using `/bin/sh`)
         #[serde(default)]
-        pub on_init: Vec<String>,
+        pub on_init_pre: Vec<String>,
 
-        /// Copies files to container as init scripts (places them in `/init.d/`)
+        /// Run command after all other scripts (ran using `/bin/sh`)
         #[serde(default)]
-        pub on_init_file: Vec<String>,
+        pub on_init_post: Vec<String>,
 
         /// Environment variables to set
         ///

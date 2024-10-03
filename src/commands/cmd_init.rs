@@ -13,8 +13,8 @@ use base64::prelude::*;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub struct InitArgs {
-    /// Commands to run on init
-    pub on_init: Vec<String>,
+    pub on_init_pre: Vec<String>,
+    pub on_init_post: Vec<String>,
 }
 
 impl InitArgs {
@@ -343,11 +343,22 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
         r.store(false, Ordering::SeqCst);
     }).expect("Error while setting signal handler");
 
-    if !args.on_init.is_empty() {
-        let path = Path::new("/init.d/99_on_init.sh");
+    if !args.on_init_pre.is_empty() {
+        let path = Path::new("/init.d/00_on_init_pre.sh");
+
         // write the init commands to single file
         fs::write(path, "#!/bin/sh").unwrap();
-        fs::write(path, args.on_init.join("\n")).unwrap();
+        fs::write(path, args.on_init_pre.join("\n")).unwrap();
+
+        make_executable(path).unwrap();
+    }
+
+    if !args.on_init_post.is_empty() {
+        let path = Path::new("/init.d/99_on_init_post.sh");
+
+        // write the init commands to single file
+        fs::write(path, "#!/bin/sh").unwrap();
+        fs::write(path, args.on_init_post.join("\n")).unwrap();
 
         make_executable(path).unwrap();
     }

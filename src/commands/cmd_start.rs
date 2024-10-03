@@ -170,8 +170,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
         cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
         cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
-        cli_args.on_init.extend_from_slice(&config.on_init);
-        cli_args.on_init_file.extend_from_slice(&config.on_init_file);
+        cli_args.on_init_pre.extend_from_slice(&config.on_init_pre);
+        cli_args.on_init_post.extend_from_slice(&config.on_init_post);
     } else {
         container_name = cli_args.name.unwrap_or_else(generate_name);
     }
@@ -349,15 +349,6 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         }
     }
 
-    for file_path in cli_args.on_init_file {
-        let file = Path::new(&file_path);
-
-        if !file.exists() {
-            eprintln!("Could not find file {:?}", file_path);
-            return Err(1);
-        }
-
-        cmd.arg(format!("--volume={}:/init.d/99_{}:copy", file.canonicalize().unwrap().to_string_lossy(), util::rand()));
     }
 
     // mount skel if provided
@@ -371,10 +362,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     let encoded_init_args = {
         // pass all the args here
         let init_args = InitArgs {
-            on_init: cli_args.on_init,
-
-            // take only the paths
-            persist: cli_args.persist.iter().map(|x| x.0.clone()).collect(),
+            on_init_pre: cli_args.on_init_pre,
+            on_init_post: cli_args.on_init_post,
         };
 
         match init_args.encode() {

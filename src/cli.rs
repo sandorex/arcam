@@ -57,13 +57,13 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub session_bus: Option<bool>,
 
-    /// Run command on init (ran using `/bin/sh`)
+    /// Run command on init, ran before all other scripts (ran using `/bin/sh`)
     #[arg(long, value_name = "SCRIPT")]
-    pub on_init: Vec<String>,
+    pub on_init_pre: Vec<String>,
 
-    /// Copies files to container as init scripts (places them in `/init.d/`)
-    #[arg(long, value_name = "FILE")]
-    pub on_init_file: Vec<String>,
+    /// Run command on init, ran after all other scripts (ran using `/bin/sh`)
+    #[arg(long, value_name = "SCRIPT")]
+    pub on_init_post: Vec<String>,
 
     /// Add or drop capabilities by prefixing them with '!'
     ///
