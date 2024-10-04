@@ -1,6 +1,6 @@
 [package]
 name = "arcam"
-version = "0.1.9"
+version = "0.1.10"
 description = "Sandboxed development containers at your fingertips"
 edition = "2021"
 license = "GPL-2.0-or-later"
