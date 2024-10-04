@@ -16,18 +16,25 @@ pub fn print_containers(engine: Engine, dry_run: bool) -> ExitResult {
             .expect(crate::ENGINE_ERR_MSG);
 
         if output.status.success() {
-            println!(
-                "{0: <14} {1: <40} {2: <35} {3: <40}",
-                "NAMES", "IMAGE", "WS", "PORTS"
-            );
             let stdout = String::from_utf8_lossy(&output.stdout);
-            for i in stdout.lines() {
-                let columns: Vec<&str> = i.trim().split("|").collect();
+            for (index, line) in stdout.lines().enumerate() {
+                let columns: Vec<&str> = line.trim().split("|").collect();
 
-                println!(
-                    "{0: <14} {1: <40} {2: <40} {3: <30}",
-                    columns[0], columns[1], columns[2], columns[3],
-                );
+                let name = columns[0];
+                let image = columns[1];
+                let ws = columns[2];
+                let ports = columns[3];
+
+                // format nicely by adding a newline
+                if index != 0 {
+                    println!();
+                }
+
+                println!("Container {:?} at {}", name, ws);
+                println!("  image: {}", image);
+                if !ports.is_empty() {
+                    println!("  ports: {}", ports);
+                }
             }
 
             Ok(())
