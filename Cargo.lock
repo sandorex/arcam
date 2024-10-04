@@ -251,7 +251,8 @@ checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 [[package]]
 name = "code-docs-rs"
 version = "0.1.0"
-source = "git+https://github.com/sandorex/code-docs-rs.git?rev=94b08b23c623658f5bf94979167fccab11ff7b5c#94b08b23c623658f5bf94979167fccab11ff7b5c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb9d36ffc76772001333372ffe2971760acecb75625280f4687d803145b56e8d"
 
 [[package]]
 name = "colorchoice"
