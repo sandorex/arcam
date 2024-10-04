@@ -28,7 +28,7 @@ pub struct Cli {
 #[derive(Args, Debug, Clone, Default)]
 pub struct CmdStartArgs {
     /// Name of the new container (if not set a randomly generated name will be used)
-    #[arg(long, value_name = "IMAGE|@CONFIG", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    #[arg(long, env = ENV_VAR_PREFIX!("CONTAINER"))]
     pub name: Option<String>,
 
     /// Path to directory which will be used as /etc/skel inside the container
@@ -68,7 +68,7 @@ pub struct CmdStartArgs {
     /// Add capabilities, or drop them with by prefixing `!cap`
     ///
     /// For more details about capabilities read `man 7 capabilities`
-    #[arg(long = "cap")]
+    #[arg(long = "cap", value_name = "[!]CAPABILITY")]
     pub capabilities: Vec<String>,
 
     /// Mount additional paths inside workspace
@@ -80,7 +80,7 @@ pub struct CmdStartArgs {
     pub env: Vec<String>,
 
     /// Container image to use or @config
-    #[arg(env = ENV_VAR_PREFIX!("IMAGE"))]
+    #[arg(env = ENV_VAR_PREFIX!("IMAGE"), value_name = "IMAGE|@CONFIG")]
     pub image: String,
 
     /// Pass rest of args to engine verbatim
