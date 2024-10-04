@@ -170,6 +170,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
         cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
         cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
+        cli_args.ports.extend_from_slice(&config.ports);
         cli_args.on_init_pre.extend_from_slice(&config.on_init_pre);
         cli_args.on_init_post.extend_from_slice(&config.on_init_post);
         cli_args.capabilities.extend_from_slice(&config.capabilities);
@@ -361,6 +362,13 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             println!("Could not pass through session bus as DBUS_SESSION_BUS_ADDRESS is not defined");
             return Err(1);
         }
+    }
+
+    // pass through ports
+    for (container, host) in &cli_args.ports {
+        // for simplicity i am passing through both udp and tcp
+        cmd.arg(format!("--publish={}:{}/tcp", host, container));
+        cmd.arg(format!("--publish={}:{}/udp", host, container));
     }
 
     // mount skel if provided

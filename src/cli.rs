@@ -65,6 +65,12 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "SCRIPT")]
     pub on_init_post: Vec<String>,
 
+    /// Pass through container port to host (both TCP and UDP)
+    ///
+    /// Not all ports are allowed with rootless podman
+    #[arg(short, long = "port", value_name = "PORT[:HOST_PORT]", value_parser = parse_ports)]
+    pub ports: Vec<(u32, u32)>,
+
     /// Add capabilities, or drop them with by prefixing `!cap`
     ///
     /// For more details about capabilities read `man 7 capabilities`
@@ -86,6 +92,22 @@ pub struct CmdStartArgs {
     /// Pass rest of args to engine verbatim
     #[arg(last = true)]
     pub engine_args: Vec<String>,
+}
+
+fn parse_ports(input: &str) -> Result<(u32, u32), String> {
+    let parse_port = |raw: &str| -> Result<u32, String> {
+        raw.parse::<u32>()
+            .map_err(|_| format!("Invalid port {:?}", raw))
+    };
+
+    if let Some((left_raw, right_raw)) = input.split_once(":") {
+        Ok((parse_port(left_raw)?, parse_port(right_raw)?))
+    } else {
+        let port = parse_port(input)?;
+
+        // map it to itself
+        Ok((port, port))
+    }
 }
 
 #[derive(Args, Debug, Clone)]

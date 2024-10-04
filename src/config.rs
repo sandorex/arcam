@@ -127,6 +127,12 @@ code_docs_struct! {
         #[serde(default)]
         pub on_init_post: Vec<String>,
 
+        /// Pass through container port to host (both TCP and UDP)
+        ///
+        /// Not all ports are allowed with rootless podman
+        #[serde(default)]
+        pub ports: Vec<(u32, u32)>,
+
         /// Environment variables to set
         ///
         /// Environ vars are expanded
