@@ -10,19 +10,14 @@ Experimental but all code since `v0.1.1` was written inside arcam container
 *Originally named `box`*
 
 ### Features
-- Sandboxed ephemeral container by default (podman defaults with network turned on)
+- Sandboxed ephemeral container by default (podman defaults)
 - Pass through audio, wayland, ssh-agent easily on demand with flags or config
 - Customize your experience per language, even per project
 - Override dotfiles locally on demand, so you don't have to rebuild image to update dotfiles
 - Automatic passwordless sudo *(or `su` if not installed)*
 - Consistant development environment on any distro, especially useful on immutable distros like fedora atomic
 - Offline use, container initialization process does not require internet connection *(image has to be downloaded of course)*
-
-## Planned Features
-These are features that are planned but the details are debatable
-
-- Provide support for devcontainer features
-- Docker support
+- Builtin up-to-date config documentation by running `arcam config options`
 
 ### Installation
 You can download binary for latest release [here](https://github.com/sandorex/arcam/releases/latest/download/arcam)
@@ -41,8 +36,8 @@ cargo install --git https://github.com/sandorex/arcam
 Making a custom container image is same as for any other container, to take full advantage of box keep following things in mind:
 - Install `sudo` for nicer experience
 - Any executable files in `/init.d` will be executed on start of the container as the user, you can use `sudo` or `su` for root access
-- Put dotfiles in `/etc/skel` which will be copied to user home on start, note that it may be overriden at runtime using flags
-- All data inside the container (not counting mounts) will be deleted when container stops, to add caching or presistant data use a named volume
+- Put dotfiles in `/etc/skel` which will be copied to user home on start, note that it may be overriden at runtime using `--skel`
+- All data inside the container (not counting volumes) will be deleted when container stops, to add caching or presistant data use a named volume
 
 For examples you can take a look at [my container](https://github.com/sandorex/config/tree/master/boxes) with neovim and all LSPs preinstalled
 
@@ -50,4 +45,4 @@ For examples you can take a look at [my container](https://github.com/sandorex/c
 #### Toolbox / Distrobox
 Both are great at their job, to provide a seamless integration with the host but not sandboxing
 
-Box provides sandbox by default approach where you choose where to sacrifice sandboxing for convenience
+Aracam provides sandboxed experience by default, and it's your job to choose where/when to sacrifice security for convenience, it's highly configurable
