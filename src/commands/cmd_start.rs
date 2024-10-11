@@ -108,7 +108,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     }
 
     // handle configs
-    if cli_args.image.starts_with("@") {
+    let host_commands = if cli_args.image.starts_with("@") {
         // return owned config so i could move values without cloning
         let config = match util::load_configs()?.remove(&cli_args.image[1..]) {
             Some(x) => x,
@@ -174,9 +174,13 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cli_args.on_init_pre.extend_from_slice(&config.on_init_pre);
         cli_args.on_init_post.extend_from_slice(&config.on_init_post);
         cli_args.capabilities.extend_from_slice(&config.capabilities);
+
+        Some(config.host_pre_init)
     } else {
         container_name = cli_args.name.unwrap_or_else(generate_name);
-    }
+
+        None
+    };
 
     // allow dry-run regardless if the container exists
     if !dry_run {
@@ -184,6 +188,33 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         if util::get_container_status(&engine, &container_name).is_some() {
             eprintln!("Container {} already exists", &container_name);
             return Err(1);
+        }
+    }
+
+    // execute host pre-init commands
+    if let Some(commands) = host_commands {
+        dbg!(&commands);
+        for command in commands {
+            // execute each command using sh
+            let mut cmd = Command::new("/bin/sh");
+            cmd.arg("-c");
+            cmd.arg(&command);
+
+            if dry_run {
+                cmd.print_escaped_cmd()?;
+            } else {
+                let status = cmd.status()
+                    .expect("Could not run /bin/sh")
+                    .to_exitcode();
+
+                match status {
+                    Ok(()) => {},
+                    Err(x) => {
+                        eprintln!("Command {:?} failed with code: {}", command, x);
+                        return Err(1);
+                    }
+                }
+            }
         }
     }
 

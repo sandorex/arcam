@@ -127,6 +127,10 @@ code_docs_struct! {
         #[serde(default)]
         pub on_init_post: Vec<String>,
 
+        /// Execute commands on host before container starts (ran using `/bin/sh`)
+        #[serde(default)]
+        pub host_pre_init: Vec<String>,
+
         /// Pass through container port to host (both TCP and UDP)
         ///
         /// Not all ports are allowed with rootless podman
