@@ -338,7 +338,8 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
 
     // try to pass through wayland socket
     if cli_args.wayland.unwrap_or(false) {
-        if let Ok(wayland_display) = std::env::var("WAYLAND_DISPLAY") {
+        // prefer ARCAM_WAYLAND_DISPLAY
+        if let Ok(wayland_display) = std::env::var(ENV_VAR_PREFIX!("WAYLAND_DISPLAY")).or(std::env::var("WAYLAND_DISPLAY")) {
             let socket_path = format!("/run/user/{}/{}", uid, wayland_display);
             if Path::new(&socket_path).exists() {
                 // TODO pass XDG_CURRENT_DESKTOP XDG_SESSION_TYPE
@@ -347,7 +348,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
                     format!("--env=WAYLAND_DISPLAY={}", wayland_display),
                 ]);
             } else {
-                eprintln!("Could not find the wayland socket to pass to the container");
+                eprintln!("Could not find the wayland socket {:?}", socket_path);
                 return Err(1);
             }
         } else {
