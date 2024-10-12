@@ -8,13 +8,14 @@ pub use command::*;
 
 use std::path::PathBuf;
 use std::collections::HashMap;
+use crate::vars;
 
 pub type ExitResult = Result<(), u8>;
 
 /// Get app configuration directory
 pub fn app_dir() -> PathBuf {
     // prefer custom path from environment
-    match std::env::var(crate::ENV_VAR_PREFIX!("DIR")) {
+    match std::env::var(vars::APP_DIR) {
         Ok(x) => PathBuf::from(x),
         Err(_) => {
             // respect XDG standard

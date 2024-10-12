@@ -1,7 +1,7 @@
 use code_docs::DocumentedStruct;
 use crate::config::Config;
 use crate::util;
-use crate::ENV_VAR_PREFIX;
+use crate::vars;
 
 pub fn show_config_options() {
     let docstring = Config::commented_fields()
@@ -37,8 +37,7 @@ ports = [
 --- CONFIG OPTIONS ---
 
 "#,
-        // TODO this should be a global const as its a duplicated value
-        appdir_env=ENV_VAR_PREFIX!("DIR"),
+        appdir_env=vars::APP_DIR,
         appdir=util::app_dir(),
         cfgdir=util::config_dir(),
     );

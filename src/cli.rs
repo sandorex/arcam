@@ -2,7 +2,7 @@ pub mod cli_config;
 
 use cli_config::ConfigCommands;
 use clap::{Parser, Subcommand, Args};
-use crate::{FULL_VERSION, ENV_VAR_PREFIX};
+use crate::{vars, FULL_VERSION};
 
 const AFTER_HELP: &str = concat!(
     "For documentation for this particular version go to following url\n",
@@ -14,7 +14,7 @@ const AFTER_HELP: &str = concat!(
 #[command(name = crate::APP_NAME, author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
 pub struct Cli {
     /// Explicitly set container engine to use
-    #[arg(long, env = ENV_VAR_PREFIX!("ENGINE"))]
+    #[arg(long, env = vars::ENGINE)]
     pub engine: Option<String>,
 
     /// Just print engine commands that would've been ran, do not execute
@@ -28,7 +28,7 @@ pub struct Cli {
 #[derive(Args, Debug, Clone, Default)]
 pub struct CmdStartArgs {
     /// Name of the new container (if not set a randomly generated name will be used)
-    #[arg(long, env = ENV_VAR_PREFIX!("CONTAINER"))]
+    #[arg(long, env = vars::CONTAINER)]
     pub name: Option<String>,
 
     /// Path to directory which will be used as /etc/skel inside the container
@@ -88,7 +88,7 @@ pub struct CmdStartArgs {
     pub env: Vec<String>,
 
     /// Container image to use or @config
-    #[arg(env = ENV_VAR_PREFIX!("IMAGE"), value_name = "IMAGE|@CONFIG")]
+    #[arg(env = vars::IMAGE, value_name = "IMAGE|@CONFIG")]
     pub image: String,
 
     /// Pass rest of args to engine verbatim
@@ -121,7 +121,7 @@ pub struct CmdShellArgs {
     pub shell: Option<String>,
 
     /// Name or the ID of the container
-    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
     pub name: String,
 }
 
@@ -134,7 +134,7 @@ pub struct CmdExecArgs {
     pub shell: Option<String>,
 
     /// Name or the ID of the container
-    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
     pub name: String,
 
     // NOTE command is required but last so that you can use name from environment
@@ -144,7 +144,7 @@ pub struct CmdExecArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdExistsArgs {
-    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
     pub name: String,
 }
 
@@ -154,7 +154,7 @@ pub struct CmdLogsArgs {
     #[arg(short, long)]
     pub follow: bool,
 
-    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
     pub name: String,
 }
 
@@ -168,7 +168,7 @@ pub struct CmdKillArgs {
     #[arg(short, long, default_value_t = 20)]
     pub timeout: u32,
 
-    #[arg(value_name = "CONTAINER", default_value = "", env = ENV_VAR_PREFIX!("CONTAINER"))]
+    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
     pub name: String,
 }
 
@@ -220,13 +220,6 @@ mod tests {
     fn verify_cli() {
         use clap::CommandFactory;
         Cli::command().debug_assert()
-    }
-
-    #[test]
-    fn verify_env_var_prefix() {
-        // just for my sanity check if i forgot to update them
-        assert_eq!(ENV_VAR_PREFIX!("A"), format!("{}_A", crate::APP_NAME_UPPERCASE));
-        assert_eq!(crate::APP_NAME.to_uppercase(), crate::APP_NAME_UPPERCASE);
     }
 }
 

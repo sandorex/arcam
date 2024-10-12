@@ -1,4 +1,4 @@
-use crate::{ExitResult, VERSION, ENV_VAR_PREFIX, APP_NAME};
+use crate::{vars, ExitResult, APP_NAME, ENV_VAR_PREFIX, VERSION};
 use crate::util::{self, Engine, EngineKind};
 use crate::util::command_extensions::*;
 use crate::cli;
@@ -32,7 +32,7 @@ fn generate_name() -> String {
     let adjective = adjectives.get(util::rand() as usize % adjectives.len()).unwrap();
 
     // allow custom container suffix but default to bin name
-    let suffix = std::env::var(ENV_VAR_PREFIX!("CONTAINER_SUFFIX"))
+    let suffix = std::env::var(vars::CONTAINER_SUFFIX)
         .unwrap_or_else(|_| APP_NAME.to_string());
 
     format!("{}-{}", adjective, suffix)
@@ -339,7 +339,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
     // try to pass through wayland socket
     if cli_args.wayland.unwrap_or(false) {
         // prefer ARCAM_WAYLAND_DISPLAY
-        if let Ok(wayland_display) = std::env::var(ENV_VAR_PREFIX!("WAYLAND_DISPLAY")).or(std::env::var("WAYLAND_DISPLAY")) {
+        if let Ok(wayland_display) = std::env::var(vars::WAYLAND_DISPLAY).or(std::env::var("WAYLAND_DISPLAY")) {
             let socket_path = format!("/run/user/{}/{}", uid, wayland_display);
             if Path::new(&socket_path).exists() {
                 // TODO pass XDG_CURRENT_DESKTOP XDG_SESSION_TYPE

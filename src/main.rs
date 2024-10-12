@@ -2,6 +2,7 @@ mod util;
 mod cli;
 mod commands;
 mod config;
+mod vars;
 
 use clap::Parser;
 use cli::CliCommands;
