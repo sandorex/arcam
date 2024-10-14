@@ -128,7 +128,7 @@ fn initialization(_args: &InitArgs) -> ExitResult {
                 "--shell", shell,
                 "--home-dir", &home,
                 "--uid", &uid,
-                "--gid", &gid,
+                "--user-group",
                 "--no-create-home",
                 &user,
             ])
