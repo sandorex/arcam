@@ -13,8 +13,10 @@ const AFTER_HELP: &str = concat!(
 #[derive(Parser, Debug)]
 #[command(name = crate::APP_NAME, author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
 pub struct Cli {
+    // NOTE this is hidden as only podman is supported so honestly until docker
+    // is supported then its bloat to help screen
     /// Explicitly set container engine to use
-    #[arg(long, env = vars::ENGINE)]
+    #[arg(long, hide = true)]
     pub engine: Option<String>,
 
     /// Just print engine commands that would've been ran, do not execute

@@ -193,7 +193,6 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
 
     // execute host pre-init commands
     if let Some(commands) = host_commands {
-        dbg!(&commands);
         for command in commands {
             // execute each command using sh
             let mut cmd = Command::new("/bin/sh");
