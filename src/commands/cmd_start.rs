@@ -350,6 +350,21 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
                 eprintln!("Could not find the wayland socket {:?}", socket_path);
                 return Err(1);
             }
+
+            // add fonts just in case
+            cmd.arg("--volume=/usr/share/fonts:/usr/share/fonts/host:ro");
+
+            // legacy ~/.fonts
+            let home_dot_fonts = Path::new(&home_dir).join(".fonts");
+            if home_dot_fonts.exists() {
+                cmd.arg(format!("--volume={}:/usr/share/fonts/host_dot:ro", home_dot_fonts.to_string_lossy()));
+            }
+
+            // font dir ~/.local/share/fonts
+            let home_dot_local_fonts = Path::new(&home_dir).join(".local").join("share").join("fonts");
+            if home_dot_local_fonts.exists() {
+                cmd.arg(format!("--volume={}:/usr/share/fonts/host_local:ro", home_dot_local_fonts.to_string_lossy()));
+            }
         } else {
             eprintln!("Could not pass through wayland socket as WAYLAND_DISPLAY is not defined");
             return Err(1);

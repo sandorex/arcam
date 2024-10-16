@@ -161,6 +161,23 @@ fn initialization(_args: &InitArgs) -> ExitResult {
     chown(&home, Some(uid_u), Some(gid_u))
         .expect("Failed to chown user home directory");
 
+    // generate font cache just in case
+    {
+        println!("Recreating font cache");
+
+        let cmd = Command::new("fc-cache")
+            .status();
+
+        match cmd {
+            Ok(x) => if !x.success() {
+                eprintln!("Failed to regenerate font cache");
+                return Err(1);
+            },
+            // some images may not have it so im just gonna ignore it
+            Err(_) => println!("Failed to execute fc-cache, ignoring error.."),
+        }
+    }
+
     let mut files: Vec<PathBuf> = vec![];
     let mut dirs: Vec<PathBuf> = vec![];
 
