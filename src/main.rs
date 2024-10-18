@@ -75,7 +75,7 @@ fn command(args: &cli::Cli) -> Result<(), ExitCode> {
             ConfigCommands::Inspect(x) => commands::inspect_config(&x),
             ConfigCommands::Options => { commands::show_config_options(); Ok(()) },
         },
-        CliCommands::List => commands::print_containers(get_engine(&args)?, args.dry_run),
+        CliCommands::List(x) => commands::print_containers(get_engine(&args)?, args.dry_run, x.clone()),
         CliCommands::Logs(x) => commands::print_logs(get_engine(&args)?, x.clone()),
         CliCommands::Kill(x) => commands::kill_container(get_engine(&args)?, args.dry_run, x.clone()),
         CliCommands::Init(x) => {

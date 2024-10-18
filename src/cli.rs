@@ -151,6 +151,19 @@ pub struct CmdExistsArgs {
 }
 
 #[derive(Args, Debug, Clone)]
+pub struct CmdListArgs {
+    /// List containers one per line with properties delimited by a tab
+    ///
+    /// Meant for use with scripts as its easily parseable
+    #[arg(long)]
+    pub raw: bool,
+
+    /// Only show containers started in this directory
+    #[arg(long)]
+    pub here: bool,
+}
+
+#[derive(Args, Debug, Clone)]
 pub struct CmdLogsArgs {
     /// Follow the logs
     #[arg(short, long)]
@@ -201,7 +214,7 @@ pub enum CliCommands {
     Config(ConfigCommands),
 
     /// List running owned containers
-    List,
+    List(CmdListArgs),
 
     /// Show container logs in journalctl
     Logs(CmdLogsArgs),
@@ -224,4 +237,3 @@ mod tests {
         Cli::command().debug_assert()
     }
 }
-
