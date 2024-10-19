@@ -360,6 +360,11 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
         r.store(false, Ordering::SeqCst);
     }).expect("Error while setting signal handler");
 
+    // create the dir always
+    if !Path::new("/init.d").exists() {
+        std::fs::create_dir("/init.d").unwrap();
+    }
+
     if !args.on_init_pre.is_empty() {
         let path = Path::new("/init.d/00_on_init_pre.sh");
 
