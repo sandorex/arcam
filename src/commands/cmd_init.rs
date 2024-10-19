@@ -364,8 +364,8 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
         let path = Path::new("/init.d/00_on_init_pre.sh");
 
         // write the init commands to single file
-        fs::write(path, "#!/bin/sh").unwrap();
-        fs::write(path, args.on_init_pre.join("\n")).unwrap();
+        fs::write(path, format!("#!/bin/sh\n{}",
+            args.on_init_pre.join("\n"))).unwrap();
 
         make_executable(path).unwrap();
     }
@@ -374,8 +374,8 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
         let path = Path::new("/init.d/99_on_init_post.sh");
 
         // write the init commands to single file
-        fs::write(path, "#!/bin/sh").unwrap();
-        fs::write(path, args.on_init_post.join("\n")).unwrap();
+        fs::write(path, format!("#!/bin/sh\n{}",
+            args.on_init_post.join("\n"))).unwrap();
 
         make_executable(path).unwrap();
     }
