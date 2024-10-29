@@ -69,6 +69,10 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "SCRIPT")]
     pub on_init_post: Vec<String>,
 
+    /// Automatically shutdown the container when there are no shells or processes running in it
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
+    pub auto_shutdown: Option<bool>,
+
     /// Pass through container port to host (both TCP and UDP)
     ///
     /// Not all ports are allowed with rootless podman
@@ -189,6 +193,7 @@ pub struct CmdKillArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdInitArgs {
+    // NOTE DO NOT ADD ARGUMENTS HERE
     /// BASE64 encoded BSON data
     pub args: String,
 }

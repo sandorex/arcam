@@ -131,6 +131,10 @@ code_docs_struct! {
         #[serde(default)]
         pub host_pre_init: Vec<String>,
 
+        /// Automatically shutdown the container when there are no shells or processes running in it
+        #[serde(default)]
+        pub auto_shutdown: bool,
+
         /// Pass through container port to host (both TCP and UDP)
         ///
         /// Not all ports are allowed with rootless podman
@@ -248,4 +252,3 @@ engine_args_docker = [ "docker" ]
         });
     }
 }
-

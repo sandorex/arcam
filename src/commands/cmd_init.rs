@@ -15,6 +15,7 @@ use base64::prelude::*;
 pub struct InitArgs {
     pub on_init_pre: Vec<String>,
     pub on_init_post: Vec<String>,
+    pub automatic_idle_shutdown: bool,
 }
 
 impl InitArgs {
@@ -458,7 +459,29 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
 
     initialization(&args)?;
 
-    // TODO add autoshutdown when all root processes and shells are dead
+    // start thread to kill container if idle
+    if args.automatic_idle_shutdown {
+        let r = running.clone();
+
+        std::thread::spawn(move || {
+            while r.load(Ordering::SeqCst) {
+                // check every 10 minutes
+                std::thread::sleep(std::time::Duration::from_secs(30)); // temp 10s
+                // std::thread::sleep(std::time::Duration::from_secs(10 * 60));
+
+                let root_processes: Vec<u64> = get_root_processes()
+                    .unwrap();
+
+                // if there are not procesess then stop
+                if root_processes.len() == 0 {
+                    println!("Automatic shutdown commencing, no processes running");
+                    r.store(false, Ordering::SeqCst);
+                    break
+                }
+            }
+        });
+    }
+
     // simply wait until container gets killed
     while running.load(Ordering::SeqCst) {
         // from my testing the delay from this does not really matter but an
@@ -473,6 +496,7 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
         .map(|x| x.to_string())
         .collect::<Vec<_>>();
 
+    // TODO send the signal manually so there is no relience on kill command?
     // do not run kill if there are no processes to kill
     if !pids.is_empty() {
         println!("Propagating signal to processes");

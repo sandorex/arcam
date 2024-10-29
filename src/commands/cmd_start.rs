@@ -170,6 +170,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
         cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
         cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
+        cli_args.auto_shutdown = cli_args.auto_shutdown.or(Some(config.auto_shutdown));
         cli_args.ports.extend_from_slice(&config.ports);
         cli_args.on_init_pre.extend_from_slice(&config.on_init_pre);
         cli_args.on_init_post.extend_from_slice(&config.on_init_post);
@@ -430,6 +431,7 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         let init_args = InitArgs {
             on_init_pre: cli_args.on_init_pre,
             on_init_post: cli_args.on_init_post,
+            automatic_idle_shutdown: cli_args.auto_shutdown.unwrap_or(false),
         };
 
         match init_args.encode() {
@@ -508,4 +510,3 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
             .to_exitcode()
     }
 }
-
