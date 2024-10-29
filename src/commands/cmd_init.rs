@@ -319,25 +319,96 @@ fn initialization(_args: &InitArgs) -> ExitResult {
     Ok(())
 }
 
-/// Gets PIDs of all root processes inside the container as they all share PPID of 0
-fn get_root_processes() -> Result<Vec<String>, u8> {
-    let cmd = Command::new("pgrep")
-        .args(["-P", "0"])
-        .output()
-        .expect("Failed to execute pgrep");
+/// Parse PID and PPID from contents of `/proc/PID/stat` file
+fn parse_proc_stat(input: &str) -> (u64, u64) {
+    // FORMAT: PID (EXE_NAME) STATE PPID ...
+    // WARNING EXE_NAME can contain spaces, newlines basically anything
 
-    cmd.to_exitcode()?;
+    let pid = input.split_once(" ")
+        .unwrap()
+        .0
+        .parse::<u64>()
+        .unwrap();
 
-    let stdout = String::from_utf8_lossy(&cmd.stdout);
+    // parse pid and ppid
+    let ppid = {
+        // remove everything before the executable name, cause its hard to parse
+        let rest = input.rsplit_once(") ").unwrap().1;
 
-    let lines: Vec<String> = stdout
-        .trim()
-        .lines()
-        .filter(|x| *x != "1") // this binary is is pid 1
-        .map(|x| x.to_string())
-        .collect();
+        // split again and get the PPID
+        rest.split(" ")
+            .nth(1)
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+    };
 
-    Ok(lines)
+    (pid, ppid)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_proc_stat() {
+        use super::parse_proc_stat;
+
+        // names to test the algorithm with
+        const NAMES: [&str; 4] = [
+            "arcam",
+            "((dw)",
+            ")) ) ) ",
+            r#") ;
+_)
+;w
+dw
+"#
+        ];
+
+        for name in NAMES {
+            assert_eq!(
+                parse_proc_stat(&format!(
+                    "{} ({}) S {} 1 1 0 -1 4194560 219 8424 0 3 1 8 7 7 20 0 2 0 87254147 75227136 893 18446744073709551615 94609717866496 94609719346301 140731732879504 0 0 0 0 4096 17475 0 0 0 17 11 0 0 0 0 0 94609719712240 94609719767160 94610004168704 140731732880722 140731732880935 140731732880935 140731732881393 0",
+                    69, name, 420
+                )),
+                (69, 420)
+            );
+        }
+    }
+}
+
+/// Get PIDs of all root processes (pid 1 is excluded)
+fn get_root_processes() -> Result<Vec<u64>, u8> {
+    let mut root_pids: Vec<u64> = vec![];
+
+    // as container works bit weirdly each command ran from exec will have PPID
+    // of 0, so im manually filtering cause pgrep is not always available
+    for entry in fs::read_dir("/proc/").unwrap().flatten() {
+        // skip non numeric filenames
+        if !entry.file_name().to_string_lossy().chars().all(|x| x.is_ascii_digit()) {
+            continue
+        }
+
+        // skip non-dir entries
+        match entry.file_type() {
+            Ok(x) if x.is_dir() => {},
+            _ => continue,
+        }
+
+        let (pid, ppid) = {
+            // read the /proc/PID/stat
+            let stat_file = fs::read_to_string(entry.path().join("stat"))
+                .unwrap();
+
+            parse_proc_stat(&stat_file)
+        };
+
+        // ppid of 0 means its root process but ignore the init binary itself
+        if ppid == 0 && pid != 1 {
+            root_pids.push(pid);
+        }
+    }
+
+    Ok(root_pids)
 }
 
 pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
@@ -387,15 +458,20 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
 
     initialization(&args)?;
 
+    // TODO add autoshutdown when all root processes and shells are dead
     // simply wait until container gets killed
     while running.load(Ordering::SeqCst) {
-        // from my testing the delay from this does not really matter but an empty while generated
-        // a high cpu usage which is not ideal in the slightest
+        // from my testing the delay from this does not really matter but an
+        // empty while loop generated a high cpu usage which is not ideal
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
 
     // find leftover processes
-    let pids = get_root_processes()?;
+    // convert to string as command does not allow number arguments
+    let pids = get_root_processes()?
+        .iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>();
 
     // do not run kill if there are no processes to kill
     if !pids.is_empty() {
