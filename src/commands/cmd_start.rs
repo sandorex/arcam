@@ -77,6 +77,7 @@ fn find_terminfo() -> Vec<String> {
     args
 }
 
+// TODO split this function into several for each argument basically!
 pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStartArgs) -> ExitResult {
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     let user = std::env::var("USER").expect("Unable to get USER from env var");
@@ -227,6 +228,10 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         "--user=root",
     ]);
 
+    // TODO check if it does not exist and panic if error!!
+    // create if it does not exist
+    let _ = std::fs::create_dir(format!("/run/user/{uid}/{APP_NAME}"));
+
     cmd.args([
         format!("--label=manager={}", engine),
         format!("--label={}={}", APP_NAME, main_project_dir),
@@ -242,14 +247,14 @@ pub fn start_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdStar
         format!("--env=HOST_USER_GID={}", gid),
         // TODO explore all the xdg dirs and set them properly
         format!("--env=XDG_RUNTIME_DIR=/run/user/{}", uid),
-        format!("--volume={}:/{}:ro,nocopy", executable_path.display(), env!("CARGO_BIN_NAME")),
+        format!("--volume={}:/{}:ro,nocopy", executable_path.display(), APP_NAME),
+        format!("--volume=/run/user/{uid}/{appname}:/run/{appname}", appname=APP_NAME),
         format!("--volume={}:{}", &cwd.to_string_lossy(), main_project_dir),
         format!("--hostname={}", get_hostname()),
     ]);
 
     // engine specific args
     match engine.kind {
-        // TODO add docker equivalent
         EngineKind::Podman => {
             cmd.args([
                 "--userns=keep-id",

@@ -2,6 +2,7 @@
 
 use crate::util::command_extensions::*;
 use crate::{cli, ExitResult, FULL_VERSION};
+
 use std::fs::OpenOptions;
 use std::{env, fs};
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
@@ -311,6 +312,20 @@ fn initialization(_args: &InitArgs) -> ExitResult {
         }
     }
 
+    // session termination detection
+    {
+        // TODO this should be a global const
+        let pidfile_dir = Path::new("/run/arcam/");
+        if !pidfile_dir.exists() {
+            panic!("pidfile directory does not exist at /run/arcam/");
+        }
+
+        // make sure its own by the user
+        chown(&pidfile_dir, Some(uid_u), Some(gid_u))
+            .expect("Failed to chown pidfile directory");
+    }
+
+    // TODO should be a global const
     // signalize that init is done
     fs::write("/initialized", "y")
         .unwrap();

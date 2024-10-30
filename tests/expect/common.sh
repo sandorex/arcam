@@ -16,9 +16,11 @@ if ! command -v expect &>/dev/null; then
     exit 1
 fi
 
+ROOT=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+
 # NOTE args here are those passed to the script itself
 export TEST="$(basename "$0")"
-export EXE="${1:-../../target/debug/arcam}"
+export EXE="${1:-$ROOT/../../target/debug/arcam}"
 FAILED=0
 
 # run expect with common functions sourced
@@ -29,7 +31,7 @@ function run() {
 
     echo
 
-    expect -c "source common.tcl" "$@"
+    expect -c "source $ROOT/common.tcl" "$@"
     ret=$?
 
     # run is not meant for tests so errors here are a failure in the system
@@ -50,7 +52,7 @@ function run_test() {
     echo -e "$(tput bold)$(tput setaf 3)Test: ${1:?}$(tput sgr0)"
     shift
 
-    expect -c "source common.tcl" "$@"
+    expect -c "source $ROOT/common.tcl" "$@"
     ret=$?
 
     if [[ "$ret" -eq 0 ]]; then
@@ -82,4 +84,3 @@ function end_test_suite() {
 
 # call it automatically to reduce boilerplate
 trap end_test_suite EXIT
-

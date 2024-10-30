@@ -5,7 +5,7 @@ use crate::util::command_extensions::*;
 /// Extracts default shell for user from /etc/passwd inside a container
 fn get_user_shell(engine: &Engine, container: &str, user: &str) -> String {
     let cmd_result = Command::new(&engine.path)
-        .args(["exec", "--user", "root", "-it", container, "getent", "passwd", user])
+        .args(["exec", "--user", "root", "-i", container, "getent", "passwd", user])
         .output()
         .expect("Could not execute engine");
 
@@ -23,25 +23,21 @@ fn get_user_shell(engine: &Engine, container: &str, user: &str) -> String {
         .expect(ERR)
 }
 
-fn gen_open_shell_cmd(engine: &Engine, shell: &Option<String>, ws_dir: String, container_name: &str) -> Vec<String> {
-    let user = std::env::var("USER").expect("Unable to get USER from env var");
-    let user_shell = match shell {
-        Some(x) => x,
-        None => &get_user_shell(engine, container_name, user.as_str()),
-    };
+// pub fn touch_process(engine: &Engine, container: &str, pid: &str) -> ExitResult {
+//     match std::fs::OpenOptions::new().create(true).write(true).open() {
+//         Ok(_) => Ok(()),
+//         Err(e) => Err(e),
+// }
 
-    vec![
-        "exec".into(), "-it".into(),
-        format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
-        format!("--env=HOME=/home/{}", user),
-        format!("--env=SHELL={}", user_shell),
-        "--workdir".into(), ws_dir,
-        "--user".into(), user,
-        container_name.to_string(),
-        user_shell.to_string(), "-l".into(),
-    ]
+pub fn touch_file(name: &str) {
+    use std::fs::File;
+    use std::time::SystemTime;
+
+    let file = File::create(name).unwrap();
+    file.set_modified(SystemTime::now()).unwrap();
 }
 
+// TODO check if this could be merged into exec command as its mostly duplicate code
 pub fn open_shell(engine: Engine, dry_run: bool, mut cli_args: cli::CmdShellArgs) -> ExitResult {
     // try to find container in current directory
     if cli_args.name.is_empty() {
@@ -70,13 +66,44 @@ pub fn open_shell(engine: Engine, dry_run: bool, mut cli_args: cli::CmdShellArgs
         }
     };
 
-    let args = gen_open_shell_cmd(&engine, &cli_args.shell, ws_dir, &cli_args.name);
+    let unique_id = std::process::id().to_string();
+
+    let user = std::env::var("USER").expect("Unable to get USER from env var");
+    let args = {
+        let user_shell = match &cli_args.shell {
+            Some(x) => x,
+            None => &get_user_shell(&engine, &cli_args.name, user.as_str()),
+        };
+
+        vec![
+            "exec".into(), "-it".into(),
+            format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
+            format!("--env=HOME=/home/{}", user),
+            format!("--env=SHELL={}", user_shell),
+            "--workdir".into(), ws_dir,
+            "--user".into(), user,
+            cli_args.name.clone(),
+            // TODO this could be automated using this binary
+            // execute shell and save the pid into the file
+            "/bin/sh".into(), "-c".into(),
+
+            // then replace process with the shell
+            format!("[ -d /run/arcam/ ] && echo $$ > /run/arcam/{}; exec {} {}", unique_id, user_shell, "-l"),
+        ]
+    };
+
     let mut cmd = Command::new(&engine.path);
     cmd.args(args);
 
     if dry_run {
         cmd.print_escaped_cmd()
     } else {
+        // touch the file
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(5000));
+            touch_file(format!("/run/user/1000/arcam/{}", unique_id).as_str());
+        });
+
         let cmd = cmd
             .status()
             .expect(crate::ENGINE_ERR_MSG);
@@ -90,4 +117,3 @@ pub fn open_shell(engine: Engine, dry_run: bool, mut cli_args: cli::CmdShellArgs
         cmd.to_exitcode()
     }
 }
-
