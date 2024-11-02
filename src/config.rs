@@ -1,43 +1,11 @@
 //! Contains everything related to container configuration
 
 use code_docs::{code_docs_struct, DocumentedStruct};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
+use std::path::Path;
 use crate::util::Engine;
-
-#[derive(Debug)]
-pub enum ConfigError {
-    Message(String),
-    Generic(Box<dyn Error>),
-    File(String, Box<dyn Error>),
-}
-
-impl fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Message(msg) => write!(f, "{}", msg),
-            Self::Generic(x) => x.fmt(f),
-            Self::File(file, err) => {
-                write!(f, "Config error in file {}: ", file)?;
-                err.fmt(f)?;
-
-                Ok(())
-            },
-        }
-    }
-}
-
-impl Error for ConfigError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Message(_) => None,
-            Self::Generic(x) => Some(x.as_ref()),
-            Self::File(_, x) => Some(x.as_ref()),
-        }
-    }
-}
 
 /// Whole config file
 #[derive(Debug, Clone, PartialEq, Default, Deserialize)]
@@ -56,24 +24,23 @@ const fn default_version() -> u64 { 1 }
 
 impl ConfigFile {
     /// Loads config from str, path is just for error message and can be anything
-    pub fn load_from_str(text: &str) -> Result<Self, ConfigError> {
+    pub fn load_from_str(text: &str) -> Result<Self> {
         // TODO load a table first and get the version then try parsing appropriate struct
 
-        let obj = toml::from_str::<ConfigFile>(text)
-            .map_err(|err| ConfigError::Generic(Box::new(err)) )?;
+        let obj = toml::from_str::<ConfigFile>(text)?;
 
         match obj.version {
             1 => Ok(obj),
-            _ => Err(ConfigError::Message(format!("Invalid schema version {}", obj.version))),
+            _ => Err(anyhow!("Invalid schema version {}", obj.version)),
         }
     }
 
-    pub fn load_from_file(path: &str) -> Result<Self, ConfigError> {
+    pub fn load_from_file(path: &Path) -> Result<Self> {
         let file_contents = std::fs::read_to_string(path)
-            .map_err(|err| ConfigError::File(path.to_string(), Box::new(err)))?;
+            .with_context(|| format!("Error while reading config file {:?}", path))?;
 
         Self::load_from_str(&file_contents)
-            .map_err(|err| ConfigError::File(path.to_string(), Box::new(err)))
+            .with_context(|| format!("Error while parsing config file {:?}", path))
     }
 }
 
@@ -184,7 +151,7 @@ impl Config {
 }
 
 /// Load and merge configs from directory (loads *.toml file)
-pub fn load_from_dir(path: &str) -> Result<HashMap<String, Config>, ConfigError> {
+pub fn load_from_dir(path: &Path) -> Result<HashMap<String, Config>> {
     let mut configs: HashMap<String, Config> = HashMap::new();
 
     // the directory does not exist just exit quietly
@@ -194,13 +161,13 @@ pub fn load_from_dir(path: &str) -> Result<HashMap<String, Config>, ConfigError>
 
     let toml_files: Vec<std::path::PathBuf> = std::path::Path::new(path)
         .read_dir()
-        .map_err(|err| ConfigError::Message(format!("Error reading config directory {}: {}", path, err)))?
+        .map_err(|err| anyhow!("Error reading config directory {}: {}", path.to_string_lossy(), err))?
         .map(|x| x.unwrap().path() )
         .filter(|x| x.extension().unwrap_or_default() == "toml")
         .collect();
 
     for file in toml_files {
-        let config_file = ConfigFile::load_from_file(file.display().to_string().as_str())?;
+        let config_file = ConfigFile::load_from_file(file.as_path())?;
 
         for config in config_file.config.unwrap_or_default() {
             // ignore any duplicates, let the user handle it if they wish

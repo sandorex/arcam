@@ -17,4 +17,3 @@ pub use cmd_list::print_containers;
 pub use cmd_logs::print_logs;
 pub use cmd_kill::kill_container;
 pub use cmd_init::container_init;
-

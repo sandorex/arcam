@@ -1,93 +1,87 @@
-use crate::util::{self, Engine};
-use crate::{cli, ExitResult};
+use crate::prelude::*;
+use crate::cli;
 use crate::util::command_extensions::*;
 
 /// Extracts default shell for user from /etc/passwd inside a container
-fn get_user_shell(engine: &Engine, container: &str, user: &str) -> String {
-    let cmd_result = Command::new(&engine.path)
-        .args(["exec", "--user", "root", "-it", container, "getent", "passwd", user])
-        .output()
-        .expect("Could not execute engine");
+fn get_user_shell(ctx: &Context, container: &str) -> Result<String> {
+    let output = ctx.engine_exec_root(container, vec!["getent", "passwd", &ctx.user])?;
 
-    const ERR: &str = "Failed to extract default shell from /etc/passwd";
-    let stdout = String::from_utf8_lossy(&cmd_result.stdout);
-    if ! cmd_result.status.success() || stdout.is_empty() {
-        panic!("{}", ERR);
-    }
-
-    // i do not want to rely on external tools like awk so im extracting manually
-    stdout.trim()
-        .split(':')
-        .last()
-        .map(|x| x.to_string())
-        .expect(ERR)
+    Ok(
+        output
+            .trim()
+            .rsplit_once(':')
+            .ok_or(anyhow!("Error parsing user from passwd (output was {:?})", output))?
+            .1
+            .to_string()
+    )
 }
 
-fn gen_open_shell_cmd(engine: &Engine, shell: &Option<String>, ws_dir: String, container_name: &str) -> Vec<String> {
-    let user = std::env::var("USER").expect("Unable to get USER from env var");
-    let user_shell = match shell {
-        Some(x) => x,
-        None => &get_user_shell(engine, container_name, user.as_str()),
-    };
-
-    vec![
-        "exec".into(), "-it".into(),
-        format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
-        format!("--env=HOME=/home/{}", user),
-        format!("--env=SHELL={}", user_shell),
-        "--workdir".into(), ws_dir,
-        "--user".into(), user,
-        container_name.to_string(),
-        user_shell.to_string(), "-l".into(),
-    ]
-}
-
-pub fn open_shell(engine: Engine, dry_run: bool, mut cli_args: cli::CmdShellArgs) -> ExitResult {
+pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
     // try to find container in current directory
     if cli_args.name.is_empty() {
-        if let Some(containers) = util::find_containers_by_cwd(&engine) {
+        if let Some(containers) = ctx.get_cwd_container() {
             if containers.is_empty() {
-                eprintln!("Could not find a running container in current directory");
-                return Err(1);
+                return Err(anyhow!("Could not find a running container in current directory"));
             }
 
             cli_args.name = containers.first().unwrap().clone();
         }
-    } else if !dry_run && !util::container_exists(&engine, &cli_args.name) {
-        eprintln!("Container {:?} does not exist", &cli_args.name);
-        return Err(1);
+    } else if !ctx.dry_run && !ctx.get_container_status(&cli_args.name).is_some() {
+        return Err(anyhow!("Container {:?} does not exist", &cli_args.name));
     }
 
     // check if container is owned
-    let ws_dir = match util::get_container_ws(&engine, &cli_args.name) {
+    let ws_dir = match ctx.get_container_label(&cli_args.name, crate::CONTAINER_LABEL_CONTAINER_DIR) {
         Some(x) => x,
         // allow dry_run to work
-        None if dry_run => "/ws/dry_run".to_string(),
-        None => {
-            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME);
-
-            return Err(1);
-        }
+        None if ctx.dry_run => "/ws/dry_run".to_string(),
+        None => return Err(anyhow!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME)),
     };
 
-    let args = gen_open_shell_cmd(&engine, &cli_args.shell, ws_dir, &cli_args.name);
-    let mut cmd = Command::new(&engine.path);
+    let args = {
+        let user_shell = match &cli_args.shell {
+            Some(x) => x,
+            None => &get_user_shell(&ctx, &cli_args.name)?,
+        };
+
+        // TODO share the env with exec command so its consistent
+        vec![
+            "exec".into(), "-it".into(),
+            format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
+            format!("--env=HOME=/home/{}", ctx.user),
+            format!("--env=SHELL={}", user_shell),
+            "--workdir".into(), ws_dir,
+            "--user".into(), ctx.user.clone(),
+            cli_args.name.clone(),
+            user_shell.to_string(), "-l".into(),
+        ]
+    };
+
+    let mut cmd = ctx.engine_command();
     cmd.args(args);
 
-    if dry_run {
-        cmd.print_escaped_cmd()
+    if ctx.dry_run {
+        cmd.print_escaped_cmd();
+
+        Ok(())
     } else {
         let cmd = cmd
             .status()
             .expect(crate::ENGINE_ERR_MSG);
 
+        let code = cmd.get_code();
+
+        // TODO redo this so it does not clear screen each time its exited
         // code 137 usually means SIGKILL and that messes up the terminal so reset it afterwards
-        if cmd.code().is_some_and(|x| x == 137) {
+        if code == 137 {
             // i do not care if it failed
             let _ = Command::new("reset").status();
         }
 
-        cmd.to_exitcode()
+        if cmd.success() {
+            Ok(())
+        } else {
+            Err(anyhow!("Shell exited with error code {}", cmd))
+        }
     }
 }
-

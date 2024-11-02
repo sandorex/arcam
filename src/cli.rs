@@ -2,7 +2,7 @@ pub mod cli_config;
 
 use cli_config::ConfigCommands;
 use clap::{Parser, Subcommand, Args};
-use crate::{vars, FULL_VERSION};
+use crate::FULL_VERSION;
 
 const AFTER_HELP: &str = concat!(
     "For documentation for this particular version go to following url\n",
@@ -30,7 +30,7 @@ pub struct Cli {
 #[derive(Args, Debug, Clone, Default)]
 pub struct CmdStartArgs {
     /// Name of the new container (if not set a randomly generated name will be used)
-    #[arg(long, env = vars::CONTAINER)]
+    #[arg(long, env = crate::ENV_CONTAINER)]
     pub name: Option<String>,
 
     /// Path to directory which will be used as /etc/skel inside the container
@@ -94,7 +94,7 @@ pub struct CmdStartArgs {
     pub env: Vec<String>,
 
     /// Container image to use or @config
-    #[arg(env = vars::IMAGE, value_name = "IMAGE|@CONFIG")]
+    #[arg(env = crate::ENV_IMAGE, value_name = "IMAGE|@CONFIG")]
     pub image: String,
 
     /// Pass rest of args to engine verbatim
@@ -127,7 +127,7 @@ pub struct CmdShellArgs {
     pub shell: Option<String>,
 
     /// Name or the ID of the container
-    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
+    #[arg(value_name = "CONTAINER", default_value = "", env = crate::ENV_CONTAINER)]
     pub name: String,
 }
 
@@ -140,7 +140,7 @@ pub struct CmdExecArgs {
     pub shell: Option<String>,
 
     /// Name or the ID of the container
-    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
+    #[arg(value_name = "CONTAINER", default_value = "", env = crate::ENV_CONTAINER)]
     pub name: String,
 
     // NOTE command is required but last so that you can use name from environment
@@ -150,7 +150,7 @@ pub struct CmdExecArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdExistsArgs {
-    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
+    #[arg(value_name = "CONTAINER", default_value = "", env = crate::ENV_CONTAINER)]
     pub name: String,
 }
 
@@ -173,7 +173,7 @@ pub struct CmdLogsArgs {
     #[arg(short, long)]
     pub follow: bool,
 
-    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
+    #[arg(value_name = "CONTAINER", default_value = "", env = crate::ENV_CONTAINER)]
     pub name: String,
 }
 
@@ -187,7 +187,7 @@ pub struct CmdKillArgs {
     #[arg(short, long, default_value_t = 20)]
     pub timeout: u32,
 
-    #[arg(value_name = "CONTAINER", default_value = "", env = vars::CONTAINER)]
+    #[arg(value_name = "CONTAINER", default_value = "", env = crate::ENV_CONTAINER)]
     pub name: String,
 }
 

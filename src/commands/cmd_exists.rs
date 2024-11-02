@@ -1,26 +1,28 @@
 use crate::cli;
-use crate::util::{self, Engine};
-use crate::ExitResult;
+use crate::prelude::*;
 
-pub fn container_exists(engine: Engine, mut cli_args: cli::CmdExistsArgs) -> ExitResult {
+pub fn container_exists(ctx: Context, mut cli_args: cli::CmdExistsArgs) -> Result<()> {
     // try to find container in current directory
     if cli_args.name.is_empty() {
-        if let Some(containers) = util::find_containers_by_cwd(&engine) {
+        // TODO this whole thing could be a function its used at least 3 times!
+        if let Some(containers) = ctx.get_cwd_container() {
             if containers.is_empty() {
-                eprintln!("Could not find a running container in current directory");
-                return Err(1);
+                return Err(anyhow!("Could not find a running container in current directory"));
             }
 
             cli_args.name = containers.first().unwrap().clone();
         }
     }
 
-    match util::container_exists(&engine,&cli_args.name) {
+    use std::process::exit;
+
+    // TODO i am not sure if there is any problems with using exit here
+    match ctx.engine_container_exists(&cli_args.name) {
         // give different exit code if the container exists but is not owned
-        true => match util::get_container_ws(&engine, &cli_args.name) {
+        true => match ctx.get_container_label(&cli_args.name, crate::CONTAINER_LABEL_CONTAINER_DIR) {
             Some(_) => Ok(()),
-            None => Err(2),
+            None => exit(2),
         },
-        false => Err(1),
+        false => exit(1),
     }
 }

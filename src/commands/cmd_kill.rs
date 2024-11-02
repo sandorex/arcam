@@ -1,49 +1,44 @@
-use crate::{ExitResult, cli};
+use crate::cli;
+use crate::prelude::*;
 use crate::util::command_extensions::*;
-use crate::util::{self, Engine};
+use crate::util;
 
-pub fn kill_container(engine: Engine, dry_run: bool, mut cli_args: cli::CmdKillArgs) -> ExitResult {
+pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()> {
     // try to find container in current directory
     if cli_args.name.is_empty() {
-        if let Some(containers) = util::find_containers_by_cwd(&engine) {
+        if let Some(containers) = ctx.get_cwd_container() {
             if containers.is_empty() {
-                eprintln!("Could not find a running container in current directory");
-                return Err(1);
+                return Err(anyhow!("Could not find a running container in current directory"));
             }
 
             cli_args.name = containers.first().unwrap().clone();
         }
 
         // i do not need to test container if it was found by cwd
-    } else if !dry_run {
-        if !util::container_exists(&engine, &cli_args.name) {
-            eprintln!("Container {:?} does not exist", &cli_args.name);
-            return Err(1);
+    } else if !ctx.dry_run {
+        if !ctx.engine_container_exists(&cli_args.name) {
+            return Err(anyhow!("Container {:?} does not exist", &cli_args.name));
         }
 
         // check if container is owned
-        if util::get_container_ws(&engine, &cli_args.name).is_none() {
-            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME);
-
-            return Err(1);
+        if ctx.get_container_label(&cli_args.name, crate::CONTAINER_LABEL_CONTAINER_DIR).is_none() {
+            return Err(anyhow!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME));
         }
     }
 
     if !cli_args.yes && !util::prompt(format!("Are you sure you want to kill container {:?} ?", &cli_args.name).as_str()) {
-        return Err(1);
+        return Err(anyhow!("Cancelled by user."));
     }
 
     let timeout = cli_args.timeout.to_string();
-
-    let mut cmd = Command::new(&engine.path);
+    let mut cmd = ctx.engine_command();
     cmd.args(["container", "stop", "--time", &timeout, &cli_args.name]);
 
-    if dry_run {
-        cmd.print_escaped_cmd()
+    if ctx.dry_run {
+        cmd.print_escaped_cmd();
     } else {
-        cmd
-            .status()
-            .expect(crate::ENGINE_ERR_MSG)
-            .to_exitcode()
+        cmd.run_get_output()?;
     }
+
+    Ok(())
 }

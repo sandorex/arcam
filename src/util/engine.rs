@@ -1,4 +1,5 @@
 use std::{fmt::Display, process::Command};
+use super::executable_in_path;
 
 #[derive(Debug, Clone)]
 pub enum EngineKind {
@@ -60,6 +61,7 @@ impl Engine {
             .unwrap_or("")
             .to_string()
         );
+
         match kind {
             Ok(x) => Some(Engine {
                 path: engine.to_string(),
@@ -71,7 +73,7 @@ impl Engine {
 
     /// Finds first available engine, prioritizes podman!
     pub fn find_available_engine() -> Option<Self> {
-        if executable_exists("podman") {
+        if executable_in_path("podman") {
             return Some(
                 Self {
                     path: "podman".into(),
@@ -80,7 +82,7 @@ impl Engine {
             );
         }
 
-        if executable_exists("docker") {
+        if executable_in_path("docker") {
             return Some(
                 Self {
                     path: "docker".into(),
@@ -92,16 +94,3 @@ impl Engine {
         None
     }
 }
-
-/// Check whether executable exists in PATH
-#[cfg(target_os = "linux")]
-pub fn executable_exists(cmd: &str) -> bool {
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(format!("which {}", cmd))
-        .output()
-        .expect("Failed to execute 'which'");
-
-    output.status.success()
-}
-

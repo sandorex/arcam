@@ -1,24 +1,21 @@
-use crate::ExitResult;
-use crate::util::Engine;
+use crate::prelude::*;
 use crate::cli::cli_config::CmdConfigExtractArgs;
 use crate::util::command_extensions::*;
 
-pub fn extract_config(engine: Engine, dry_run: bool, cli_args: &CmdConfigExtractArgs) -> ExitResult {
+pub fn extract_config(ctx: Context, cli_args: CmdConfigExtractArgs) -> Result<()> {
     // allow dry run to run always
-    if !dry_run {
-        let cmd = Command::new(&engine.path)
+    if !ctx.dry_run {
+        let cmd = ctx.engine_command()
             .args(["image", "exists", &cli_args.image])
             .output()
             .expect(crate::ENGINE_ERR_MSG);
 
         if !cmd.status.success() {
-            eprintln!("Image {} does not exist", cli_args.image);
-
-            return Err(2);
+            return Err(anyhow!("Image {} does not exist", cli_args.image));
         }
     }
 
-    let mut cmd = Command::new(&engine.path);
+    let mut cmd = ctx.engine_command();
     cmd.args([
         "run", "--rm", "-it",
         // basically just cat the file, should be pretty portable
@@ -27,8 +24,10 @@ pub fn extract_config(engine: Engine, dry_run: bool, cli_args: &CmdConfigExtract
         "/config.toml"
     ]);
 
-    if dry_run {
-        cmd.print_escaped_cmd()
+    if ctx.dry_run {
+        cmd.print_escaped_cmd();
+
+        Ok(())
     } else {
         let output = cmd
             .output()
@@ -40,9 +39,7 @@ pub fn extract_config(engine: Engine, dry_run: bool, cli_args: &CmdConfigExtract
 
             Ok(())
         } else {
-            eprintln!("Failed to extract config from image {}", cli_args.image);
-
-            Err(1)
+            return Err(anyhow!("Failed to extract config from image {}", cli_args.image));
         }
     }
 }

@@ -1,74 +1,8 @@
-mod container;
 mod engine;
 mod command;
 
-pub use container::*;
 pub use engine::*;
 pub use command::*;
-
-use std::path::PathBuf;
-use std::collections::HashMap;
-use crate::vars;
-
-pub type ExitResult = Result<(), u8>;
-
-/// Get app configuration directory
-pub fn app_dir() -> PathBuf {
-    // prefer custom path from environment
-    match std::env::var(vars::APP_DIR) {
-        Ok(x) => PathBuf::from(x),
-        Err(_) => {
-            // respect XDG standard
-            let xdg_config_home = match std::env::var("XDG_CONFIG_HOME") {
-                Ok(x) => x,
-                // fallback to ~/.config
-                Err(_) => {
-                    let home = std::env::var("HOME").expect("Failed to get HOME dir from env var");
-
-                    PathBuf::from(home).join(".config").to_str().unwrap().to_string()
-                },
-            };
-
-            // use bin name for dir name
-            PathBuf::from(xdg_config_home).join(crate::APP_NAME)
-        },
-    }
-}
-
-/// Get container configuration directory
-pub fn config_dir() -> PathBuf {
-    app_dir().join("configs")
-}
-
-/// Loads all configs while also handling all errors
-pub fn load_configs() -> Result<HashMap<String, crate::config::Config>, u8> {
-    use crate::config;
-
-    match config::load_from_dir(config_dir().to_str().unwrap()) {
-        Ok(x) => Ok(x),
-        Err(err) => {
-            eprintln!("{}\n", err);
-
-            Err(1)
-        },
-    }
-}
-
-#[link(name = "c")]
-extern "C" {
-    fn geteuid() -> u32;
-    fn getegid() -> u32;
-}
-
-/// Get user UID and GID
-pub fn get_user_uid_gid() -> (u32, u32) {
-    unsafe {
-        (
-            geteuid(),
-            getegid(),
-        )
-    }
-}
 
 /// Generate random number using `/dev/urandom`
 pub fn rand() -> u32 {
@@ -102,6 +36,27 @@ pub fn prompt(prompt: &str) -> bool {
     matches!(s.to_lowercase().as_str(), "y"|"yes")
 }
 
+/// Check whether executable exists in PATH
+pub fn executable_in_path(cmd: &str) -> bool {
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(format!("which {}", cmd))
+        .output()
+        .expect("Failed to execute 'which'");
+
+    output.status.success()
+}
+
+/// Check if running inside a container
+pub fn is_in_container() -> bool {
+    use std::path::Path;
+    use std::env;
+
+    return Path::new("/run/.containerenv").exists()
+        || Path::new("/.dockerenv").exists()
+        || env::var("container").is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::rand;
@@ -112,4 +67,3 @@ mod tests {
         assert_ne!(rand(), rand());
     }
 }
-

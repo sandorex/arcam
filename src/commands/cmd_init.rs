@@ -1,7 +1,8 @@
 //! Contains all code that should run inside the container as the init
 
 use crate::util::command_extensions::*;
-use crate::{cli, ExitResult, FULL_VERSION};
+use crate::{cli, FULL_VERSION};
+use crate::prelude::*;
 use std::fs::OpenOptions;
 use std::{env, fs};
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
@@ -11,6 +12,9 @@ use std::sync::Arc;
 use std::io::prelude::*;
 use base64::prelude::*;
 
+/// This file existing is a signal when container initialization is finished
+pub const INITALIZED_FLAG_FILE: &str = "/initialized";
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub struct InitArgs {
     pub on_init_pre: Vec<String>,
@@ -19,12 +23,12 @@ pub struct InitArgs {
 }
 
 impl InitArgs {
-    pub fn decode(input: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn decode(input: &str) -> Result<Self> {
         let decoded = BASE64_STANDARD.decode(input)?;
         Ok(bson::from_slice(&decoded)?)
     }
 
-    pub fn encode(&self) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn encode(&self) -> Result<String> {
         Ok(BASE64_STANDARD.encode(bson::to_vec(self)?))
     }
 }
@@ -99,15 +103,15 @@ fn make_executable(path: &Path) -> Result<(), std::io::Error> {
 }
 
 // TODO create /tmp/.X11-unix just so its properly owned by root? and has correct permissions?
-fn initialization(_args: &InitArgs) -> ExitResult {
+fn initialization(_args: &InitArgs) -> Result<()> {
     println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
 
     let user = std::env::var("HOST_USER")
-        .expect("HOST_USER is undefined");
+        .context("HOST_USER is undefined")?;
     let uid = std::env::var("HOST_USER_UID")
-        .expect("HOST_USER_UID is undefined");
+        .context("HOST_USER_UID is undefined")?;
     let gid = std::env::var("HOST_USER_GID")
-        .expect("HOST_USER_GID is undefined");
+        .context("HOST_USER_GID is undefined")?;
 
     let uid_u: u32 = uid.parse().unwrap();
     let gid_u: u32 = gid.parse().unwrap();
@@ -120,8 +124,10 @@ fn initialization(_args: &InitArgs) -> ExitResult {
         .args(["passwd", &user])
         .output()
         .expect("Error executing getent")
-        .status.success();
-    if !user_found {
+        .status
+        .success();
+
+    let cmd = if !user_found {
         println!("Creating user {:?}", user);
 
         Command::new("useradd")
@@ -135,7 +141,6 @@ fn initialization(_args: &InitArgs) -> ExitResult {
             ])
             .status()
             .expect("Error executing useradd")
-            .to_exitcode()?;
     } else {
         println!("Modifying user {:?}", user);
 
@@ -147,7 +152,10 @@ fn initialization(_args: &InitArgs) -> ExitResult {
             ])
             .status()
             .expect("Error executing usermod")
-            .to_exitcode()?;
+    };
+
+    if !cmd.success() {
+        return Err(anyhow!("Error while setting up the user"));
     }
 
     println!("Setting up the user home");
@@ -155,12 +163,12 @@ fn initialization(_args: &InitArgs) -> ExitResult {
     // create the home directory if missing
     if !Path::new(&home).exists() {
         fs::create_dir(&home)
-            .expect("Failed to create user home");
+            .context("Failed to create user home")?;
     }
 
     // make sure its own by the user
     chown(&home, Some(uid_u), Some(gid_u))
-        .expect("Failed to chown user home directory");
+        .context("Failed to chown user home directory")?;
 
     // generate font cache just in case
     {
@@ -171,8 +179,7 @@ fn initialization(_args: &InitArgs) -> ExitResult {
 
         match cmd {
             Ok(x) => if !x.success() {
-                eprintln!("Failed to regenerate font cache");
-                return Err(1);
+                return Err(anyhow!("Failed to regenerate font cache"));
             },
             // some images may not have it so im just gonna ignore it
             Err(_) => println!("Failed to execute fc-cache, ignoring error.."),
@@ -183,11 +190,11 @@ fn initialization(_args: &InitArgs) -> ExitResult {
     let mut dirs: Vec<PathBuf> = vec![];
 
     // NOTE changing directory so i get './' paths and don't have to deal with path manipulation
-    env::set_current_dir("/etc/skel").unwrap();
+    env::set_current_dir("/etc/skel")?;
 
     walk_dir(Path::new("."), &mut files, &mut dirs);
 
-    env::set_current_dir("/").unwrap();
+    env::set_current_dir("/")?;
 
     // recreate all the directories
     for dir in &dirs {
@@ -195,15 +202,12 @@ fn initialization(_args: &InitArgs) -> ExitResult {
         let dest = Path::new(&home).join(dir);
 
         if !dest.exists() {
-            fs::create_dir(&dest)
-                .unwrap();
+            fs::create_dir(&dest)?;
         }
 
-        chown(&dest, Some(uid_u), Some(gid_u))
-            .unwrap();
+        chown(&dest, Some(uid_u), Some(gid_u))?;
 
-        clone_perm(&source, &dest)
-            .unwrap();
+        clone_perm(&source, &dest)?;
     }
 
     // clone all the files including symlinks
@@ -213,39 +217,32 @@ fn initialization(_args: &InitArgs) -> ExitResult {
 
         // NOTE fs::copy fails on broken symlinks
         if source.is_symlink() {
-            symlink(source.read_link().unwrap(), &dest)
-                .unwrap();
+            symlink(source.read_link().unwrap(), &dest)?;
         } else {
             // NOTE it seems copy clones permissions as well so its fine
-            fs::copy(&source, &dest)
-                .unwrap();
+            fs::copy(&source, &dest)?;
         }
 
-        lchown(&dest, Some(uid_u), Some(gid_u))
-            .unwrap();
+        lchown(&dest, Some(uid_u), Some(gid_u))?;
     }
 
     // create the runtime dir whatever it is
     {
-        let dest = std::env::var("XDG_RUNTIME_DIR").unwrap();
+        let dest = std::env::var("XDG_RUNTIME_DIR")?;
 
         // create all the dirs required
-        fs::create_dir_all(&dest)
-            .unwrap();
+        fs::create_dir_all(&dest)?;
 
         // make sure user owns it
-        chown(&dest, Some(uid_u), Some(gid_u))
-            .unwrap();
+        chown(&dest, Some(uid_u), Some(gid_u))?;
 
         // set permission
-        let mut perm = fs::symlink_metadata(&dest)
-            .unwrap()
+        let mut perm = fs::symlink_metadata(&dest)?
             .permissions();
 
         perm.set_mode(0o700);
 
-        fs::set_permissions(&dest, perm)
-            .unwrap();
+        fs::set_permissions(&dest, perm)?
     }
 
     let has_sudo = Path::new("/bin/sudo").exists();
@@ -254,25 +251,26 @@ fn initialization(_args: &InitArgs) -> ExitResult {
 
         let mut file = OpenOptions::new()
             .append(true)
-            .open("/etc/sudoers")
-            .unwrap();
+            .open("/etc/sudoers")?;
 
         // disable hostname resolving
-        writeln!(file, "Defaults !fqdn")
-            .unwrap();
+        writeln!(file, "Defaults !fqdn")?;
 
         // allow everything without a password for everyone
-        writeln!(file, "ALL ALL = (ALL) NOPASSWD: ALL")
-            .unwrap();
+        writeln!(file, "ALL ALL = (ALL) NOPASSWD: ALL")?;
     } else {
         println!("Sudo not found, enabling passwordless su");
 
         // just remove root password for passwordless su
-        Command::new("passwd")
+        let code = Command::new("passwd")
             .args(["-d", "root"])
             .status()
             .expect("Failed to execute passwd")
-            .to_exitcode()?;
+            .get_code();
+
+        if code != 0 {
+            return Err(anyhow!("Error while setting passwd for root ({})", code));
+        }
     }
 
     let init_dir = Path::new("/init.d");
@@ -280,7 +278,7 @@ fn initialization(_args: &InitArgs) -> ExitResult {
         for entry in init_dir.read_dir().unwrap().flatten() {
             // make sure its executable
             if !entry.metadata().is_ok_and(|x| x.permissions().mode() & 0o111 != 0) {
-                make_executable(&entry.path()).unwrap();
+                make_executable(&entry.path())?;
             }
 
             // accept both files and symlinks
@@ -295,24 +293,22 @@ fn initialization(_args: &InitArgs) -> ExitResult {
                 Command::new("sudo")
                     .args(["-u", &user])
                     .arg(entry.path())
-                    .status()
-                    .unwrap()
+                    .status()?
             } else {
                 Command::new("su")
                     .args([&user, "-c"])
                     .arg(entry.path())
-                    .status()
-                    .unwrap()
+                    .status()?
             };
 
-            if ! cmd.success() {
-                eprintln!("Script {:?} has failed with exit code {}", entry.path(), cmd.to_exitcode().unwrap_err());
+            if !cmd.success() {
+                eprintln!("Script {:?} has failed with exit code {}", entry.path(), cmd.get_code());
             }
         }
     }
 
     // signalize that init is done
-    fs::write("/initialized", "y")
+    fs::write(INITALIZED_FLAG_FILE, "y")
         .unwrap();
 
     println!("Initialization finished");
@@ -378,12 +374,12 @@ dw
 }
 
 /// Get PIDs of all root processes (pid 1 is excluded)
-fn get_root_processes() -> Result<Vec<u64>, u8> {
+fn get_root_processes() -> Result<Vec<u64>> {
     let mut root_pids: Vec<u64> = vec![];
 
     // as container works bit weirdly each command ran from exec will have PPID
     // of 0, so im manually filtering cause pgrep is not always available
-    for entry in fs::read_dir("/proc/").unwrap().flatten() {
+    for entry in fs::read_dir("/proc/")?.flatten() {
         // skip non numeric filenames
         if !entry.file_name().to_string_lossy().chars().all(|x| x.is_ascii_digit()) {
             continue
@@ -397,8 +393,7 @@ fn get_root_processes() -> Result<Vec<u64>, u8> {
 
         let (pid, ppid) = {
             // read the /proc/PID/stat
-            let stat_file = fs::read_to_string(entry.path().join("stat"))
-                .unwrap();
+            let stat_file = fs::read_to_string(entry.path().join("stat"))?;
 
             parse_proc_stat(&stat_file)
         };
@@ -412,13 +407,12 @@ fn get_root_processes() -> Result<Vec<u64>, u8> {
     Ok(root_pids)
 }
 
-pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
+pub fn container_init(cli_args: cli::CmdInitArgs) -> Result<()> {
     // decode the encoded args
     let args = match InitArgs::decode(&cli_args.args) {
         Ok(x) => x,
         Err(err) => {
-            eprintln!("Error decoding encoded args {:?}: {}", cli_args.args, err);
-            return Err(1);
+            return Err(anyhow!("Error decoding encoded args {:?}: {}", cli_args.args, err));
         }
     };
 
@@ -502,14 +496,13 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> ExitResult {
         println!("Propagating signal to processes");
 
         // to avoid more crates just use kill command
-        Command::new("kill")
+        let _ = Command::new("kill")
             // be verbose
             // send TERM then KILL after 10s
             .args(["--verbose", "--timeout", "10000", "KILL", "--signal", "TERM"])
             .args(&pids)
             .status()
-            .expect("Failed to execute kill")
-            .to_exitcode()?;
+            .expect("Failed to execute kill");
     }
 
     println!("Goodbye!");

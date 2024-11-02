@@ -1,22 +1,38 @@
-//! Contains all environment vars
+//! File containing constants
 
-use crate::ENV_VAR_PREFIX;
+/// Prefix env var name with proper prefix
+#[macro_export]
+macro_rules! ENV_VAR_PREFIX {
+    ($($args:literal),*) => {
+        concat!(env!("CARGO_PKG_NAME_UPPERCASE"), "_", $($args),*)
+    };
+}
 
-/// Container engine to use, podman, docker
-pub const ENGINE: &str = ENV_VAR_PREFIX!("ENGINE");
+pub const ENGINE_ERR_MSG: &str = "Failed to execute engine";
+
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_DESCRIBE"), " (", env!("VERGEN_GIT_BRANCH"), ")");
+
+pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
+pub const APP_NAME_UPPERCASE: &str = env!("CARGO_PKG_NAME_UPPERCASE");
+
+/// Container label used to specify the host directory where container was started
+pub const CONTAINER_LABEL_HOST_DIR: &str = "host_dir";
+
+/// Container label used to specify the path to main project in the container
+pub const CONTAINER_LABEL_CONTAINER_DIR: &str = "container_dir";
 
 /// Wayland socket to pass through
-pub const WAYLAND_DISPLAY: &str = ENV_VAR_PREFIX!("WAYLAND_DISPLAY");
+pub const ENV_WAYLAND_DISPLAY: &str = ENV_VAR_PREFIX!("WAYLAND_DISPLAY");
 
 /// Container name
-pub const CONTAINER: &str = ENV_VAR_PREFIX!("CONTAINER");
+pub const ENV_CONTAINER: &str = ENV_VAR_PREFIX!("CONTAINER");
 
 /// Suffix added to each unnamed container created
-pub const CONTAINER_SUFFIX: &str = ENV_VAR_PREFIX!("CONTAINER_SUFFIX");
+pub const ENV_CONTAINER_SUFFIX: &str = ENV_VAR_PREFIX!("CONTAINER_SUFFIX");
 
 /// Image or config to use by default
-pub const IMAGE: &str = ENV_VAR_PREFIX!("IMAGE");
+pub const ENV_IMAGE: &str = ENV_VAR_PREFIX!("IMAGE");
 
 /// Directory where the app stores data
-pub const APP_DIR: &str = ENV_VAR_PREFIX!("DIR");
-
+pub const ENV_APP_DIR: &str = ENV_VAR_PREFIX!("DIR");

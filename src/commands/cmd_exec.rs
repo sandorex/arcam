@@ -1,43 +1,34 @@
-use crate::util::{self, Engine};
 use crate::cli;
 use crate::util::command_extensions::*;
-use crate::ExitResult;
+use crate::prelude::*;
 
-pub fn container_exec(engine: Engine, dry_run: bool, mut cli_args: cli::CmdExecArgs) -> ExitResult {
+pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()> {
     // try to find container in current directory
     if cli_args.name.is_empty() {
-        if let Some(containers) = util::find_containers_by_cwd(&engine) {
+        if let Some(containers) = ctx.get_cwd_container() {
             if containers.is_empty() {
-                eprintln!("Could not find a running container in current directory");
-                return Err(1);
+                return Err(anyhow!("Could not find a running container in current directory"));
             }
 
             cli_args.name = containers.first().unwrap().clone();
         }
-    } else if !dry_run && !util::container_exists(&engine, &cli_args.name) {
-        eprintln!("Container {:?} does not exist", &cli_args.name);
-        return Err(1);
+    } else if !ctx.dry_run && !ctx.engine_container_exists(&cli_args.name) {
+        return Err(anyhow!("Container {:?} does not exist", &cli_args.name));
     }
 
     // check if container is owned
-    let ws_dir = match util::get_container_ws(&engine, &cli_args.name) {
+    let ws_dir = match ctx.get_container_label(&cli_args.name, crate::CONTAINER_LABEL_CONTAINER_DIR) {
         Some(x) => x,
         // allow dry_run to work
-        None if dry_run => "/ws/dry_run".to_string(),
-        None => {
-            eprintln!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME);
-
-            return Err(1);
-        }
+        None if ctx.dry_run => "/ws/dry_run".to_string(),
+        None => return Err(anyhow!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME)),
     };
 
-    let user = std::env::var("USER").expect("Unable to get USER from env var");
-
-    let mut cmd = Command::new(&engine.path);
+    let mut cmd = ctx.engine_command();
     cmd.args(["exec", "-it"]);
     cmd.args([
         format!("--workdir={}", ws_dir),
-        format!("--user={}", user),
+        format!("--user={}", ctx.user),
         format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
     ]);
 
@@ -57,13 +48,11 @@ pub fn container_exec(engine: Engine, dry_run: bool, mut cli_args: cli::CmdExecA
         cmd.args(&cli_args.command);
     }
 
-    if dry_run {
-        cmd.print_escaped_cmd()
+    if ctx.dry_run {
+        cmd.print_escaped_cmd();
     } else {
-        cmd
-            .status()
-            .expect(crate::ENGINE_ERR_MSG)
-            .to_exitcode()
+        cmd.run_interactive()?;
     }
-}
 
+    Ok(())
+}

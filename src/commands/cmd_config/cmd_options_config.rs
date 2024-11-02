@@ -1,9 +1,8 @@
 use code_docs::DocumentedStruct;
 use crate::config::Config;
-use crate::util;
-use crate::vars;
+use crate::prelude::*;
 
-pub fn show_config_options() {
+pub fn show_config_options(ctx: Context) {
     let docstring = Config::commented_fields()
         .unwrap()
         // replacing vec with array for people that dont know rust
@@ -11,9 +10,7 @@ pub fn show_config_options() {
 
     // TODO generate the example config with the serialize function instead of
     // raw text so it is always up to date
-    println!(r#"ENV {appdir_env}: {appdir:?}
-
-APP DIRECTORY: {appdir:?}
+    println!(r#"APP DIRECTORY (ENV {appdir_env}): {appdir:?}
 CONFIG DIRECTORY: {cfgdir:?}
 
 --- EXAMPLE CONFIG FILE ---
@@ -37,9 +34,8 @@ ports = [
 --- CONFIG OPTIONS ---
 
 "#,
-        appdir_env=vars::APP_DIR,
-        appdir=util::app_dir(),
-        cfgdir=util::config_dir(),
+        appdir_env=crate::ENV_APP_DIR,
+        appdir=ctx.app_dir,
+        cfgdir=ctx.config_dir(),
     );
 }
-

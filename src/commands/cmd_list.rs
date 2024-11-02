@@ -1,62 +1,56 @@
-use crate::util::{Engine, command_extensions::*};
-use crate::ExitResult;
+use crate::util::command_extensions::*;
+use crate::prelude::*;
 use crate::cli::CmdListArgs;
 
-pub fn print_containers(engine: Engine, dry_run: bool, args: CmdListArgs) -> ExitResult {
-    let mut cmd = Command::new(&engine.path);
+pub fn print_containers(ctx: Context, args: CmdListArgs) -> Result<()> {
+    let mut cmd = ctx.engine_command();
     cmd.args([
         "container", "ls",
         "--filter", format!("label={}", crate::APP_NAME).as_str(),
-        // TODO host_dir label should be a global const!
-        "--format", "{{.Names}}\t{{.Image}}\t{{.Labels.host_dir}}\t{{.Ports}}"
+        "--format", format!("{{{{.Names}}}}\t{{{{.Image}}}}\t{{{{.Labels.{}}}}}\t{{{{.Ports}}}}", crate::CONTAINER_LABEL_HOST_DIR).as_str(),
     ]);
 
     // filter the container by host_dir
     if args.here {
         cmd.arg("--filter");
-        cmd.arg(format!("label=host_dir={}", std::env::current_dir()
-            .expect("Error getting cwd")
-            .to_string_lossy()));
+        cmd.arg(format!("label={}={}", crate::CONTAINER_LABEL_HOST_DIR, ctx.cwd.to_string_lossy()));
     }
 
-    if dry_run {
-        cmd.print_escaped_cmd()
+    if ctx.dry_run {
+        cmd.print_escaped_cmd();
+
+        Ok(())
     } else {
         if args.raw {
             // just run it raw
-            cmd.status()
-                .expect(crate::ENGINE_ERR_MSG)
-                .to_exitcode()
+            cmd.run_interactive()?;
+
+            Ok(())
         } else {
-            let output = cmd.output()
-                .expect(crate::ENGINE_ERR_MSG);
+            let output = cmd.run_get_output()?;
 
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                for (index, line) in stdout.lines().enumerate() {
-                    let columns: Vec<&str> = line.trim_start().split("\t").collect();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for (index, line) in stdout.lines().enumerate() {
+                let columns: Vec<&str> = line.trim_start().split("\t").collect();
 
-                    let name = columns[0];
-                    let image = columns[1];
-                    let ws = columns[2];
-                    let ports = columns[3];
+                let name = columns[0];
+                let image = columns[1];
+                let ws = columns[2];
+                let ports = columns[3];
 
-                    // format nicely by adding a newline
-                    if index != 0 {
-                        println!();
-                    }
-
-                    println!("Container {:?} at {}", name, ws);
-                    println!("  image: {}", image);
-                    if !ports.is_empty() {
-                        println!("  ports: {}", ports);
-                    }
+                // format nicely by adding a newline
+                if index != 0 {
+                    println!();
                 }
 
-                Ok(())
-            } else {
-                output.to_exitcode()
+                println!("Container {:?} at {} {}", name, ws, if std::path::Path::new(ws) == ctx.cwd { "*" } else { " " });
+                println!("  image: {}", image);
+                if !ports.is_empty() {
+                    println!("  ports: {}", ports);
+                }
             }
+
+            Ok(())
         }
     }
 }

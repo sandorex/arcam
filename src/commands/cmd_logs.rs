@@ -1,13 +1,13 @@
-use crate::util::{self, command_extensions::*, Engine};
-use crate::{cli, ExitResult};
+use crate::util::command_extensions::*;
+use crate::cli;
+use crate::prelude::*;
 
-pub fn print_logs(engine: Engine, mut cli_args: cli::CmdLogsArgs) -> ExitResult {
+pub fn print_logs(ctx: Context, mut cli_args: cli::CmdLogsArgs) -> Result<()> {
     // try to find container in current directory
     if cli_args.name.is_empty() {
-        if let Some(containers) = util::find_containers_by_cwd(&engine) {
+        if let Some(containers) = ctx.get_cwd_container() {
             if containers.is_empty() {
-                eprintln!("Could not find a running container in current directory");
-                return Err(1);
+                return Err(anyhow!("Could not find a running container in current directory"));
             }
 
             cli_args.name = containers.first().unwrap().clone();
@@ -24,7 +24,7 @@ pub fn print_logs(engine: Engine, mut cli_args: cli::CmdLogsArgs) -> ExitResult 
         cmd.arg("--follow");
     }
 
-    cmd.status()
-        .expect("Failed to execute journalctl")
-        .to_exitcode()
+    cmd.run_interactive()?;
+
+    Ok(())
 }
