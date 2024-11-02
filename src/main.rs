@@ -4,6 +4,7 @@ mod commands;
 mod config;
 mod context;
 mod vars;
+mod socket;
 
 use clap::Parser;
 use cli::CliCommands;

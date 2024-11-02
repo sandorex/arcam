@@ -4,6 +4,8 @@ use users::os::unix::UserExt;
 use crate::util::Engine;
 use std::collections::HashMap;
 use crate::util::command_extensions::*;
+use std::os::unix::net::UnixStream;
+use crate::socket::Response;
 
 /// Possible status of a container
 #[derive(Debug)]
@@ -32,6 +34,9 @@ pub struct Context {
     /// Directory where app related configuration files reside
     pub app_dir: PathBuf,
 
+    /// Directory where temp files reside
+    pub state_dir: PathBuf,
+
     /// Which container engine to use
     pub engine: Engine,
 }
@@ -59,6 +64,20 @@ fn get_app_dir() -> PathBuf {
     }
 }
 
+/// State directory for this app, respects XDG_STATE_HOME env var but
+/// defaults to `~/.local/state/` when undefined
+fn get_local_state_dir(user: &str) -> PathBuf {
+    // respect XDG standard
+    match std::env::var("XDG_STATE_HOME") {
+        Ok(x) => PathBuf::from(x),
+        // fallback to ~/.local/state/
+        Err(_) => PathBuf::from("/home/")
+            .join(user)
+            .join(".local")
+            .join("state"),
+    }.join(crate::APP_NAME)
+}
+
 impl Context {
     /// Construct new context with current user
     pub fn new(dry_run: bool, engine: Engine) -> Result<Self> {
@@ -67,8 +86,11 @@ impl Context {
         let user = get_user_by_uid(uid)
             .ok_or(anyhow::anyhow!("Unable to find user by id {}", uid))?;
 
+        let user_name = user.name().to_string_lossy().to_string();
+        let state_dir = get_local_state_dir(&user_name);
+
         Ok(Self {
-            user: user.name().to_string_lossy().to_string(),
+            user: user_name,
             user_home: user.home_dir().to_path_buf(),
             user_id: uid,
             user_gid: user.primary_group_id(),
@@ -77,22 +99,9 @@ impl Context {
                 .with_context(|| "Failed to get current directory")?,
             dry_run,
             app_dir: get_app_dir(),
+            state_dir,
             engine,
         })
-    }
-
-    /// State directory for this app, respects XDG_STATE_HOME env var but
-    /// defaults to `~/.local/state/` when undefined
-    pub fn get_local_state_dir(&self) -> PathBuf {
-        // respect XDG standard
-        match std::env::var("XDG_STATE_HOME") {
-            Ok(x) => PathBuf::from(x),
-            // fallback to ~/.local/state/
-            Err(_) => PathBuf::from("/home/")
-                .join(&self.user)
-                .join(".local")
-                .join("state"),
-        }.join(crate::APP_NAME)
     }
 
     /// Get container configuration directory
@@ -192,7 +201,6 @@ impl Context {
         }
     }
 
-
     /// Get container status if it exists
     pub fn get_container_status(&self, container: &str) -> Option<ContainerStatus> {
         let cmd = self.engine_command()
@@ -219,5 +227,49 @@ impl Context {
     pub fn load_configs(&self) -> Result<HashMap<String, crate::config::Config>> {
         crate::config::load_from_dir(self.config_dir().as_path())
             .map_err(|err| anyhow!("{}", err))
+    }
+
+    pub fn socket_path(&self, container: &str) -> PathBuf {
+        self.state_dir.join(format!("{}.sock", container))
+    }
+
+    pub fn socket_send(&self, container: &str, command: crate::socket::Command) -> Result<Response> {
+        use std::io::prelude::*;
+
+        let socket_path = self.socket_path(container);
+        let mut stream = UnixStream::connect(socket_path.as_path())
+            .with_context(|| anyhow!("Could not open socket {:?}", socket_path))?;
+
+        println!("Sending command {:?}", command);
+
+        // write to the stream
+        let data = bson::to_vec(&command)
+            .with_context(|| anyhow!("Failed to serialize command {:?} to bson", command))?;
+        stream.write(&data)
+            .context("Could not write to socket")?;
+
+        stream.shutdown(std::net::Shutdown::Write)
+            .context("Failed to close write on socket")?;
+
+        // read response
+        let mut size_buf = [0u8; 4];
+
+        // read length so i can preallocate
+        stream.read_exact(&mut size_buf)
+            .context("Failed to read response length from socket")?;
+
+        let mut buf: Vec<u8> = Vec::from(size_buf.clone());
+        let len = i32::from_le_bytes(size_buf);
+        buf.reserve_exact(len.try_into().unwrap()); // TODO remove unwrap
+
+        stream.read_exact(&mut buf)
+            .context("Failed to read whole response length")?;
+
+        let response = bson::from_slice::<Response>(&buf)
+            .context("Failed to parse socket respone")?;
+
+        println!("got response {:?}", response);
+
+        Ok(response)
     }
 }

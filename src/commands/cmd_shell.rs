@@ -65,6 +65,12 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
 
         Ok(())
     } else {
+        // TODO test
+        ctx.socket_send(&cli_args.name, crate::socket::Command::Heartbeat {
+            host_pid: 69,
+            container_pid: 420,
+        })?;
+
         let cmd = cmd
             .status()
             .expect(crate::ENGINE_ERR_MSG);
