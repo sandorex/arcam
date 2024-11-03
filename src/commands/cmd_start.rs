@@ -377,6 +377,11 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         std::fs::create_dir_all(&ctx.state_dir)?;
     }
 
+    let socket_dir = ctx.socket_dir(&container_name);
+    if !socket_dir.exists() {
+        std::fs::create_dir_all(&socket_dir)?;
+    }
+
     cmd.args([
         format!("--label=manager={}", ctx.engine),
         format!("--label={}={}", APP_NAME, VERSION),
@@ -395,8 +400,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!("--env=XDG_RUNTIME_DIR=/run/user/{}", ctx.user_id),
         format!("--volume={}:/{}:ro,nocopy", executable_path.display(), env!("CARGO_BIN_NAME")),
         format!("--volume={}:{}", ctx.cwd.to_string_lossy(), main_project_dir),
-        format!("--volume={}:/", ctx.socket_path(&container_name).to_string_lossy(), APP_NAME),
-        format!("--hostname={}", get_hostname()?),
+        format!("--volume={}:/run/socket", ctx.socket_dir(&container_name).to_string_lossy()),
+        format!("--hostname={}", get_hostname()?)
     ]);
 
     // engine specific args

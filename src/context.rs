@@ -229,8 +229,12 @@ impl Context {
             .map_err(|err| anyhow!("{}", err))
     }
 
+    pub fn socket_dir(&self, container: &str) -> PathBuf {
+        self.state_dir.join(container)
+    }
+
     pub fn socket_path(&self, container: &str) -> PathBuf {
-        self.state_dir.join(format!("{}.sock", container))
+        self.socket_dir(container).join("arcam.sock")
     }
 
     pub fn socket_send(&self, container: &str, command: crate::socket::Command) -> Result<Response> {
@@ -240,7 +244,11 @@ impl Context {
         let mut stream = UnixStream::connect(socket_path.as_path())
             .with_context(|| anyhow!("Could not open socket {:?}", socket_path))?;
 
-        println!("Sending command {:?}", command);
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+
+        if cfg!(debug_assertions) {
+            println!("Sending command {:?}", command);
+        }
 
         // write to the stream
         let data = bson::to_vec(&command)
@@ -248,27 +256,14 @@ impl Context {
         stream.write(&data)
             .context("Could not write to socket")?;
 
-        stream.shutdown(std::net::Shutdown::Write)
-            .context("Failed to close write on socket")?;
+        stream.flush()
+            .context("Error flushing socket")?;
 
-        // read response
-        let mut size_buf = [0u8; 4];
+        let response: Response = bson::from_reader(stream)?;
 
-        // read length so i can preallocate
-        stream.read_exact(&mut size_buf)
-            .context("Failed to read response length from socket")?;
-
-        let mut buf: Vec<u8> = Vec::from(size_buf.clone());
-        let len = i32::from_le_bytes(size_buf);
-        buf.reserve_exact(len.try_into().unwrap()); // TODO remove unwrap
-
-        stream.read_exact(&mut buf)
-            .context("Failed to read whole response length")?;
-
-        let response = bson::from_slice::<Response>(&buf)
-            .context("Failed to parse socket respone")?;
-
-        println!("got response {:?}", response);
+        if cfg!(debug_assertions) {
+            println!("Got response {:?}", response);
+        }
 
         Ok(response)
     }

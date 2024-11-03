@@ -480,7 +480,7 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> Result<()> {
     {
         use std::os::unix::net::UnixListener;
 
-        let socket_path = Path::new("/arcam.sock");
+        let socket_path = Path::new("/run/socket/arcam.sock");
         if socket_path.exists() {
             std::fs::remove_file(socket_path)?;
         }
@@ -488,32 +488,33 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> Result<()> {
         let socket = UnixListener::bind(socket_path)
             .context("Could not create the unix socket")?;
 
+        // TODO remove hardcoded values
+        chown(socket_path, Some(1000), Some(1000))?;
+
         let r = running.clone();
         std::thread::spawn(move || -> Result<()> {
             while r.load(Ordering::SeqCst) {
-                let (mut stream, _) = socket.accept().context("Failed to accept socket connection")?;
+                let (mut stream, _) = socket
+                    .accept()
+                    .context("Failed to accept socket connection")?;
 
-                // read response
-                let mut size_buf = [0u8; 4];
+                stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
 
-                // read length so i can preallocate
-                stream.read_exact(&mut size_buf)
-                    .context("Failed to read command length from socket")?;
+                if cfg!(debug_assertions) {
+                    println!("Accepting socket connection");
+                }
 
-                let mut buf: Vec<u8> = Vec::from(size_buf.clone());
-                let len = i32::from_le_bytes(size_buf);
-                buf.reserve_exact(len.try_into().unwrap()); // TODO remove unwrap
+                let command: SocketCommand = bson::from_reader(&stream)?;
 
-                stream.read_exact(&mut buf)
-                    .context("Failed to read whole command length")?;
+                if cfg!(debug_assertions) {
+                    println!("Received command {:?}", command);
+                }
 
-                // Ok(
-                let command = bson::from_slice::<SocketCommand>(&buf)
-                    .context("Failed to parse socket command")?;
+                let response = Response::Received;
 
-                println!("got command: {:?}", command);
-
-                let response = Response::Received(1);
+                if cfg!(debug_assertions) {
+                    println!("Sending response {:?}", response);
+                }
 
                 // write to the stream
                 let data = bson::to_vec(&response)
@@ -521,23 +522,13 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> Result<()> {
                 stream.write(&data)
                     .context("Could not write response")?;
 
-                // )
-                // let mut message = String::new();
-                // stream
-                //     .read_to_string(&mut message)
-                //     .context("Failed at reading the unix stream")?;
-
-                // println!("We received this message: {}\nReplying...", message);
-
-                // stream
-                //     .write(b"I hear you!")
-                //     .context("Failed at writing onto the unix stream")?;
+                stream.flush()
+                    .context("Error flushing socket")?;
             }
 
             Ok(())
         });
     }
-
 
     // simply wait until container gets killed
     while running.load(Ordering::SeqCst) {
