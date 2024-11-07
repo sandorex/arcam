@@ -275,6 +275,7 @@ fn initialization(_args: &InitArgs) -> Result<()> {
 
     let init_dir = Path::new("/init.d");
     if init_dir.exists() {
+        let mut files: Vec<PathBuf> = vec![];
         for entry in init_dir.read_dir().unwrap().flatten() {
             // make sure its executable
             if !entry.metadata().is_ok_and(|x| x.permissions().mode() & 0o111 != 0) {
@@ -286,23 +287,30 @@ fn initialization(_args: &InitArgs) -> Result<()> {
                 continue;
             }
 
-            println!("Executing script {:?}", entry.path());
+            files.push(entry.path());
+        }
+
+        // sort all files to guarantee the correct execution order
+        files.sort_by_key(|x| x.file_name().unwrap().to_owned());
+
+        for file in files {
+            println!("Executing script {:?}", file);
 
             // use sudo if available
             let cmd = if has_sudo {
                 Command::new("sudo")
                     .args(["-u", &user])
-                    .arg(entry.path())
+                    .arg(&file)
                     .status()?
             } else {
                 Command::new("su")
                     .args([&user, "-c"])
-                    .arg(entry.path())
+                    .arg(&file)
                     .status()?
             };
 
             if !cmd.success() {
-                eprintln!("Script {:?} has failed with exit code {}", entry.path(), cmd.get_code());
+                eprintln!("Script {:?} has failed with exit code {}", file, cmd.get_code());
             }
         }
     }
