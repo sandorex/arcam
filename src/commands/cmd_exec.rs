@@ -34,10 +34,14 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
 
     if let Some(shell) = &cli_args.shell {
         cmd.arg(format!("--env=SHELL={}", shell));
-        cmd.args([
-            &cli_args.name,
-            shell, "-c"
-        ]);
+        cmd.args([&cli_args.name, shell]);
+
+        // add -l and hope for the best
+        if cli_args.login {
+            cmd.arg("-l");
+        }
+
+        cmd.arg("-c");
 
         // run the command as one big concatenated string
         cmd.arg(cli_args.command.join(" "));

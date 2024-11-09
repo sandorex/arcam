@@ -133,11 +133,17 @@ pub struct CmdShellArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdExecArgs {
-    /// Execute command using a shell
+    /// Execute command using a shell, if not value is provided `/bin/sh` is used
     ///
     /// The shell will be used like `<shell> -c '<command..>'` so it must be compatible
     #[arg(long, default_missing_value = "/bin/sh", require_equals = true, num_args = 0..=1)]
     pub shell: Option<String>,
+
+    /// Execute command using login shell
+    /// All it does is adds `-l` flag to the shell cmd, so it may not work with
+    /// non-posix shells
+    #[arg(long, requires = "shell")]
+    pub login: bool,
 
     /// Name or the ID of the container
     #[arg(value_name = "CONTAINER", default_value = "", env = crate::ENV_CONTAINER)]
