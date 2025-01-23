@@ -1,4 +1,7 @@
 ## arcam
+![Crates.io Version](https://img.shields.io/crates/v/arcam)
+![GitHub Release](https://img.shields.io/github/v/release/sandorex/arcam)
+
 Fast sandboxed development container manager using podman, minimal permissions by default choose balance between security and convenience
 
 ![Demo GIF](arcam-demo.gif)
