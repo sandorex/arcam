@@ -24,13 +24,23 @@ pub mod prelude {
 fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
 
-    // init does not need context
-    if let CliCommands::Init(x) = args.cmd {
-        if !util::is_in_container() {
-            return Err(anyhow!("Running init outside a container is dangerous, qutting.."));
-        }
+    // init and healthcheck do not need context
+    match args.cmd {
+        CliCommands::Init(x) => {
+            if !util::is_in_container() {
+                return Err(anyhow!("Running init outside a container is dangerous, qutting.."));
+            }
 
-        return commands::container_init(x);
+            return commands::container_init(x);
+        },
+        CliCommands::HealthCheck => {
+            if !util::is_in_container() {
+                return Err(anyhow!("Running healthcheck outside a container is dangerous, qutting.."));
+            }
+
+            return commands::container_healthcheck();
+        },
+        _ => {},
     }
 
     // find and detect engine
@@ -62,7 +72,7 @@ fn main() -> anyhow::Result<()> {
         CliCommands::List(x) => commands::print_containers(ctx, x)?,
         CliCommands::Logs(x) => commands::print_logs(ctx, x)?,
         CliCommands::Kill(x) => commands::kill_container(ctx, x)?,
-        CliCommands::Init(_) => unreachable!(),
+        CliCommands::Init(_) | CliCommands::HealthCheck => unreachable!(),
     };
 
     Ok(())

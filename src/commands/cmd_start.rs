@@ -3,7 +3,7 @@ use crate::util::{self, EngineKind};
 use crate::prelude::*;
 use crate::util::command_extensions::*;
 use crate::cli::CmdStartArgs;
-use super::cmd_init::{InitArgs, INITALIZED_FLAG_FILE};
+use super::cmd_init::InitArgs;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -94,7 +94,6 @@ fn execute_host_pre_init(ctx: &Context, commands: &Vec<String>) -> Result<()> {
             cmd.run_interactive()?;
         }
     }
-
 
     Ok(())
 }
@@ -371,7 +370,19 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         "run", "-d", "--rm",
         "--security-opt=label=disable",
         "--user=root",
+        "--init", // arcam does not act as the init system anymore
     ]);
+
+    // using health-cmd for auto-shutdown
+    if cli_args.auto_shutdown.unwrap_or(false) {
+        cmd.args([
+            "--label=autoshutdown".into(),
+            format!("--health-cmd={} health-check", crate::ARCAM_EXE),
+            "--health-interval=5s".into(), // TODO this is only for testing
+            // "--health-start-period=5m",
+            // "--health-on-failure=kill".into(),
+        ]);
+    }
 
     cmd.args([
         format!("--label=manager={}", ctx.engine),
@@ -389,7 +400,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!("--env=HOST_USER_GID={}", ctx.user_gid),
         // TODO explore all the xdg dirs and set them properly
         format!("--env=XDG_RUNTIME_DIR=/run/user/{}", ctx.user_id),
-        format!("--volume={}:/{}:ro,nocopy", executable_path.display(), env!("CARGO_BIN_NAME")),
+        format!("--volume={}:/{}:ro,nocopy", executable_path.display(), crate::ARCAM_EXE),
         format!("--volume={}:{}", ctx.cwd.to_string_lossy(), main_project_dir),
         format!("--hostname={}", get_hostname()?),
     ]);
@@ -460,7 +471,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         let init_args = InitArgs {
             on_init_pre: cli_args.on_init_pre,
             on_init_post: cli_args.on_init_post,
-            automatic_idle_shutdown: cli_args.auto_shutdown.unwrap_or(false),
         };
 
         match init_args.encode() {
@@ -473,7 +483,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         // detaching breaks things
         "--detach-keys=",
 
-        concat!("--entrypoint=/", env!("CARGO_BIN_NAME")),
+        format!("--entrypoint={}", crate::ARCAM_EXE).as_str(),
 
         // the container image
         &cli_args.image,
@@ -507,7 +517,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             let cmd = Command::new(&ctx.engine.path)
                 .arg("exec")
                 .arg(id)
-                .args(["sh", "-c", format!("test -f {}", INITALIZED_FLAG_FILE).as_str()]) // TODO make initialized file a const
+                .args(["sh", "-c", format!("test -f {}", crate::FLAG_FILE_INIT).as_str()])
                 .output()
                 .expect(crate::ENGINE_ERR_MSG);
 
@@ -517,7 +527,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 125 => return Err(anyhow!("Container has exited unexpectedly (125)")),
 
                 // this really should not happen unless something breaks
-                x => panic!("Unknown error during container initialization ({})", x),
+                x => return Err(anyhow!("Unknown error during container initialization ({})", x)),
             }
         };
 

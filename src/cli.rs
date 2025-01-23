@@ -236,6 +236,10 @@ pub enum CliCommands {
     /// Init command used to setup the container
     #[command(hide = true)]
     Init(CmdInitArgs),
+
+    /// Command used in healthcheck-cmd, used to terminate idle containers if requested
+    #[command(hide = true)]
+    HealthCheck,
 }
 
 #[cfg(test)]

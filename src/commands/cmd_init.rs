@@ -7,19 +7,13 @@ use std::fs::OpenOptions;
 use std::{env, fs};
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::io::prelude::*;
 use base64::prelude::*;
-
-/// This file existing is a signal when container initialization is finished
-pub const INITALIZED_FLAG_FILE: &str = "/initialized";
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub struct InitArgs {
     pub on_init_pre: Vec<String>,
     pub on_init_post: Vec<String>,
-    pub automatic_idle_shutdown: bool,
 }
 
 impl InitArgs {
@@ -209,7 +203,7 @@ fn initialization(_args: &InitArgs) -> Result<()> {
 
         // NOTE fs::copy fails on broken symlinks
         if source.is_symlink() {
-            symlink(source.read_link().unwrap(), &dest)?;
+            symlink(source.read_link()?, &dest)?;
         } else {
             // NOTE it seems copy clones permissions as well so its fine
             fs::copy(&source, &dest)?;
@@ -265,7 +259,7 @@ fn initialization(_args: &InitArgs) -> Result<()> {
         }
     }
 
-    let init_dir = Path::new("/init.d");
+    let init_dir = Path::new(crate::INIT_D_DIR);
     if init_dir.exists() {
         let mut files: Vec<PathBuf> = vec![];
         for entry in init_dir.read_dir().unwrap().flatten() {
@@ -308,103 +302,12 @@ fn initialization(_args: &InitArgs) -> Result<()> {
     }
 
     // signalize that init is done
-    fs::write(INITALIZED_FLAG_FILE, "y")
+    fs::write(crate::FLAG_FILE_INIT, "y")
         .unwrap();
 
     println!("Initialization finished");
 
     Ok(())
-}
-
-/// Parse PID and PPID from contents of `/proc/PID/stat` file
-fn parse_proc_stat(input: &str) -> (u64, u64) {
-    // FORMAT: PID (EXE_NAME) STATE PPID ...
-    // WARNING EXE_NAME can contain spaces, newlines basically anything
-
-    let pid = input.split_once(" ")
-        .unwrap()
-        .0
-        .parse::<u64>()
-        .unwrap();
-
-    // parse pid and ppid
-    let ppid = {
-        // remove everything before the executable name, cause its hard to parse
-        let rest = input.rsplit_once(") ").unwrap().1;
-
-        // split again and get the PPID
-        rest.split(" ")
-            .nth(1)
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
-    };
-
-    (pid, ppid)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_proc_stat() {
-        use super::parse_proc_stat;
-
-        // names to test the algorithm with
-        const NAMES: [&str; 4] = [
-            "arcam",
-            "((dw)",
-            ")) ) ) ",
-            r#") ;
-_)
-;w
-dw
-"#
-        ];
-
-        for name in NAMES {
-            assert_eq!(
-                parse_proc_stat(&format!(
-                    "{} ({}) S {} 1 1 0 -1 4194560 219 8424 0 3 1 8 7 7 20 0 2 0 87254147 75227136 893 18446744073709551615 94609717866496 94609719346301 140731732879504 0 0 0 0 4096 17475 0 0 0 17 11 0 0 0 0 0 94609719712240 94609719767160 94610004168704 140731732880722 140731732880935 140731732880935 140731732881393 0",
-                    69, name, 420
-                )),
-                (69, 420)
-            );
-        }
-    }
-}
-
-/// Get PIDs of all root processes (pid 1 is excluded)
-fn get_root_processes() -> Result<Vec<u64>> {
-    let mut root_pids: Vec<u64> = vec![];
-
-    // as container works bit weirdly each command ran from exec will have PPID
-    // of 0, so im manually filtering cause pgrep is not always available
-    for entry in fs::read_dir("/proc/")?.flatten() {
-        // skip non numeric filenames
-        if !entry.file_name().to_string_lossy().chars().all(|x| x.is_ascii_digit()) {
-            continue
-        }
-
-        // skip non-dir entries
-        match entry.file_type() {
-            Ok(x) if x.is_dir() => {},
-            _ => continue,
-        }
-
-        let (pid, ppid) = {
-            // read the /proc/PID/stat
-            let stat_file = fs::read_to_string(entry.path().join("stat"))?;
-
-            parse_proc_stat(&stat_file)
-        };
-
-        // ppid of 0 means its root process but ignore the init binary itself
-        if ppid == 0 && pid != 1 {
-            root_pids.push(pid);
-        }
-    }
-
-    Ok(root_pids)
 }
 
 pub fn container_init(cli_args: cli::CmdInitArgs) -> Result<()> {
@@ -416,96 +319,51 @@ pub fn container_init(cli_args: cli::CmdInitArgs) -> Result<()> {
         }
     };
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-
-    ctrlc::set_handler(move || {
-        println!("Termination signal received");
-
-        // stop the loop
-        r.store(false, Ordering::SeqCst);
-    }).expect("Error while setting signal handler");
-
-    // create the dir always
-    if !Path::new("/init.d").exists() {
-        std::fs::create_dir("/init.d").unwrap();
+    if !Path::new(crate::ARCAM_DIR).exists() {
+        std::fs::create_dir(crate::ARCAM_DIR).unwrap();
     }
 
+    if !Path::new(crate::HEALTH_DIR).exists() {
+        std::fs::create_dir(crate::HEALTH_DIR).unwrap();
+    }
+
+    // create the dir always
+    if !Path::new(crate::INIT_D_DIR).exists() {
+        std::fs::create_dir(crate::INIT_D_DIR).unwrap();
+    }
+
+    // TODO these should be moved to start
     if !args.on_init_pre.is_empty() {
-        let path = Path::new("/init.d/00_on_init_pre.sh");
+        let path = PathBuf::new()
+            .join(crate::INIT_D_DIR)
+            .join("00_on_init_pre.sh");
 
         // write the init commands to single file
-        fs::write(path, format!("#!/bin/sh\n{}",
+        fs::write(&path, format!("#!/bin/sh\n{}",
             args.on_init_pre.join("\n"))).unwrap();
 
-        make_executable(path).unwrap();
+        make_executable(&path).unwrap();
     }
 
     if !args.on_init_post.is_empty() {
-        let path = Path::new("/init.d/99_on_init_post.sh");
+        let path = PathBuf::new()
+            .join(crate::INIT_D_DIR)
+            .join("99_on_init_post.sh");
 
         // write the init commands to single file
-        fs::write(path, format!("#!/bin/sh\n{}",
+        fs::write(&path, format!("#!/bin/sh\n{}",
             args.on_init_post.join("\n"))).unwrap();
 
-        make_executable(path).unwrap();
+        make_executable(&path).unwrap();
     }
 
     initialization(&args)?;
 
-    // start thread to kill container if idle
-    if args.automatic_idle_shutdown {
-        let r = running.clone();
-
-        std::thread::spawn(move || {
-            while r.load(Ordering::SeqCst) {
-                // check every 10 minutes
-                std::thread::sleep(std::time::Duration::from_secs(30)); // temp 10s
-                // std::thread::sleep(std::time::Duration::from_secs(10 * 60));
-
-                let root_processes: Vec<u64> = get_root_processes()
-                    .unwrap();
-
-                // if there are not procesess then stop
-                if root_processes.len() == 0 {
-                    println!("Automatic shutdown commencing, no processes running");
-                    r.store(false, Ordering::SeqCst);
-                    break
-                }
-            }
-        });
+    // just sleep forever, podman-init will kill it
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(60));
     }
 
-    // simply wait until container gets killed
-    while running.load(Ordering::SeqCst) {
-        // from my testing the delay from this does not really matter but an
-        // empty while loop generated a high cpu usage which is not ideal
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
-
-    // find leftover processes
-    // convert to string as command does not allow number arguments
-    let pids = get_root_processes()?
-        .iter()
-        .map(|x| x.to_string())
-        .collect::<Vec<_>>();
-
-    // TODO send the signal manually so there is no relience on kill command?
-    // do not run kill if there are no processes to kill
-    if !pids.is_empty() {
-        println!("Propagating signal to processes");
-
-        // to avoid more crates just use kill command
-        let _ = Command::new("kill")
-            // be verbose
-            // send TERM then KILL after 10s
-            .args(["--verbose", "--timeout", "10000", "KILL", "--signal", "TERM"])
-            .args(&pids)
-            .status()
-            .expect("Failed to execute kill");
-    }
-
-    println!("Goodbye!");
-
+    #[allow(unreachable_code)]
     Ok(())
 }

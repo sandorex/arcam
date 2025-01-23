@@ -36,3 +36,18 @@ pub const ENV_IMAGE: &str = ENV_VAR_PREFIX!("IMAGE");
 
 /// Directory where the app stores data
 pub const ENV_APP_DIR: &str = ENV_VAR_PREFIX!("DIR");
+
+/// Where scripts are executed from
+pub const INIT_D_DIR: &str = "/init.d";
+
+/// Path where all arcam related things should be
+pub const ARCAM_DIR: &str = "/arcam";
+
+/// Path where arcam binary is mounted
+pub const ARCAM_EXE: &str = "/arcam/exe";
+
+/// Path where flag files for each of the running shell/exec processes resides
+pub const HEALTH_DIR: &str = "/arcam/health";
+
+/// This file existing is a signal when container initialization is finished
+pub const FLAG_FILE_INIT: &str = "/arcam/initialized";
