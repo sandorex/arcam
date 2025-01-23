@@ -76,6 +76,7 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
         if code == 137 {
             // i do not care if it failed
             let _ = Command::new("reset").status();
+            return Ok(());
         }
 
         if cmd.success() {
