@@ -4,6 +4,12 @@ use crate::util::command_extensions::*;
 
 /// Extracts default shell for user from /etc/passwd inside a container
 fn get_user_shell(ctx: &Context, container: &str) -> Result<String> {
+    // try to get default shell from symlink
+    if let Ok(shell) = ctx.engine_exec_root(container, vec!["readlink", "/shell"]) {
+        return Ok(shell.trim().to_string());
+    }
+
+    // fallback to user shell
     let output = ctx.engine_exec_root(container, vec!["getent", "passwd", &ctx.user])?;
 
     Ok(
@@ -53,7 +59,8 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
             "--workdir".into(), ws_dir,
             "--user".into(), ctx.user.clone(),
             cli_args.name.clone(),
-            user_shell.to_string(), "-l".into(),
+            // hacky way to always source ~/.profile even with fish shell
+            "sh".into(), "-l".into(), "-c".into(), format!("exec {}", user_shell),
         ]
     };
 

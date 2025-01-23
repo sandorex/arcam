@@ -33,23 +33,6 @@ impl InitArgs {
     }
 }
 
-fn find_preferred_shell() -> &'static str {
-    const SHELLS: [&str; 3] = [
-        "/bin/fish",
-        "/bin/zsh",
-        "/bin/bash",
-    ];
-
-    for shell in SHELLS {
-        if Path::new(shell).exists() {
-            return shell;
-        }
-    }
-
-    // use sh as fallback
-    "/bin/sh"
-}
-
 /// Walk recursively collecting files/symlinks into one vec, dirs into another
 fn walk_dir(dir: &Path, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {
     let iter = fs::read_dir(dir).unwrap();
@@ -117,7 +100,16 @@ fn initialization(_args: &InitArgs) -> Result<()> {
     let gid_u: u32 = gid.parse().unwrap();
 
     let home = format!("/home/{}", user);
-    let shell = find_preferred_shell();
+
+    // by default use bash or sh and let user set the shell using other means
+    let shell = {
+        if Path::new("/bin/bash").exists() {
+            "/bin/bash"
+        } else {
+            // use sh as fallback
+            "/bin/sh"
+        }
+    };
 
     // setting up the user
     let user_found = Command::new("getent")
