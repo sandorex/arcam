@@ -42,8 +42,8 @@ pub fn print_containers(ctx: Context, args: CmdListArgs) -> Result<()> {
                 println!();
             }
 
-            println!("Container {:?} at {} {}", name, ws, if std::path::Path::new(ws) == ctx.cwd { "*" } else { " " });
-            println!("  image: {}", image);
+            println!("Container {:?} at {:?} {}", name, ws, if std::path::Path::new(ws) == ctx.cwd { "*" } else { " " });
+            println!("  image: {:?}", image);
             if !ports.is_empty() {
                 println!("  ports: {}", ports);
             }

@@ -295,7 +295,6 @@ pub fn container_init() -> Result<()> {
     // create needed directories
     for dir in [
         crate::ARCAM_DIR,
-        crate::HEALTH_DIR,
         crate::INIT_D_DIR,
     ] {
         if !Path::new(dir).exists() {

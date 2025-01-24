@@ -349,6 +349,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         }
 
         // prefer options from cli
+        cli_args.shell = cli_args.shell.or(config.shell);
         cli_args.network = cli_args.network.or(Some(config.network));
         cli_args.audio = cli_args.audio.or(Some(config.audio));
         cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
@@ -375,6 +376,11 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         execute_host_pre_init(&ctx, x)?;
     }
 
+    // set default shell to bash if not set already
+    if cli_args.shell.is_none() {
+        cli_args.shell = Some("/bin/bash".into());
+    }
+
     let mut cmd = Command::new(&ctx.engine.path);
     cmd.args([
         "run", "-d", "--rm",
@@ -388,6 +394,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!("--label={}={}", APP_NAME, VERSION),
         format!("--label={}={}", crate::CONTAINER_LABEL_HOST_DIR, ctx.cwd.to_string_lossy()),
         format!("--label={}={}", crate::CONTAINER_LABEL_CONTAINER_DIR, main_project_dir),
+        format!("--label={}={}", crate::CONTAINER_LABEL_USER_SHELL, cli_args.shell.as_ref().unwrap()),
         format!("--env={0}={0}", APP_NAME),
         format!("--name={}", container_name),
         format!("--env={}={}", ENV_VAR_PREFIX!("VERSION"), VERSION),
@@ -555,16 +562,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             std::thread::sleep(std::time::Duration::from_millis(300));
         }
 
-        // print the name instead of id
-        let cmd = Command::new(&ctx.engine.path)
-            .args(["inspect", "--format", "{{.Name}}", id])
-            .status()
-            .expect(crate::ENGINE_ERR_MSG);
+        // print container name
+        println!("{}", container_name);
 
-        if !cmd.success() {
-            Err(anyhow!("Error could not find container after initialization, has it quit? ({})", cmd.get_code()))
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }

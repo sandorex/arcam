@@ -82,6 +82,10 @@ pub struct CmdStartArgs {
     #[arg(long)]
     pub skel: Option<String>,
 
+    /// Set container default shell
+    #[arg(long)]
+    pub shell: Option<String>,
+
     /// Set network access permission for the container
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
     pub network: Option<bool>,
@@ -111,10 +115,6 @@ pub struct CmdStartArgs {
     /// Run command on init, ran after all other scripts (ran using `/bin/sh`)
     #[arg(long, value_name = "SCRIPT")]
     pub on_init_post: Vec<String>,
-
-    /// Automatically shutdown the container when there are no shells or processes running in it
-    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
-    pub auto_shutdown: Option<bool>,
 
     /// Pass through container port to host (both TCP and UDP)
     ///
@@ -271,7 +271,7 @@ pub enum CliCommands {
     /// Exit code is 0 if container exists otherwise 1
     Exists(CmdExistsArgs),
 
-    /// Inspect a config from file, can be used as syntax check
+    /// Inspect a config, can be used as syntax check
     Config(CmdConfigArgs),
 
     /// List running owned containers

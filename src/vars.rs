@@ -22,6 +22,9 @@ pub const CONTAINER_LABEL_HOST_DIR: &str = "host_dir";
 /// Container label used to specify the path to main project in the container
 pub const CONTAINER_LABEL_CONTAINER_DIR: &str = "container_dir";
 
+/// Container label used to specify default shell
+pub const CONTAINER_LABEL_USER_SHELL: &str = "default_shell";
+
 /// Wayland socket to pass through
 pub const ENV_WAYLAND_DISPLAY: &str = ENV_VAR_PREFIX!("WAYLAND_DISPLAY");
 
@@ -48,9 +51,6 @@ pub const ARCAM_EXE: &str = "/arcam/exe";
 
 /// Path to optional config file distributed within the image
 pub const ARCAM_CONFIG: &str = "/config.toml";
-
-/// Path where flag files for each of the running shell/exec processes resides
-pub const HEALTH_DIR: &str = "/arcam/health";
 
 /// This file existing is a signal when container initialization is finished
 pub const FLAG_FILE_INIT: &str = "/arcam/initialized";

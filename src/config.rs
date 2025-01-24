@@ -48,6 +48,10 @@ code_docs_struct! {
         /// Environ vars are expanded
         pub skel: Option<String>,
 
+        /// Default user shell
+        #[serde(default)]
+        pub shell: Option<String>,
+
         /// Set network access
         #[serde(default)]
         pub network: bool,
