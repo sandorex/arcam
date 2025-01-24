@@ -255,6 +255,17 @@ pub struct CmdKillArgs {
     pub name: String,
 }
 
+#[derive(Args, Debug, Clone)]
+pub struct CmdCompletionArgs {
+    /// Explicitly generate completions for specific shell
+    #[arg(long, value_enum, exclusive = true)]
+    pub shell: Option<clap_complete::Shell>,
+
+    /// Used to provide better completion
+    #[arg(hide = true)]
+    pub complete: Option<crate::commands::ShellCompletionType>,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum CliCommands {
     /// Start a container in current directory, mounting it as the rw workspace
@@ -282,6 +293,9 @@ pub enum CliCommands {
 
     /// Stop running owned container
     Kill(CmdKillArgs),
+
+    /// Shell autocompletion
+    Completion(CmdCompletionArgs),
 
     /// Init command used to setup the container
     #[command(hide = true)]
