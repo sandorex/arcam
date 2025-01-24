@@ -53,7 +53,11 @@ impl ConfigArg {
     }
 
     pub fn parse(input: &str) -> Result<Self, String> {
-        if input.starts_with("./") || input.starts_with("/") || input.starts_with("~/") {
+        if input.starts_with("./")          // ex. ./local/file.toml
+            || input.starts_with(".")       // ex. .arcam.toml
+            || input.starts_with("/")       // ex. /etc/arcam/configs/something.toml
+            || input.starts_with("~/")      // ex. ~/.config/arcam/configs/something.toml
+            || input.ends_with(".toml") {   // well no image is gonna end with .toml? right?
             // it must be a path
             Ok(Self::File(PathBuf::from(input)))
         } else if let Some(config_name) = input.strip_prefix("@") {
