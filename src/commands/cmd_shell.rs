@@ -32,7 +32,7 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
 
             cli_args.name = containers.first().unwrap().clone();
         }
-    } else if !ctx.dry_run && !ctx.get_container_status(&cli_args.name).is_some() {
+    } else if !ctx.dry_run && ctx.get_container_status(&cli_args.name).is_none() {
         return Err(anyhow!("Container {:?} does not exist", &cli_args.name));
     }
 
@@ -75,16 +75,6 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
         let cmd = cmd
             .status()
             .expect(crate::ENGINE_ERR_MSG);
-
-        let code = cmd.get_code();
-
-        // TODO redo this so it does not clear screen each time its exited
-        // code 137 usually means SIGKILL and that messes up the terminal so reset it afterwards
-        if code == 137 {
-            // i do not care if it failed
-            let _ = Command::new("reset").status();
-            return Ok(());
-        }
 
         if cmd.success() {
             Ok(())

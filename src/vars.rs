@@ -46,8 +46,15 @@ pub const ARCAM_DIR: &str = "/arcam";
 /// Path where arcam binary is mounted
 pub const ARCAM_EXE: &str = "/arcam/exe";
 
+// /// Path to init config which is written by start command
+// pub const ARCAM_CONFIG: &str = "/arcam/config";
+
 /// Path where flag files for each of the running shell/exec processes resides
 pub const HEALTH_DIR: &str = "/arcam/health";
 
 /// This file existing is a signal when container initialization is finished
 pub const FLAG_FILE_INIT: &str = "/arcam/initialized";
+
+/// This file existing is a signal start command has copied all data required in the container so
+/// the initialization can begin
+pub const FLAG_FILE_PRE_INIT: &str = "/arcam/preinit";

@@ -7,7 +7,6 @@ mod cmd_list;
 mod cmd_logs;
 mod cmd_kill;
 mod cmd_init;
-mod cmd_healthcheck;
 
 pub use cmd_start::start_container;
 pub use cmd_shell::open_shell;
@@ -18,4 +17,3 @@ pub use cmd_list::print_containers;
 pub use cmd_logs::print_logs;
 pub use cmd_kill::kill_container;
 pub use cmd_init::container_init;
-pub use cmd_healthcheck::container_healthcheck;

@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use crate::prelude::*;
 use users::os::unix::UserExt;
-use crate::util::Engine;
 use std::collections::HashMap;
+use crate::util::Engine;
 use crate::util::command_extensions::*;
 
 /// Possible status of a container
@@ -192,6 +192,12 @@ impl Context {
         }
     }
 
+    // /// Reads container config from inside the container
+    // pub fn get_container_config(&self, container: &str) -> Result<ContainerConfig> {
+    //     let raw = self.engine_exec_root(container, vec!["exec", "cat", crate::ARCAM_CONFIG])?;
+    //
+    //     Ok(ContainerConfig::deserialize(&raw)?)
+    // }
 
     /// Get container status if it exists
     pub fn get_container_status(&self, container: &str) -> Option<ContainerStatus> {

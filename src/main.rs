@@ -26,20 +26,20 @@ fn main() -> anyhow::Result<()> {
 
     // init and healthcheck do not need context
     match args.cmd {
-        CliCommands::Init(x) => {
+        CliCommands::Init => {
             if !util::is_in_container() {
                 return Err(anyhow!("Running init outside a container is dangerous, qutting.."));
             }
 
-            return commands::container_init(x);
+            return commands::container_init();
         },
-        CliCommands::HealthCheck => {
-            if !util::is_in_container() {
-                return Err(anyhow!("Running healthcheck outside a container is dangerous, qutting.."));
-            }
-
-            return commands::container_healthcheck();
-        },
+        // CliCommands::HealthCheck => {
+        //     if !util::is_in_container() {
+        //         return Err(anyhow!("Running healthcheck outside a container is dangerous, qutting.."));
+        //     }
+        //
+        //     return commands::container_healthcheck();
+        // },
         _ => {},
     }
 
@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
         CliCommands::List(x) => commands::print_containers(ctx, x)?,
         CliCommands::Logs(x) => commands::print_logs(ctx, x)?,
         CliCommands::Kill(x) => commands::kill_container(ctx, x)?,
-        CliCommands::Init(_) | CliCommands::HealthCheck => unreachable!(),
+        CliCommands::Init => unreachable!(),
     };
 
     Ok(())

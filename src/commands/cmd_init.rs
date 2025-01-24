@@ -1,31 +1,38 @@
 //! Contains all code that should run inside the container as the init
 
 use crate::util::command_extensions::*;
-use crate::{cli, FULL_VERSION};
+use crate::FULL_VERSION;
 use crate::prelude::*;
 use std::fs::OpenOptions;
 use std::{env, fs};
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::io::prelude::*;
-use base64::prelude::*;
+// use serde::{Deserialize, Serialize};
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
-pub struct InitArgs {
-    pub on_init_pre: Vec<String>,
-    pub on_init_post: Vec<String>,
-}
+// /// Contains information about the container initialization process
+// #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+// #[serde(deny_unknown_fields)]
+// pub struct ContainerConfig {
+//     pub autoshutdown: bool,
+// }
 
-impl InitArgs {
-    pub fn decode(input: &str) -> Result<Self> {
-        let decoded = BASE64_STANDARD.decode(input)?;
-        Ok(bson::from_slice(&decoded)?)
-    }
-
-    pub fn encode(&self) -> Result<String> {
-        Ok(BASE64_STANDARD.encode(bson::to_vec(self)?))
-    }
-}
+// impl ContainerConfig {
+//     pub fn deserialize(string: &str) -> Result<Self> {
+//         Ok(toml::from_str::<Self>(string)?)
+//     }
+//
+//     pub fn serialize(&self) -> Result<String> {
+//         // write pretty when debug
+//         let serialized = if cfg!(debug_assertions) {
+//             toml::to_string_pretty(self)
+//         } else {
+//             toml::to_string(self)
+//         };
+//
+//         Ok(serialized?)
+//     }
+// }
 
 /// Walk recursively collecting files/symlinks into one vec, dirs into another
 fn walk_dir(dir: &Path, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {
@@ -80,7 +87,7 @@ fn make_executable(path: &Path) -> Result<(), std::io::Error> {
 }
 
 // TODO create /tmp/.X11-unix just so its properly owned by root? and has correct permissions?
-fn initialization(_args: &InitArgs) -> Result<()> {
+fn initialization() -> Result<()> {
     println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
 
     let user = std::env::var("HOST_USER")
@@ -302,62 +309,34 @@ fn initialization(_args: &InitArgs) -> Result<()> {
     }
 
     // signalize that init is done
-    fs::write(crate::FLAG_FILE_INIT, "y")
-        .unwrap();
+    fs::write(crate::FLAG_FILE_INIT, "y")?;
 
     println!("Initialization finished");
 
     Ok(())
 }
 
-pub fn container_init(cli_args: cli::CmdInitArgs) -> Result<()> {
-    // decode the encoded args
-    let args = match InitArgs::decode(&cli_args.args) {
-        Ok(x) => x,
-        Err(err) => {
-            return Err(anyhow!("Error decoding encoded args {:?}: {}", cli_args.args, err));
+pub fn container_init() -> Result<()> {
+    // create needed directories
+    for dir in [
+        crate::ARCAM_DIR,
+        crate::HEALTH_DIR,
+        crate::INIT_D_DIR,
+    ] {
+        if !Path::new(dir).exists() {
+            std::fs::create_dir(dir)?;
         }
-    };
-
-    if !Path::new(crate::ARCAM_DIR).exists() {
-        std::fs::create_dir(crate::ARCAM_DIR).unwrap();
     }
 
-    if !Path::new(crate::HEALTH_DIR).exists() {
-        std::fs::create_dir(crate::HEALTH_DIR).unwrap();
+    // create the flag file to start preinit
+    std::fs::write(crate::FLAG_FILE_PRE_INIT, "y")?;
+
+    // wait for the flag file to be deleted to proceed
+    while std::fs::exists(crate::FLAG_FILE_PRE_INIT)? {
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
-    // create the dir always
-    if !Path::new(crate::INIT_D_DIR).exists() {
-        std::fs::create_dir(crate::INIT_D_DIR).unwrap();
-    }
-
-    // TODO these should be moved to start
-    if !args.on_init_pre.is_empty() {
-        let path = PathBuf::new()
-            .join(crate::INIT_D_DIR)
-            .join("00_on_init_pre.sh");
-
-        // write the init commands to single file
-        fs::write(&path, format!("#!/bin/sh\n{}",
-            args.on_init_pre.join("\n"))).unwrap();
-
-        make_executable(&path).unwrap();
-    }
-
-    if !args.on_init_post.is_empty() {
-        let path = PathBuf::new()
-            .join(crate::INIT_D_DIR)
-            .join("99_on_init_post.sh");
-
-        // write the init commands to single file
-        fs::write(&path, format!("#!/bin/sh\n{}",
-            args.on_init_post.join("\n"))).unwrap();
-
-        make_executable(&path).unwrap();
-    }
-
-    initialization(&args)?;
+    initialization()?;
 
     // just sleep forever, podman-init will kill it
     loop {

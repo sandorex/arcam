@@ -5,8 +5,7 @@ use clap::{Parser, Subcommand, Args};
 use crate::FULL_VERSION;
 
 const AFTER_HELP: &str = concat!(
-    "For documentation for this particular version go to following url\n",
-    env!("CARGO_PKG_REPOSITORY"), "/tree/", env!("VERGEN_GIT_SHA"), "/docs"
+    "For help visit the git repository\n", env!("CARGO_PKG_REPOSITORY")
 );
 
 /// Sandboxed development container manager, with focus on security by default
@@ -235,11 +234,11 @@ pub enum CliCommands {
 
     /// Init command used to setup the container
     #[command(hide = true)]
-    Init(CmdInitArgs),
+    Init,
 
-    /// Command used in healthcheck-cmd, used to terminate idle containers if requested
-    #[command(hide = true)]
-    HealthCheck,
+    // /// Command used in healthcheck-cmd, used to terminate idle containers if requested
+    // #[command(hide = true)]
+    // HealthCheck,
 }
 
 #[cfg(test)]

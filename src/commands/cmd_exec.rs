@@ -56,23 +56,6 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
     if ctx.dry_run {
         cmd.print_escaped_cmd();
     } else {
-        // this updates the flag files so auto-shutdown works
-        std::thread::spawn(move || {
-            // TODO encode these settings into a label using base64
-            // return early if there is no autoshutdown label
-            if ctx.get_container_label(&cli_args.name, "autoshutdown").is_none() {
-                return;
-            }
-
-            loop {
-                let _ = ctx.engine_exec_root(&cli_args.name, vec![
-                    "touch",
-                    &Path::new(crate::HEALTH_DIR).join(std::process::id().to_string()).to_string_lossy()
-                ]);
-                std::thread::sleep(std::time::Duration::from_secs(1));
-            }
-        });
-
         cmd.run_interactive()?;
     }
 

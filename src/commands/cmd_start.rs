@@ -3,9 +3,8 @@ use crate::util::{self, EngineKind};
 use crate::prelude::*;
 use crate::util::command_extensions::*;
 use crate::cli::CmdStartArgs;
-use super::cmd_init::InitArgs;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Get hostname from system using `hostname` command
 fn get_hostname() -> Result<String> {
@@ -326,6 +325,37 @@ fn mount_session_bus(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
     Ok(())
 }
 
+/// Writes text to file inside the container
+pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str) -> Result<()> {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    // write to file using tee
+    let mut child = ctx.engine_command()
+        .args(["exec", "-i", "--user", "root", container, "tee", &file.to_string_lossy()])
+        .stdin(Stdio::piped()) // pipe into stdin but ignore stdout/stderr
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect(crate::ENGINE_ERR_MSG);
+
+    let mut stdin = child.stdin.take()
+        .with_context(|| anyhow!("Failed to open child stdin"))?;
+
+    stdin.write(content.as_bytes())?;
+
+    // NOTE drop is important here otherwise stdin wont close
+    drop(stdin);
+
+    let result = child.wait()?;
+
+    if result.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("Error writing to file {:?} in container ({})", file, result.get_code()))
+    }
+}
+
 pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     let executable_path = ctx.get_executable_path()?;
 
@@ -372,17 +402,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         "--user=root",
         "--init", // arcam does not act as the init system anymore
     ]);
-
-    // using health-cmd for auto-shutdown
-    if cli_args.auto_shutdown.unwrap_or(false) {
-        cmd.args([
-            "--label=autoshutdown".into(),
-            format!("--health-cmd={} health-check", crate::ARCAM_EXE),
-            "--health-interval=5s".into(), // TODO this is only for testing
-            // "--health-start-period=5m",
-            // "--health-on-failure=kill".into(),
-        ]);
-    }
 
     cmd.args([
         format!("--label=manager={}", ctx.engine),
@@ -466,19 +485,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     // add the extra args verbatim
     cmd.args(cli_args.engine_args.clone());
 
-    let encoded_init_args = {
-        // pass all the args here
-        let init_args = InitArgs {
-            on_init_pre: cli_args.on_init_pre,
-            on_init_post: cli_args.on_init_post,
-        };
-
-        match init_args.encode() {
-            Ok(x) => x,
-            Err(err) => return Err(anyhow!("Error while encoding init args into BSON: {}", err)),
-        }
-    };
-
     cmd.args([
         // detaching breaks things
         "--detach-keys=",
@@ -489,13 +495,10 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         &cli_args.image,
 
         "init",
-
-        // pass the init args as encoded string
-        &encoded_init_args,
     ]);
 
     if ctx.dry_run {
-        let _ = cmd.print_escaped_cmd();
+        cmd.print_escaped_cmd();
 
         Ok(())
     } else {
@@ -504,20 +507,17 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             .output()
             .expect(crate::ENGINE_ERR_MSG);
 
-        if ! output.status.success() {
+        if !output.status.success() {
             return Err(anyhow!("Stderr from container init: {}", String::from_utf8_lossy(&output.stderr)));
         }
 
-        let id_raw = String::from_utf8_lossy(&output.stdout);
-        let id = id_raw.trim();
+        let id = String::from_utf8_lossy(&output.stdout);
+        let id = id.trim();
 
-        // as the initialization can take a second or two this prevents broken dotfiles with shell
-        // command when you type quickly
-        let is_initialized = || -> Result<bool> {
-            let cmd = Command::new(&ctx.engine.path)
-                .arg("exec")
-                .arg(id)
-                .args(["sh", "-c", format!("test -f {}", crate::FLAG_FILE_INIT).as_str()])
+        // check if file exists in the container, used for flag files
+        let file_exists = |file: &str| -> Result<bool> {
+            let cmd = ctx.engine_command()
+                .args(["exec", id, "test", "-f", file])
                 .output()
                 .expect(crate::ENGINE_ERR_MSG);
 
@@ -525,15 +525,63 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 0 => Ok(true),
                 1 => Ok(false),
                 125 => return Err(anyhow!("Container has exited unexpectedly (125)")),
+                127 => panic!("Unknown command used during container initialization check"),
 
                 // this really should not happen unless something breaks
                 x => return Err(anyhow!("Unknown error during container initialization ({})", x)),
             }
         };
 
+        // wait until container finishes pre-initialization
+        while !file_exists(crate::FLAG_FILE_PRE_INIT)? {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
+        // write pre init script into the container
+        if !cli_args.on_init_pre.is_empty() {
+            let path = PathBuf::new()
+                .join(crate::INIT_D_DIR)
+                .join("00_on_init_pre.sh");
+
+            let mut buffer: String = "#!/bin/sh\n".into();
+            for cmd in cli_args.on_init_pre {
+                buffer += &cmd;
+                buffer += "\n";
+            }
+
+            write_to_file(&ctx, id, &path, &buffer)?;
+        }
+
+        // write post init script into the container
+        if !cli_args.on_init_post.is_empty() {
+            let path = PathBuf::new()
+                .join(crate::INIT_D_DIR)
+                .join("99_on_init_post.sh");
+
+            let mut buffer: String = "#!/bin/sh\n".into();
+            for cmd in cli_args.on_init_post {
+                buffer += &cmd;
+                buffer += "\n";
+            }
+
+            write_to_file(&ctx, id, &path, &buffer)?;
+        }
+
+        // // write the container config
+        // {
+        //     let serialized_config = ContainerConfig {
+        //         autoshutdown: cli_args.auto_shutdown.unwrap_or(false),
+        //     }.serialize()?;
+        //
+        //     write_to_file(&ctx, id, Path::new(crate::ARCAM_CONFIG), &serialized_config)?;
+        // }
+
+        // remove pre-init flag to start initalization
+        ctx.engine_exec_root(id, vec!["rm", crate::FLAG_FILE_PRE_INIT])?;
+
         // wait until container finishes initialization
-        while !is_initialized()? {
-            std::thread::sleep(std::time::Duration::from_millis(1000));
+        while !file_exists(crate::FLAG_FILE_INIT)? {
+            std::thread::sleep(std::time::Duration::from_millis(300));
         }
 
         // print the name instead of id
