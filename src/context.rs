@@ -192,13 +192,6 @@ impl Context {
         }
     }
 
-    // /// Reads container config from inside the container
-    // pub fn get_container_config(&self, container: &str) -> Result<ContainerConfig> {
-    //     let raw = self.engine_exec_root(container, vec!["exec", "cat", crate::ARCAM_CONFIG])?;
-    //
-    //     Ok(ContainerConfig::deserialize(&raw)?)
-    // }
-
     /// Get container status if it exists
     pub fn get_container_status(&self, container: &str) -> Option<ContainerStatus> {
         let cmd = self.engine_command()

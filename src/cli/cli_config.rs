@@ -8,8 +8,9 @@ pub struct CmdConfigExtractArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdConfigInspectArgs {
-    /// Path to config.toml
-    pub path: String,
+    /// Path to file, name of image or @config to inspect
+    #[clap(value_name = "FILE|IMAGE|@CONFIG")]
+    pub config: String,
 }
 
 #[derive(Subcommand, Debug)]

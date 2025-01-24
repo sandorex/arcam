@@ -7,6 +7,9 @@ use std::collections::HashMap;
 use std::path::Path;
 use crate::util::Engine;
 
+// TODO rework configs so each file is one container config
+// also allow extending configs
+
 /// Whole config file
 #[derive(Debug, Clone, PartialEq, Default, Deserialize)]
 #[serde(deny_unknown_fields)]

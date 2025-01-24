@@ -1,8 +1,9 @@
 pub mod cli_config;
 
+use std::{path::PathBuf, str::FromStr};
 use cli_config::ConfigCommands;
-use clap::{Parser, Subcommand, Args};
-use crate::FULL_VERSION;
+use clap::{Args, Parser, Subcommand};
+use crate::{config::Config, FULL_VERSION};
 
 const AFTER_HELP: &str = concat!(
     "For help visit the git repository\n", env!("CARGO_PKG_REPOSITORY")
@@ -24,6 +25,43 @@ pub struct Cli {
 
     #[command(subcommand)]
     pub cmd: CliCommands,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum ContainerConfig {
+    /// Use configuration from this file
+    File(Config),
+
+    /// Use no configuration, plain container using this image
+    Image(String),
+
+    /// Use following config
+    Config(Config),
+}
+
+impl ContainerConfig {
+    pub fn parse(input: &str) -> Result<Self, String> {
+        if input.starts_with("./") {
+            // if it starts ./ then it must be a local path
+            let path = PathBuf::from(input);
+
+            if !path.try_exists().unwrap_or(false) {
+                return Err(format!("Config file {:?} does not exist or you do not have permission to read it", path));
+            }
+
+            if !path.symlink_metadata().unwrap().is_file() {
+                return Err(format!("Path {:?} is not a file", path));
+            }
+
+            // return Ok(Self::File(path));
+        } else if let Some(config_name) = input.strip_prefix("@") {
+            // @ is prefix for a config
+
+            //
+        }
+
+        return Ok(Self::Image("xx".into()));
+    }
 }
 
 #[derive(Args, Debug, Clone, Default)]
@@ -196,13 +234,6 @@ pub struct CmdKillArgs {
     pub name: String,
 }
 
-#[derive(Args, Debug, Clone)]
-pub struct CmdInitArgs {
-    // NOTE DO NOT ADD ARGUMENTS HERE
-    /// BASE64 encoded BSON data
-    pub args: String,
-}
-
 #[derive(Subcommand, Debug)]
 pub enum CliCommands {
     /// Start a container in current directory, mounting it as the rw workspace
@@ -235,10 +266,6 @@ pub enum CliCommands {
     /// Init command used to setup the container
     #[command(hide = true)]
     Init,
-
-    // /// Command used in healthcheck-cmd, used to terminate idle containers if requested
-    // #[command(hide = true)]
-    // HealthCheck,
 }
 
 #[cfg(test)]

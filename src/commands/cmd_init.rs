@@ -8,31 +8,6 @@ use std::{env, fs};
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::io::prelude::*;
-// use serde::{Deserialize, Serialize};
-
-// /// Contains information about the container initialization process
-// #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-// #[serde(deny_unknown_fields)]
-// pub struct ContainerConfig {
-//     pub autoshutdown: bool,
-// }
-
-// impl ContainerConfig {
-//     pub fn deserialize(string: &str) -> Result<Self> {
-//         Ok(toml::from_str::<Self>(string)?)
-//     }
-//
-//     pub fn serialize(&self) -> Result<String> {
-//         // write pretty when debug
-//         let serialized = if cfg!(debug_assertions) {
-//             toml::to_string_pretty(self)
-//         } else {
-//             toml::to_string(self)
-//         };
-//
-//         Ok(serialized?)
-//     }
-// }
 
 /// Walk recursively collecting files/symlinks into one vec, dirs into another
 fn walk_dir(dir: &Path, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {

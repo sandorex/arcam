@@ -97,11 +97,9 @@ fn execute_host_pre_init(ctx: &Context, commands: &Vec<String>) -> Result<()> {
     Ok(())
 }
 
-/// Merge config if specified instead of image, returns config init commands if
-/// any
+/// Merge config if specified instead of image, returns config init commands if any
 fn merge_config(ctx: &Context, cli_args: &mut CmdStartArgs) -> Result<Option<Vec<String>>> {
     if cli_args.image.starts_with("@") {
-        // return owned config so i could move values without cloning
         let config = match ctx.load_configs()?.remove(&cli_args.image[1..]) {
             Some(x) => x,
             None => return Err(anyhow!("Could not find config {}", cli_args.image)),
@@ -566,15 +564,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
             write_to_file(&ctx, id, &path, &buffer)?;
         }
-
-        // // write the container config
-        // {
-        //     let serialized_config = ContainerConfig {
-        //         autoshutdown: cli_args.auto_shutdown.unwrap_or(false),
-        //     }.serialize()?;
-        //
-        //     write_to_file(&ctx, id, Path::new(crate::ARCAM_CONFIG), &serialized_config)?;
-        // }
 
         // remove pre-init flag to start initalization
         ctx.engine_exec_root(id, vec!["rm", crate::FLAG_FILE_PRE_INIT])?;

@@ -33,13 +33,6 @@ fn main() -> anyhow::Result<()> {
 
             return commands::container_init();
         },
-        // CliCommands::HealthCheck => {
-        //     if !util::is_in_container() {
-        //         return Err(anyhow!("Running healthcheck outside a container is dangerous, qutting.."));
-        //     }
-        //
-        //     return commands::container_healthcheck();
-        // },
         _ => {},
     }
 
