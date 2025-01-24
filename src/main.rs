@@ -7,7 +7,6 @@ mod vars;
 
 use clap::Parser;
 use cli::CliCommands;
-use cli::cli_config::ConfigCommands;
 use util::Engine;
 use anyhow::anyhow;
 
@@ -25,15 +24,12 @@ fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
 
     // init and healthcheck do not need context
-    match args.cmd {
-        CliCommands::Init => {
-            if !util::is_in_container() {
-                return Err(anyhow!("Running init outside a container is dangerous, qutting.."));
-            }
+    if let CliCommands::Init = args.cmd {
+        if !util::is_in_container() {
+            return Err(anyhow!("Running init outside a container is dangerous, qutting.."));
+        }
 
-            return commands::container_init();
-        },
-        _ => {},
+        return commands::container_init();
     }
 
     // find and detect engine
@@ -57,11 +53,7 @@ fn main() -> anyhow::Result<()> {
         CliCommands::Shell(x) => commands::open_shell(ctx, x)?,
         CliCommands::Exec(x) => commands::container_exec(ctx, x)?,
         CliCommands::Exists(x) => commands::container_exists(ctx, x)?,
-        CliCommands::Config(subcmd) => match subcmd {
-            ConfigCommands::Extract(x) => commands::extract_config(ctx, x)?,
-            ConfigCommands::Inspect(x) => commands::inspect_config(x)?,
-            ConfigCommands::Options => commands::show_config_options(ctx),
-        },
+        CliCommands::Config(x) => commands::config_command(ctx, x)?,
         CliCommands::List(x) => commands::print_containers(ctx, x)?,
         CliCommands::Logs(x) => commands::print_logs(ctx, x)?,
         CliCommands::Kill(x) => commands::kill_container(ctx, x)?,

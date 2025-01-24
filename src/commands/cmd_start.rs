@@ -1,8 +1,8 @@
 use crate::{APP_NAME, ENV_VAR_PREFIX, VERSION};
-use crate::util::{self, EngineKind};
+use crate::util::{self, rand, EngineKind};
 use crate::prelude::*;
 use crate::util::command_extensions::*;
-use crate::cli::CmdStartArgs;
+use crate::cli::{CmdStartArgs, ConfigArg};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -85,7 +85,7 @@ fn execute_host_pre_init(ctx: &Context, commands: &Vec<String>) -> Result<()> {
         // execute each command using sh
         let mut cmd = Command::new("/bin/sh");
         cmd.arg("-c");
-        cmd.arg(&command);
+        cmd.arg(command);
 
         if ctx.dry_run {
             cmd.print_escaped_cmd();
@@ -95,87 +95,6 @@ fn execute_host_pre_init(ctx: &Context, commands: &Vec<String>) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Merge config if specified instead of image, returns config init commands if any
-fn merge_config(ctx: &Context, cli_args: &mut CmdStartArgs) -> Result<Option<Vec<String>>> {
-    if cli_args.image.starts_with("@") {
-        let config = match ctx.load_configs()?.remove(&cli_args.image[1..]) {
-            Some(x) => x,
-            None => return Err(anyhow!("Could not find config {}", cli_args.image)),
-        };
-
-        if cli_args.name.is_none() {
-            cli_args.name = config.container_name.clone()
-                .or_else(|| Some(generate_name()));
-        }
-
-        // expand vars
-        let cwd = ctx.cwd.to_string_lossy();
-        let pwd = ctx.cwd.to_string_lossy();
-        let home = ctx.user_home.to_string_lossy();
-
-        let environ: HashMap<&str, &str> = HashMap::from([
-            ("USER", ctx.user.as_str()),
-            ("PWD", &pwd),
-            ("HOME", &home),
-            ("CWD", &cwd),
-            ("CONTAINER", cli_args.name.as_ref().unwrap()),
-        ]);
-
-        let context_getter = |input: &str| -> Option<String> {
-            // prioritize the environ map above then get actual environ vars
-            environ.get(input)
-                .map(|x| x.to_string())
-                .or(std::env::var(input).ok())
-        };
-
-        // expand vars in engine args and append to cli args
-        for i in config.engine_args.iter().chain(config.get_engine_args(&ctx.engine).iter()) {
-            let expanded = shellexpand::env_with_context_no_errors(&i, context_getter);
-            cli_args.engine_args.push(expanded.to_string());
-        }
-
-        // cli skel takes priority
-        if cli_args.skel.is_none() {
-            if let Some(skel) = config.skel {
-                let expanded = shellexpand::env_with_context_no_errors(&skel, context_getter);
-
-                cli_args.skel = Some(expanded.to_string());
-            }
-        }
-
-        // expand env as well for some fun dynamic shennanigans
-        for (k, v) in &config.env {
-            let mapped = format!("{k}={v}");
-            let expanded = shellexpand::env_with_context_no_errors(&mapped, context_getter);
-            cli_args.env.push(expanded.to_string());
-        }
-
-        // take image from config
-        cli_args.image = config.image;
-
-        // prefer options from cli
-        cli_args.network = cli_args.network.or(Some(config.network));
-        cli_args.audio = cli_args.audio.or(Some(config.audio));
-        cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
-        cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
-        cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
-        cli_args.auto_shutdown = cli_args.auto_shutdown.or(Some(config.auto_shutdown));
-        cli_args.ports.extend_from_slice(&config.ports);
-        cli_args.on_init_pre.extend_from_slice(&config.on_init_pre);
-        cli_args.on_init_post.extend_from_slice(&config.on_init_post);
-        cli_args.capabilities.extend_from_slice(&config.capabilities);
-
-        // return pre_init
-        return Ok(Some(config.host_pre_init));
-    } else {
-        if cli_args.name.is_none() {
-            cli_args.name = Some(generate_name());
-        }
-    }
-
-    Ok(None)
 }
 
 fn resolve_capabilities(cli_args: &CmdStartArgs, cmd: &mut Command) {
@@ -188,7 +107,7 @@ fn resolve_capabilities(cli_args: &CmdStartArgs, cmd: &mut Command) {
         for i in &cli_args.capabilities {
             match i.strip_prefix("!") {
                 Some(x) => caps.insert(x, false),
-                None => caps.insert(&i, true),
+                None => caps.insert(i, true),
             };
         }
 
@@ -323,6 +242,7 @@ fn mount_session_bus(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
     Ok(())
 }
 
+// TODO fix zombie process clippy issue, child is not wait on or killed if error occurs
 /// Writes text to file inside the container
 pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str) -> Result<()> {
     use std::io::Write;
@@ -340,7 +260,7 @@ pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str)
     let mut stdin = child.stdin.take()
         .with_context(|| anyhow!("Failed to open child stdin"))?;
 
-    stdin.write(content.as_bytes())?;
+    stdin.write_all(content.as_bytes())?;
 
     // NOTE drop is important here otherwise stdin wont close
     drop(stdin);
@@ -374,22 +294,84 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         }
     }
 
-    // merge the config if possible
-    let host_pre_init_commands = merge_config(&ctx, &mut cli_args)?;
+    // prefer cli name over random one
+    let container_name = cli_args.name.clone().unwrap_or_else(generate_name);
+    let mut container_image: String = "".into();
+    let mut host_pre_init: Option<Vec<String>> = None;
 
-    // get reference to the container_name which was set in merge_config
-    let container_name = cli_args.name.as_ref().unwrap();
+    // TODO shellexpand env expansion should error out!
+    if let ConfigArg::Image(image) = &cli_args.config {
+        // no config used
+        container_image = image.to_string();
+    } else {
+        // get config from file or by name
+        let config = match &cli_args.config {
+            ConfigArg::Image(_) => unreachable!(),
+            ConfigArg::File(file) => crate::config::ConfigFile::config_from_file(file)?,
+            ConfigArg::Config(config_name) => ctx.find_config(config_name)?,
+        };
+
+        // expand vars
+        let pwd = ctx.cwd.to_string_lossy();
+        let home = ctx.user_home.to_string_lossy();
+
+        let context_getter = |input: &str| -> Option<String> {
+            match input {
+                "USER" => Some(ctx.user.clone()),
+                "PWD" | "CWD" => Some(pwd.to_string()),
+                "HOME" => Some(home.to_string()),
+                "CONTAINER" | "CONTAINER_NAME" => Some(container_name.clone()),
+                "RAND" | "RANDOM" => Some(rand().to_string()),
+
+                // fallback to environ
+                _ => std::env::var(input).ok(),
+            }
+        };
+
+        // expand vars in engine args and append to cli args
+        for i in config.engine_args.iter().chain(config.get_engine_args(&ctx.engine).iter()) {
+            cli_args.engine_args.push(
+                shellexpand::env_with_context_no_errors(&i, context_getter).to_string()
+            );
+        }
+
+        // cli skel takes priority
+        if cli_args.skel.is_none() {
+            if let Some(skel) = config.skel {
+                cli_args.skel = Some(shellexpand::env_with_context_no_errors(&skel, context_getter).to_string());
+            }
+        }
+
+        // expand env as well for some fun dynamic shennanigans
+        for (k, v) in &config.env {
+            let mapped = format!("{k}={v}");
+            cli_args.env.push(shellexpand::env_with_context_no_errors(&mapped, context_getter).to_string());
+        }
+
+        // prefer options from cli
+        cli_args.network = cli_args.network.or(Some(config.network));
+        cli_args.audio = cli_args.audio.or(Some(config.audio));
+        cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
+        cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
+        cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
+        cli_args.ports.extend_from_slice(&config.ports);
+        cli_args.on_init_pre.extend_from_slice(&config.on_init_pre);
+        cli_args.on_init_post.extend_from_slice(&config.on_init_post);
+        cli_args.capabilities.extend_from_slice(&config.capabilities);
+
+        host_pre_init = Some(config.host_pre_init);
+    }
 
     // allow dry-run regardless if the container exists
     if !ctx.dry_run {
         // quit pre-emptively if container already exists
-        if ctx.get_container_status(container_name).is_some() {
+        if ctx.get_container_status(&container_name).is_some() {
             return Err(anyhow!("Container {:?} already exists", container_name));
         }
     }
 
     // run host pre init commands if there are any
-    if let Some(x) = host_pre_init_commands.as_ref() {
+    if let Some(x) = host_pre_init.as_ref() {
         execute_host_pre_init(&ctx, x)?;
     }
 
@@ -490,7 +472,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!("--entrypoint={}", crate::ARCAM_EXE).as_str(),
 
         // the container image
-        &cli_args.image,
+        &container_image,
 
         "init",
     ]);
@@ -522,11 +504,11 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             match cmd.get_code() {
                 0 => Ok(true),
                 1 => Ok(false),
-                125 => return Err(anyhow!("Container has exited unexpectedly (125)")),
+                125 => Err(anyhow!("Container has exited unexpectedly (125)")),
                 127 => panic!("Unknown command used during container initialization check"),
 
                 // this really should not happen unless something breaks
-                x => return Err(anyhow!("Unknown error during container initialization ({})", x)),
+                x => Err(anyhow!("Unknown error during container initialization ({})", x)),
             }
         };
 

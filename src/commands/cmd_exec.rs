@@ -1,7 +1,6 @@
 use crate::cli;
 use crate::util::command_extensions::*;
 use crate::prelude::*;
-use std::path::Path;
 
 pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()> {
     // try to find container in current directory

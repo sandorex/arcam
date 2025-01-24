@@ -1,9 +1,6 @@
-pub mod cli_config;
-
-use std::{path::PathBuf, str::FromStr};
-use cli_config::ConfigCommands;
+use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
-use crate::{config::Config, FULL_VERSION};
+use crate::{config::Config, Context, FULL_VERSION};
 
 const AFTER_HELP: &str = concat!(
     "For help visit the git repository\n", env!("CARGO_PKG_REPOSITORY")
@@ -27,44 +24,49 @@ pub struct Cli {
     pub cmd: CliCommands,
 }
 
-#[derive(PartialEq, Debug)]
-pub enum ContainerConfig {
+#[derive(PartialEq, Debug, Clone)]
+pub enum ConfigArg {
     /// Use configuration from this file
-    File(Config),
+    File(PathBuf),
 
     /// Use no configuration, plain container using this image
     Image(String),
 
     /// Use following config
-    Config(Config),
+    Config(String),
 }
 
-impl ContainerConfig {
+impl ConfigArg {
+    /// Convert ContainerConfig into config
+    pub fn into_config(self, ctx: &Context) -> anyhow::Result<Config> {
+        use crate::config::ConfigFile;
+
+        match self {
+            Self::File(x) => ConfigFile::config_from_file(&x),
+            // basically an empty config with only image set
+            Self::Image(x) => Ok(Config {
+                image: x.clone(),
+                ..Default::default()
+            }),
+            Self::Config(x) => ctx.find_config(&x),
+        }
+    }
+
     pub fn parse(input: &str) -> Result<Self, String> {
-        if input.starts_with("./") {
-            // if it starts ./ then it must be a local path
-            let path = PathBuf::from(input);
-
-            if !path.try_exists().unwrap_or(false) {
-                return Err(format!("Config file {:?} does not exist or you do not have permission to read it", path));
-            }
-
-            if !path.symlink_metadata().unwrap().is_file() {
-                return Err(format!("Path {:?} is not a file", path));
-            }
-
-            // return Ok(Self::File(path));
+        if input.starts_with("./") || input.starts_with("/") || input.starts_with("~/") {
+            // it must be a path
+            Ok(Self::File(PathBuf::from(input)))
         } else if let Some(config_name) = input.strip_prefix("@") {
             // @ is prefix for a config
-
-            //
+            Ok(Self::Config(config_name.to_string()))
+        } else {
+            // assume an image
+            Ok(Self::Image(input.to_string()))
         }
-
-        return Ok(Self::Image("xx".into()));
     }
 }
 
-#[derive(Args, Debug, Clone, Default)]
+#[derive(Args, Debug, Clone)]
 pub struct CmdStartArgs {
     /// Name of the new container (if not set a randomly generated name will be used)
     #[arg(long, env = crate::ENV_CONTAINER)]
@@ -130,9 +132,9 @@ pub struct CmdStartArgs {
     #[arg(short, long, value_name = "VAR=VALUE")]
     pub env: Vec<String>,
 
-    /// Container image to use or @config
-    #[arg(env = crate::ENV_IMAGE, value_name = "IMAGE|@CONFIG")]
-    pub image: String,
+    /// File, image or config to use to start a container
+    #[arg(env = crate::ENV_IMAGE, value_parser = ConfigArg::parse, value_name = "FILE|IMAGE|@CONFIG")]
+    pub config: ConfigArg,
 
     /// Pass rest of args to engine verbatim
     #[arg(last = true)]
@@ -198,6 +200,21 @@ pub struct CmdExistsArgs {
 }
 
 #[derive(Args, Debug, Clone)]
+pub struct CmdConfigArgs {
+    /// Show all options for a config
+    #[clap(short, long, exclusive = true)]
+    pub options: bool,
+
+    /// Show example config
+    #[clap(short, long, exclusive = true)]
+    pub example: bool,
+
+    /// Path to file, name of image or @config to inspect
+    #[clap(value_parser = ConfigArg::parse, value_name = "FILE|IMAGE|@CONFIG", required_unless_present_any(["options", "example"]))]
+    pub config: Option<ConfigArg>,
+}
+
+#[derive(Args, Debug, Clone)]
 pub struct CmdListArgs {
     /// List containers one per line with properties delimited by a tab
     ///
@@ -250,9 +267,8 @@ pub enum CliCommands {
     /// Exit code is 0 if container exists otherwise 1
     Exists(CmdExistsArgs),
 
-    /// Config related commands
-    #[command(subcommand)]
-    Config(ConfigCommands),
+    /// Inspect a config from file, can be used as syntax check
+    Config(CmdConfigArgs),
 
     /// List running owned containers
     List(CmdListArgs),

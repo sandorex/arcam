@@ -52,7 +52,7 @@ pub fn is_in_container() -> bool {
     use std::path::Path;
     use std::env;
 
-    return Path::new("/run/.containerenv").exists()
+    Path::new("/run/.containerenv").exists()
         || Path::new("/.dockerenv").exists()
         || env::var("container").is_ok()
 }

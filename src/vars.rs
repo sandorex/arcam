@@ -46,8 +46,8 @@ pub const ARCAM_DIR: &str = "/arcam";
 /// Path where arcam binary is mounted
 pub const ARCAM_EXE: &str = "/arcam/exe";
 
-// /// Path to init config which is written by start command
-// pub const ARCAM_CONFIG: &str = "/arcam/config";
+/// Path to optional config file distributed within the image
+pub const ARCAM_CONFIG: &str = "/config.toml";
 
 /// Path where flag files for each of the running shell/exec processes resides
 pub const HEALTH_DIR: &str = "/arcam/health";
