@@ -296,13 +296,14 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     // prefer cli name over random one
     let container_name = cli_args.name.clone().unwrap_or_else(generate_name);
-    let mut container_image: String = "".into();
-    let mut host_pre_init: Option<Vec<String>> = None;
+    let container_image: String;
+    let host_pre_init: Option<Vec<String>>;
 
     // TODO shellexpand env expansion should error out!
     if let ConfigArg::Image(image) = &cli_args.config {
         // no config used
         container_image = image.to_string();
+        host_pre_init = None;
     } else {
         // get config from file or by name
         let config = match &cli_args.config {
@@ -310,6 +311,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             ConfigArg::File(file) => crate::config::ConfigFile::config_from_file(file)?,
             ConfigArg::Config(config_name) => ctx.find_config(config_name)?,
         };
+
+        // use config image
+        container_image = config.image.clone();
 
         // expand vars
         let pwd = ctx.cwd.to_string_lossy();
