@@ -470,7 +470,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     // add all volumes
     for (vol, path) in persist.iter().chain(persist_user.iter()) {
-        cmd.arg(format!("--volume={}:{}", vol, path));
+        // using mount here to prevent mounting paths from persist, either by accident or
+        // intentionally
+        cmd.arg(format!("--mount=type=volume,source={},destination={}", vol, path));
     }
 
     // set network if requested
