@@ -72,6 +72,12 @@ impl ConfigArg {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdStartArgs {
+    /// Enter shell after container initialization finishes
+    ///
+    /// Ignored if stdout is not a terminal (ex. a pipe)
+    #[arg(short = 'E', long, env = crate::ENV_ENTER_ON_START)]
+    pub enter: bool,
+
     /// Name of the new container (if not set a randomly generated name will be used)
     #[arg(long, env = crate::ENV_CONTAINER)]
     pub name: Option<String>,
@@ -272,6 +278,7 @@ pub enum CliCommands {
     Start(CmdStartArgs),
 
     /// Enter the shell inside a running an owned container
+    #[clap(visible_alias = "enter")]
     Shell(CmdShellArgs),
 
     /// Execute a command inside a running an owned container
@@ -292,6 +299,7 @@ pub enum CliCommands {
     Logs(CmdLogsArgs),
 
     /// Stop running owned container
+    #[clap(visible_alias = "stop")]
     Kill(CmdKillArgs),
 
     /// Shell autocompletion

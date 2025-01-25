@@ -40,6 +40,12 @@ pub const ENV_IMAGE: &str = ENV_VAR_PREFIX!("IMAGE");
 /// Directory where the app stores data
 pub const ENV_APP_DIR: &str = ENV_VAR_PREFIX!("DIR");
 
+/// Should start open the shell automatically
+pub const ENV_ENTER_ON_START: &str = ENV_VAR_PREFIX!("ENTER_ON_START");
+
+/// Stores path to arcam executable and prevents infinite loop with host_pre_init
+pub const ENV_EXE_PATH: &str = ENV_VAR_PREFIX!("EXE_PATH");
+
 /// Where scripts are executed from
 pub const INIT_D_DIR: &str = "/init.d";
 

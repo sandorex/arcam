@@ -79,24 +79,6 @@ fn find_terminfo() -> Vec<String> {
     args
 }
 
-/// Execute each command with /bin/sh
-fn execute_host_pre_init(ctx: &Context, commands: &Vec<String>) -> Result<()> {
-    for command in commands {
-        // execute each command using sh
-        let mut cmd = Command::new("/bin/sh");
-        cmd.arg("-c");
-        cmd.arg(command);
-
-        if ctx.dry_run {
-            cmd.print_escaped_cmd();
-        } else {
-            cmd.run_interactive()?;
-        }
-    }
-
-    Ok(())
-}
-
 fn resolve_capabilities(cli_args: &CmdStartArgs, cmd: &mut Command) {
     // NOTE podman does not support drop and add at the same time, once dropped its dropped so i
     // want to extend that so config can overwrite it and then cli can overwrite the overwritten
@@ -290,20 +272,22 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     if let Some(x) = ctx.get_cwd_container() {
         // check if any are running
         if !x.is_empty() {
-            return Err(anyhow!(r#"There are containers running in current directory: {:?}"#, x));
+            return Err(anyhow!(r#"There are containers running in current directory: {}"#, x.join(" ")));
         }
     }
 
     // prefer cli name over random one
     let container_name = cli_args.name.clone().unwrap_or_else(generate_name);
     let container_image: String;
-    let host_pre_init: Option<Vec<String>>;
+    let on_init_pre: String;
+    let on_init_post: String;
 
     // TODO shellexpand env expansion should error out!
     if let ConfigArg::Image(image) = &cli_args.config {
         // no config used
         container_image = image.to_string();
-        host_pre_init = None;
+        on_init_pre = "".into();
+        on_init_post = "".into();
     } else {
         // get config from file or by name
         let config = match &cli_args.config {
@@ -311,6 +295,34 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             ConfigArg::File(file) => crate::config::ConfigFile::config_from_file(file)?,
             ConfigArg::Config(config_name) => ctx.find_config(config_name)?,
         };
+
+        if let Some(host_pre_init) = &config.host_pre_init {
+            // avoid infinite loop using env var
+            if std::env::var(crate::ENV_EXE_PATH).is_err() {
+                use std::os::unix::process::CommandExt;
+
+                let mut buf: String = "#!/bin/sh\n".into();
+                buf += host_pre_init;
+
+                // write to temp file
+                let path = format!("/tmp/a{}{}", rand(), rand());
+                std::fs::write(&path, buf)?;
+
+                let argv0 = std::env::args().next().unwrap();
+
+                // execute it using the shell and replace this process with it
+                return Err(
+                    Command::new("/bin/sh")
+                        .arg(path)
+                        // skipping argv0 and command 'start'
+                        .args(std::env::args().skip(2))
+                        // pass the path to arcam in the env var
+                        .env(crate::ENV_EXE_PATH, argv0)
+                        .exec()
+                        .into()
+                );
+            }
+        }
 
         // use config image
         container_image = config.image.clone();
@@ -360,11 +372,11 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
         cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
         cli_args.ports.extend_from_slice(&config.ports);
-        cli_args.on_init_pre.extend_from_slice(&config.on_init_pre);
-        cli_args.on_init_post.extend_from_slice(&config.on_init_post);
         cli_args.capabilities.extend_from_slice(&config.capabilities);
 
-        host_pre_init = Some(config.host_pre_init);
+        // concatinate pre / post init
+        on_init_pre = cli_args.on_init_pre.join("\n") + &config.on_init_pre.unwrap_or_default();
+        on_init_post = cli_args.on_init_post.join("\n") + &config.on_init_post.unwrap_or_default();
     }
 
     // allow dry-run regardless if the container exists
@@ -373,11 +385,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         if ctx.get_container_status(&container_name).is_some() {
             return Err(anyhow!("Container {:?} already exists", container_name));
         }
-    }
-
-    // run host pre init commands if there are any
-    if let Some(x) = host_pre_init.as_ref() {
-        execute_host_pre_init(&ctx, x)?;
     }
 
     // set default shell to bash if not set already
@@ -529,32 +536,22 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         }
 
         // write pre init script into the container
-        if !cli_args.on_init_pre.is_empty() {
+        if !on_init_pre.is_empty() {
             let path = PathBuf::new()
                 .join(crate::INIT_D_DIR)
                 .join("00_on_init_pre.sh");
 
-            let mut buffer: String = "#!/bin/sh\n".into();
-            for cmd in cli_args.on_init_pre {
-                buffer += &cmd;
-                buffer += "\n";
-            }
-
+            let buffer: String = "#!/bin/sh\n".to_string() + &on_init_pre;
             write_to_file(&ctx, id, &path, &buffer)?;
         }
 
         // write post init script into the container
-        if !cli_args.on_init_post.is_empty() {
+        if !on_init_post.is_empty() {
             let path = PathBuf::new()
                 .join(crate::INIT_D_DIR)
                 .join("99_on_init_post.sh");
 
-            let mut buffer: String = "#!/bin/sh\n".into();
-            for cmd in cli_args.on_init_post {
-                buffer += &cmd;
-                buffer += "\n";
-            }
-
+            let buffer: String = "#!/bin/sh\n".to_string() + &on_init_post;
             write_to_file(&ctx, id, &path, &buffer)?;
         }
 
@@ -566,9 +563,17 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             std::thread::sleep(std::time::Duration::from_millis(300));
         }
 
-        // print container name
-        println!("{}", container_name);
+        if cli_args.enter {
+            // launch shell right away
+            crate::commands::open_shell(ctx, crate::cli::CmdShellArgs {
+                name: container_name,
+                shell: None,
+            })
+        } else {
+            // print container name
+            println!("{}", container_name);
 
-        Ok(())
+            Ok(())
+        }
     }
 }

@@ -74,15 +74,17 @@ code_docs_struct! {
 
         /// Run command before all other scripts (ran using `/bin/sh`)
         #[serde(default)]
-        pub on_init_pre: Vec<String>,
+        pub on_init_pre: Option<String>,
 
         /// Run command after all other scripts (ran using `/bin/sh`)
         #[serde(default)]
-        pub on_init_post: Vec<String>,
+        pub on_init_post: Option<String>,
 
-        /// Execute commands on host before container starts (ran using `/bin/sh`)
-        #[serde(default)]
-        pub host_pre_init: Vec<String>,
+        /// Script to run on start, all original arguments are passed verbatim, you have to run
+        /// `arcam start` yourself or nothing will happen
+        ///
+        /// NOTE: the script is ran using "/bin/sh"
+        pub host_pre_init: Option<String>,
 
         /// Pass through container port to host (both TCP and UDP)
         ///
