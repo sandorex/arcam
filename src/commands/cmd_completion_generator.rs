@@ -5,16 +5,23 @@ use std::io::Write;
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 
-/// Used to run autocompletion functions
-#[derive(Debug, Clone, clap::ValueEnum)]
-pub enum ShellCompletionType {
-    /// Complete all configs
-    Config,
-}
+// // NOTE: although this works its quite unfinished
+// const FISH_EXTRA: &str = r#"
+// complete -c arcam -n "__fish_arcam_using_subcommand start" -a "(arcam completion config)"
+// complete -c arcam -n "__fish_arcam_using_subcommand kill" -a "(arcam completion container)"
+// complete -c arcam -n "__fish_arcam_using_subcommand exists" -a "(arcam completion container)"
+// complete -c arcam -n "__fish_arcam_using_subcommand shell" -a "(arcam completion container)"
+// complete -c arcam -n "__fish_arcam_using_subcommand exec" -a "(arcam completion container)"
+// "#;
 
 fn gen(shell: Shell, buf: &mut dyn Write) {
     let mut cmd = crate::cli::Cli::command();
     generate(shell, &mut cmd, env!("CARGO_BIN_NAME"), buf);
+
+    // match shell {
+    //     Shell::Fish => writeln!(buf, "{}", FISH_EXTRA).unwrap(),
+    //     _ => {},
+    // }
 }
 
 fn detect_shell() -> Result<Shell> {
@@ -33,26 +40,6 @@ fn detect_shell() -> Result<Shell> {
     Err(anyhow!("This shell is unsupported, if this is a mistake set the shell explicitly using the argument"))
 }
 
-/// Prints help that is used for better completion scripts
-pub fn shell_completion_helper(ctx: Context, cli_args: CmdCompletionArgs) -> Result<()> {
-    match &cli_args.complete.unwrap() {
-        // very basic config completer
-        ShellCompletionType::Config => {
-            for entry in ctx.config_dir().read_dir()?.flatten() {
-                let name = entry.file_name();
-
-                // only print .toml files
-                if let Some(name) = name.to_string_lossy().strip_suffix(".toml") {
-                    println!("@{}", name);
-                }
-            }
-
-            Ok(())
-        },
-    }
-}
-
-// TODO remove this after hand-written ones are written
 /// Generates basic completion scripts by `clap_complete`
 pub fn shell_completion_generation(cli_args: CmdCompletionArgs) -> Result<()> {
     // prevent terminal text spillage
@@ -70,4 +57,3 @@ pub fn shell_completion_generation(cli_args: CmdCompletionArgs) -> Result<()> {
 
     Ok(())
 }
-
