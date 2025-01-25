@@ -302,6 +302,18 @@ pub fn container_init() -> Result<()> {
         }
     }
 
+    // small wrapper to run as root regardless if sudo is available
+    std::fs::write("/bin/asroot", r#"#!/bin/sh
+set -e
+
+if command -v sudo >/dev/null; then
+    sudo -u root -g root -- "$@"
+else
+    su -c "$*" -g root root
+fi
+"#)?;
+    make_executable(Path::new("/bin/asroot"))?;
+
     // create the flag file to start preinit
     std::fs::write(crate::FLAG_FILE_PRE_INIT, "y")?;
 

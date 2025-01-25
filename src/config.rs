@@ -72,6 +72,14 @@ code_docs_struct! {
         #[serde(default)]
         pub session_bus: bool,
 
+        /// Path to mount as a volume, basically shorthand for `--volume=<name>:<path>`
+        #[serde(default)]
+        pub persist: Vec<(String, String)>,
+
+        /// Same as `persist` but the path is chowned as user on init
+        #[serde(default)]
+        pub persist_user: Vec<(String, String)>,
+
         /// Run command before all other scripts (ran using `/bin/sh`)
         #[serde(default)]
         pub on_init_pre: Option<String>,

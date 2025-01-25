@@ -281,6 +281,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     let container_image: String;
     let on_init_pre: String;
     let on_init_post: String;
+    let mut persist: Vec<(String, String)> = vec![];
+    let mut persist_user: Vec<(String, String)> = vec![];
 
     // TODO shellexpand env expansion should error out!
     if let ConfigArg::Image(image) = &cli_args.config {
@@ -374,6 +376,10 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         cli_args.ports.extend_from_slice(&config.ports);
         cli_args.capabilities.extend_from_slice(&config.capabilities);
 
+        // get the persist paths
+        persist = config.persist;
+        persist_user = config.persist_user;
+
         // concatinate pre / post init
         on_init_pre = cli_args.on_init_pre.join("\n") + &config.on_init_pre.unwrap_or_default();
         on_init_post = cli_args.on_init_post.join("\n") + &config.on_init_post.unwrap_or_default();
@@ -397,17 +403,23 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         "run", "-d", "--rm",
         "--security-opt=label=disable",
         "--user=root",
-        "--init", // arcam does not act as the init system anymore
+
+        // arcam does not act as the init system anymore
+        "--init",
+
+        // detaching breaks things
+        "--detach-keys=",
+
     ]);
 
     cmd.args([
+        format!("--name={}", container_name),
         format!("--label=manager={}", ctx.engine),
         format!("--label={}={}", APP_NAME, VERSION),
         format!("--label={}={}", crate::CONTAINER_LABEL_HOST_DIR, ctx.cwd.to_string_lossy()),
         format!("--label={}={}", crate::CONTAINER_LABEL_CONTAINER_DIR, main_project_dir),
         format!("--label={}={}", crate::CONTAINER_LABEL_USER_SHELL, cli_args.shell.as_ref().unwrap()),
         format!("--env={0}={0}", APP_NAME),
-        format!("--name={}", container_name),
         format!("--env={}={}", ENV_VAR_PREFIX!("VERSION"), VERSION),
         format!("--env=manager={}", ctx.engine),
         format!("--env=CONTAINER_ENGINE={}", ctx.engine),
@@ -417,8 +429,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!("--env=HOST_USER_GID={}", ctx.user_gid),
         // TODO explore all the xdg dirs and set them properly
         format!("--env=XDG_RUNTIME_DIR=/run/user/{}", ctx.user_id),
-        format!("--volume={}:/{}:ro,nocopy", executable_path.display(), crate::ARCAM_EXE),
         format!("--volume={}:{}", ctx.cwd.to_string_lossy(), main_project_dir),
+        format!("--volume={}:{}:ro,nocopy", executable_path.display(), crate::ARCAM_EXE),
+        format!("--entrypoint={}", crate::ARCAM_EXE),
         format!("--hostname={}", get_hostname()?),
     ]);
 
@@ -455,6 +468,11 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         cmd.args(args);
     }
 
+    // add all volumes
+    for (vol, path) in persist.iter().chain(persist_user.iter()) {
+        cmd.arg(format!("--volume={}:{}", vol, path));
+    }
+
     // set network if requested
     if ! cli_args.network.unwrap_or(false) {
         cmd.arg("--network=none");
@@ -484,11 +502,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     cmd.args(cli_args.engine_args.clone());
 
     cmd.args([
-        // detaching breaks things
-        "--detach-keys=",
-
-        format!("--entrypoint={}", crate::ARCAM_EXE).as_str(),
-
         // the container image
         &container_image,
 
@@ -539,9 +552,30 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         if !on_init_pre.is_empty() {
             let path = PathBuf::new()
                 .join(crate::INIT_D_DIR)
-                .join("00_on_init_pre.sh");
+                .join("01_on_init_pre.sh");
 
-            let buffer: String = "#!/bin/sh\n".to_string() + &on_init_pre;
+            let buffer: String = "#!/bin/sh\nset -e\n".to_string() + &on_init_pre;
+            write_to_file(&ctx, id, &path, &buffer)?;
+        }
+
+        if !persist_user.is_empty() {
+            let path = PathBuf::new()
+                .join(crate::INIT_D_DIR)
+                .join("00_chown_persist.sh");
+
+            // get each path
+            let persist_user_paths = persist_user
+                .iter()
+                .map(|(_, x)| x.clone())
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            let buffer: String = format!(r#"#!/bin/sh
+set -e
+
+asroot chown "$USER:$USER" {0}
+"#, persist_user_paths);
+
             write_to_file(&ctx, id, &path, &buffer)?;
         }
 
@@ -551,7 +585,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 .join(crate::INIT_D_DIR)
                 .join("99_on_init_post.sh");
 
-            let buffer: String = "#!/bin/sh\n".to_string() + &on_init_post;
+            let buffer: String = "#!/bin/sh\nset -e\n".to_string() + &on_init_post;
             write_to_file(&ctx, id, &path, &buffer)?;
         }
 
