@@ -5,23 +5,9 @@ use std::io::Write;
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 
-// // NOTE: although this works its quite unfinished
-// const FISH_EXTRA: &str = r#"
-// complete -c arcam -n "__fish_arcam_using_subcommand start" -a "(arcam completion config)"
-// complete -c arcam -n "__fish_arcam_using_subcommand kill" -a "(arcam completion container)"
-// complete -c arcam -n "__fish_arcam_using_subcommand exists" -a "(arcam completion container)"
-// complete -c arcam -n "__fish_arcam_using_subcommand shell" -a "(arcam completion container)"
-// complete -c arcam -n "__fish_arcam_using_subcommand exec" -a "(arcam completion container)"
-// "#;
-
 fn gen(shell: Shell, buf: &mut dyn Write) {
     let mut cmd = crate::cli::Cli::command();
     generate(shell, &mut cmd, env!("CARGO_BIN_NAME"), buf);
-
-    // match shell {
-    //     Shell::Fish => writeln!(buf, "{}", FISH_EXTRA).unwrap(),
-    //     _ => {},
-    // }
 }
 
 fn detect_shell() -> Result<Shell> {
