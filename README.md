@@ -61,7 +61,7 @@ The GIF was generated with following command
 ```
 agg --theme monokai \
     --font-family 'FiraCode Nerd Font' \
-    --font-size 18 \
+    --font-size 16 \
     --last-frame-duration 5 \
     demo.cast demo.gif
 ```

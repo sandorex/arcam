@@ -74,6 +74,11 @@ const START_HEADING_PERMISSIONS: &str = "Permissions";
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdStartArgs {
+    // TODO
+    // /// Flag used to allow starting demo container without rw access
+    // #[clap(skip = true)]
+    // pub mount_cwd: bool,
+
     /// Enter shell after container initialization finishes
     ///
     /// Ignored if stdout is not a terminal (ex. a pipe)
