@@ -18,8 +18,8 @@ tag:
 
     # test just in case
     echo "Make sure you ran all the tests"
-    read -n
-    read -n
+    read -n1
+    read -n1
 
     version="$(just get-version)"
     if [[ -z "$version" ]]; then
