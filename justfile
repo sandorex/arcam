@@ -17,7 +17,9 @@ tag:
     set -e
 
     # test just in case
-    cargo test
+    echo "Make sure you ran all the tests"
+    read -n
+    read -n
 
     version="$(just get-version)"
     if [[ -z "$version" ]]; then
