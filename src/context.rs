@@ -1,8 +1,8 @@
 use std::path::PathBuf;
+use crate::config::Config;
 use crate::prelude::*;
 use users::os::unix::UserExt;
 use crate::util::Engine;
-use std::collections::HashMap;
 use crate::util::command_extensions::*;
 
 /// Possible status of a container
@@ -192,7 +192,6 @@ impl Context {
         }
     }
 
-
     /// Get container status if it exists
     pub fn get_container_status(&self, container: &str) -> Option<ContainerStatus> {
         let cmd = self.engine_command()
@@ -215,9 +214,9 @@ impl Context {
         })
     }
 
-    /// Loads all configs while also handling all errors
-    pub fn load_configs(&self) -> Result<HashMap<String, crate::config::Config>> {
-        crate::config::load_from_dir(self.config_dir().as_path())
-            .map_err(|err| anyhow!("{}", err))
+    /// Tries to find config by the name
+    pub fn find_config(&self, name: &str) -> Result<Config> {
+        let path = self.config_dir().as_path().join(format!("{}.toml", name));
+        crate::config::ConfigFile::config_from_file(&path)
     }
 }

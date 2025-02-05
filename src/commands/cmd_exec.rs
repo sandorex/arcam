@@ -38,6 +38,7 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
 
         // add -l and hope for the best
         if cli_args.login {
+            // use sh -l -c 'SHELL -c ..' here
             cmd.arg("-l");
         }
 

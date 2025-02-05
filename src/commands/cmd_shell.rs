@@ -2,26 +2,6 @@ use crate::prelude::*;
 use crate::cli;
 use crate::util::command_extensions::*;
 
-/// Extracts default shell for user from /etc/passwd inside a container
-fn get_user_shell(ctx: &Context, container: &str) -> Result<String> {
-    // try to get default shell from symlink
-    if let Ok(shell) = ctx.engine_exec_root(container, vec!["readlink", "/shell"]) {
-        return Ok(shell.trim().to_string());
-    }
-
-    // fallback to user shell
-    let output = ctx.engine_exec_root(container, vec!["getent", "passwd", &ctx.user])?;
-
-    Ok(
-        output
-            .trim()
-            .rsplit_once(':')
-            .ok_or(anyhow!("Error parsing user from passwd (output was {:?})", output))?
-            .1
-            .to_string()
-    )
-}
-
 pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
     // try to find container in current directory
     if cli_args.name.is_empty() {
@@ -32,7 +12,7 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
 
             cli_args.name = containers.first().unwrap().clone();
         }
-    } else if !ctx.dry_run && !ctx.get_container_status(&cli_args.name).is_some() {
+    } else if !ctx.dry_run && ctx.get_container_status(&cli_args.name).is_none() {
         return Err(anyhow!("Container {:?} does not exist", &cli_args.name));
     }
 
@@ -45,10 +25,7 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
     };
 
     let args = {
-        let user_shell = match &cli_args.shell {
-            Some(x) => x,
-            None => &get_user_shell(&ctx, &cli_args.name)?,
-        };
+        let user_shell = ctx.get_container_label(&cli_args.name, crate::CONTAINER_LABEL_USER_SHELL).unwrap();
 
         // TODO share the env with exec command so its consistent
         vec![
@@ -75,16 +52,6 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
         let cmd = cmd
             .status()
             .expect(crate::ENGINE_ERR_MSG);
-
-        let code = cmd.get_code();
-
-        // TODO redo this so it does not clear screen each time its exited
-        // code 137 usually means SIGKILL and that messes up the terminal so reset it afterwards
-        if code == 137 {
-            // i do not care if it failed
-            let _ = Command::new("reset").status();
-            return Ok(());
-        }
 
         if cmd.success() {
             Ok(())

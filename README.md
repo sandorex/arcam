@@ -4,7 +4,7 @@
 
 Fast sandboxed development container manager using podman, minimal permissions by default choose balance between security and convenience
 
-![Demo GIF](arcam-demo.gif)
+![Demo GIF](demo.gif)
 
 **NOTE: Version 0.1.X is considered alpha, breaking changes may happen at any point**
 
@@ -35,7 +35,8 @@ cargo install --git https://github.com/sandorex/arcam
 ```
 
 ### Usage
-The CLI has up-to-date documentation, for help with configuration files run `arcam config options`
+To avoid out-of-date documentation use the help text from binary itself\
+For help with config options run `arcam config --options`, or to see an example `arcam config --example`
 
 ### Custom Container Image
 Making a custom container image is same as for any other container, to take full advantage of arcam keep following things in mind:
@@ -51,3 +52,16 @@ For examples you can take a look at [my container](https://github.com/sandorex/c
 Both are great at their job, to provide a seamless integration with the host but not sandboxing
 
 Arcam provides sandboxed experience by default, and it's your job to choose where/when to sacrifice security for convenience, it's highly configurable
+
+### Development Notes
+#### Demo GIF
+Use asciinema in 80x30 terminal
+
+The GIF was generated with following command
+```
+agg --theme monokai \
+    --font-family 'FiraCode Nerd Font' \
+    --font-size 16 \
+    --last-frame-duration 5 \
+    demo.cast demo.gif
+```

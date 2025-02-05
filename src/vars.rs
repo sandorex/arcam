@@ -22,6 +22,9 @@ pub const CONTAINER_LABEL_HOST_DIR: &str = "host_dir";
 /// Container label used to specify the path to main project in the container
 pub const CONTAINER_LABEL_CONTAINER_DIR: &str = "container_dir";
 
+/// Container label used to specify default shell
+pub const CONTAINER_LABEL_USER_SHELL: &str = "default_shell";
+
 /// Wayland socket to pass through
 pub const ENV_WAYLAND_DISPLAY: &str = ENV_VAR_PREFIX!("WAYLAND_DISPLAY");
 
@@ -36,3 +39,28 @@ pub const ENV_IMAGE: &str = ENV_VAR_PREFIX!("IMAGE");
 
 /// Directory where the app stores data
 pub const ENV_APP_DIR: &str = ENV_VAR_PREFIX!("DIR");
+
+/// Should start open the shell automatically
+pub const ENV_ENTER_ON_START: &str = ENV_VAR_PREFIX!("ENTER_ON_START");
+
+/// Stores path to arcam executable and prevents infinite loop with host_pre_init
+pub const ENV_EXE_PATH: &str = ENV_VAR_PREFIX!("EXE_PATH");
+
+/// Where scripts are executed from
+pub const INIT_D_DIR: &str = "/init.d";
+
+/// Path where all arcam related things should be
+pub const ARCAM_DIR: &str = "/arcam";
+
+/// Path where arcam binary is mounted
+pub const ARCAM_EXE: &str = "/arcam/exe";
+
+/// Path to optional config file distributed within the image
+pub const ARCAM_CONFIG: &str = "/config.toml";
+
+/// This file existing is a signal when container initialization is finished
+pub const FLAG_FILE_INIT: &str = "/arcam/initialized";
+
+/// This file existing is a signal start command has copied all data required in the container so
+/// the initialization can begin
+pub const FLAG_FILE_PRE_INIT: &str = "/arcam/preinit";

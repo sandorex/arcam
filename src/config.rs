@@ -1,46 +1,34 @@
 //! Contains everything related to container configuration
 
 use code_docs::{code_docs_struct, DocumentedStruct};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::Path;
 use crate::util::Engine;
 
 /// Whole config file
-#[derive(Debug, Clone, PartialEq, Default, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConfigFile {
     /// Version of the configuration
-    #[serde(default = "default_version")]
     pub version: u64,
 
-    /// All container configs
-    pub config: Option<Vec<Config>>,
+    #[serde(flatten)]
+    pub config: Config,
 }
 
-// version 1 is gonna be default for now
-const fn default_version() -> u64 { 1 }
-
 impl ConfigFile {
-    /// Loads config from str, path is just for error message and can be anything
-    pub fn load_from_str(text: &str) -> Result<Self> {
-        // TODO load a table first and get the version then try parsing appropriate struct
-
-        let obj = toml::from_str::<ConfigFile>(text)?;
-
-        match obj.version {
-            1 => Ok(obj),
-            _ => Err(anyhow!("Invalid schema version {}", obj.version)),
-        }
+    // TODO handle different future versions of config
+    pub fn config_from_str(input: &str) -> Result<Config> {
+        Ok(toml::from_str::<ConfigFile>(input)?.config)
     }
 
-    pub fn load_from_file(path: &Path) -> Result<Self> {
-        let file_contents = std::fs::read_to_string(path)
-            .with_context(|| format!("Error while reading config file {:?}", path))?;
+    pub fn config_from_file(file: &Path) -> Result<Config> {
+        let file_contents = std::fs::read_to_string(file)
+            .with_context(|| format!("while reading config file {:?}", file))?;
 
-        Self::load_from_str(&file_contents)
-            .with_context(|| format!("Error while parsing config file {:?}", path))
+        Self::config_from_str(&file_contents)
+            .with_context(|| format!("while parsing config file {:?}", file))
     }
 }
 
@@ -52,19 +40,17 @@ code_docs_struct! {
     #[serde(deny_unknown_fields)]
     pub struct Config {
         // TODO redo these comments so they are easy to understand even for non-rust programmers
-        /// Name of the configuration
-        pub name: String,
-
         /// Image used for the container
         pub image: String,
-
-        /// Optional name to set for the container, otherwise randomly generated
-        pub container_name: Option<String>,
 
         /// Optional path to directory to use as /etc/skel (static dotfiles)
         ///
         /// Environ vars are expanded
         pub skel: Option<String>,
+
+        /// Default user shell
+        #[serde(default)]
+        pub shell: Option<String>,
 
         /// Set network access
         #[serde(default)]
@@ -86,21 +72,27 @@ code_docs_struct! {
         #[serde(default)]
         pub session_bus: bool,
 
+        /// Path to mount as a volume, basically shorthand for `--volume=<name>:<path>`
+        #[serde(default)]
+        pub persist: Vec<(String, String)>,
+
+        /// Same as `persist` but the path is chowned as user on init
+        #[serde(default)]
+        pub persist_user: Vec<(String, String)>,
+
         /// Run command before all other scripts (ran using `/bin/sh`)
         #[serde(default)]
-        pub on_init_pre: Vec<String>,
+        pub on_init_pre: Option<String>,
 
         /// Run command after all other scripts (ran using `/bin/sh`)
         #[serde(default)]
-        pub on_init_post: Vec<String>,
+        pub on_init_post: Option<String>,
 
-        /// Execute commands on host before container starts (ran using `/bin/sh`)
-        #[serde(default)]
-        pub host_pre_init: Vec<String>,
-
-        /// Automatically shutdown the container when there are no shells or processes running in it
-        #[serde(default)]
-        pub auto_shutdown: bool,
+        /// Script to run on start, all original arguments are passed verbatim, you have to run
+        /// `arcam start` yourself or nothing will happen
+        ///
+        /// NOTE: the script is ran using "/bin/sh"
+        pub host_pre_init: Option<String>,
 
         /// Pass through container port to host (both TCP and UDP)
         ///
@@ -108,11 +100,11 @@ code_docs_struct! {
         #[serde(default)]
         pub ports: Vec<(u32, u32)>,
 
-        /// Environment variables to set
+        /// Environment variables to set (name, value)
         ///
         /// Environ vars are expanded
         #[serde(default)]
-        pub env: HashMap<String, String>,
+        pub env: Vec<(String, String)>,
 
         /// Add capabilities, or drop them with by prefixing `!cap`
         ///
@@ -150,72 +142,31 @@ impl Config {
     }
 }
 
-/// Load and merge configs from directory (loads *.toml file)
-pub fn load_from_dir(path: &Path) -> Result<HashMap<String, Config>> {
-    let mut configs: HashMap<String, Config> = HashMap::new();
-
-    // the directory does not exist just exit quietly
-    if !std::path::Path::new(path).exists() {
-        return Ok(configs);
-    }
-
-    let toml_files: Vec<std::path::PathBuf> = std::path::Path::new(path)
-        .read_dir()
-        .map_err(|err| anyhow!("Error reading config directory {}: {}", path.to_string_lossy(), err))?
-        .map(|x| x.unwrap().path() )
-        .filter(|x| x.extension().unwrap_or_default() == "toml")
-        .collect();
-
-    for file in toml_files {
-        let config_file = ConfigFile::load_from_file(file.as_path())?;
-
-        for config in config_file.config.unwrap_or_default() {
-            // ignore any duplicates, let the user handle it if they wish
-            if configs.contains_key(&config.name) {
-                eprintln!("Ignoring duplicate config {} in {}", &config.name, file.display());
-                continue;
-            }
-
-            configs.insert(config.name.clone(), config);
-        }
-    }
-
-    Ok(configs)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn from_str() {
-        // TODO write all the keys here to preserve compatability in the future
         let cfg_text = r#"
-[[config]]
-name = "first"
+version = 1
 image = "fedora"
 engine_args = [ "default" ]
 engine_args_podman = [ "podman" ]
 engine_args_docker = [ "docker" ]
 "#;
 
-        let result = ConfigFile::load_from_str(cfg_text);
+        let result = ConfigFile::config_from_str(cfg_text);
         assert!(result.is_ok(), "result is err: {}", result.unwrap_err());
         let result_ok = result.unwrap();
 
-        assert_eq!(result_ok, ConfigFile {
-            version: default_version(),
-            config: Some(vec![
-                Config {
-                    name: "first".into(),
-                    image: "fedora".into(),
-                    engine_args: vec!["default".into()],
-                    engine_args_podman: vec!["podman".into()],
-                    engine_args_docker: vec!["docker".into()],
+        assert_eq!(result_ok, Config {
+            image: "fedora".into(),
+            engine_args: vec!["default".into()],
+            engine_args_podman: vec!["podman".into()],
+            engine_args_docker: vec!["docker".into()],
 
-                    ..Default::default()
-                },
-            ]),
+            ..Default::default()
         });
     }
 }

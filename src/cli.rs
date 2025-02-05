@@ -1,12 +1,9 @@
-pub mod cli_config;
-
-use cli_config::ConfigCommands;
-use clap::{Parser, Subcommand, Args};
-use crate::FULL_VERSION;
+use std::path::PathBuf;
+use clap::{Args, Parser, Subcommand};
+use crate::{config::Config, Context, FULL_VERSION};
 
 const AFTER_HELP: &str = concat!(
-    "For documentation for this particular version go to following url\n",
-    env!("CARGO_PKG_REPOSITORY"), "/tree/", env!("VERGEN_GIT_SHA"), "/docs"
+    "For help visit the git repository\n", env!("CARGO_PKG_REPOSITORY")
 );
 
 /// Sandboxed development container manager, with focus on security by default
@@ -27,63 +24,83 @@ pub struct Cli {
     pub cmd: CliCommands,
 }
 
-#[derive(Args, Debug, Clone, Default)]
+#[derive(PartialEq, Debug, Clone)]
+pub enum ConfigArg {
+    /// Use configuration from this file
+    File(PathBuf),
+
+    /// Use no configuration, plain container using this image
+    Image(String),
+
+    /// Use following config
+    Config(String),
+}
+
+impl ConfigArg {
+    /// Convert ContainerConfig into config
+    pub fn into_config(self, ctx: &Context) -> anyhow::Result<Config> {
+        use crate::config::ConfigFile;
+
+        match self {
+            Self::File(x) => ConfigFile::config_from_file(&x),
+            // basically an empty config with only image set
+            Self::Image(x) => Ok(Config {
+                image: x.clone(),
+                ..Default::default()
+            }),
+            Self::Config(x) => ctx.find_config(&x),
+        }
+    }
+
+    pub fn parse(input: &str) -> Result<Self, String> {
+        if input.starts_with("./")          // ex. ./local/file.toml
+            || input.starts_with(".")       // ex. .arcam.toml
+            || input.starts_with("/")       // ex. /etc/arcam/configs/something.toml
+            || input.starts_with("~/")      // ex. ~/.config/arcam/configs/something.toml
+            || input.ends_with(".toml") {   // well no image is gonna end with .toml? right?
+            // it must be a path
+            Ok(Self::File(PathBuf::from(input)))
+        } else if let Some(config_name) = input.strip_prefix("@") {
+            // @ is prefix for a config
+            Ok(Self::Config(config_name.to_string()))
+        } else {
+            // assume an image
+            Ok(Self::Image(input.to_string()))
+        }
+    }
+}
+
+const START_HEADING_PERMISSIONS: &str = "Permissions";
+
+#[derive(Args, Debug, Clone)]
 pub struct CmdStartArgs {
+    /// Enter shell after container initialization finishes
+    ///
+    /// Ignored if stdout is not a terminal (ex. a pipe)
+    #[arg(short = 'E', long, env = crate::ENV_ENTER_ON_START)]
+    pub enter: bool,
+
     /// Name of the new container (if not set a randomly generated name will be used)
     #[arg(long, env = crate::ENV_CONTAINER)]
     pub name: Option<String>,
 
+    /// Set container default shell
+    #[arg(long)]
+    pub shell: Option<String>,
+
     /// Path to directory which will be used as /etc/skel inside the container
     ///
     /// Used for static dotfiles that can be copied verbatim
-    #[arg(long)]
+    #[arg(long, value_name = "DIR")]
     pub skel: Option<String>,
 
-    /// Set network access permission for the container
-    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
-    pub network: Option<bool>,
-
-    /// Try to pass audio into the the container, security impact is unknown
-    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
-    pub audio: Option<bool>,
-
-    /// Passes wayland compositor through, pokes holes in sandbox, allows r/w access to clipboard
-    ///
-    /// If you want to pass through a specific wayland socket use env var ARCAM_WAYLAND_DISPLAY
-    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
-    pub wayland: Option<bool>,
-
-    /// Pass through ssh-agent socket
-    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
-    pub ssh_agent: Option<bool>,
-
-    /// Pass through session dbus socket, allows command execution on host!
-    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
-    pub session_bus: Option<bool>,
-
     /// Run command on init, ran before all other scripts (ran using `/bin/sh`)
-    #[arg(long, value_name = "SCRIPT")]
+    #[arg(long, value_name = "COMMAND")]
     pub on_init_pre: Vec<String>,
 
     /// Run command on init, ran after all other scripts (ran using `/bin/sh`)
-    #[arg(long, value_name = "SCRIPT")]
+    #[arg(long, value_name = "COMMAND")]
     pub on_init_post: Vec<String>,
-
-    /// Automatically shutdown the container when there are no shells or processes running in it
-    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
-    pub auto_shutdown: Option<bool>,
-
-    /// Pass through container port to host (both TCP and UDP)
-    ///
-    /// Not all ports are allowed with rootless podman
-    #[arg(short, long = "port", value_name = "PORT[:HOST_PORT]", value_parser = parse_ports)]
-    pub ports: Vec<(u32, u32)>,
-
-    /// Add capabilities, or drop them with by prefixing `!cap`
-    ///
-    /// For more details about capabilities read `man 7 capabilities`
-    #[arg(long = "cap", value_name = "[!]CAPABILITY")]
-    pub capabilities: Vec<String>,
 
     /// Mount additional paths inside workspace
     #[arg(short, long, value_name = "DIRECTORY")]
@@ -93,9 +110,43 @@ pub struct CmdStartArgs {
     #[arg(short, long, value_name = "VAR=VALUE")]
     pub env: Vec<String>,
 
-    /// Container image to use or @config
-    #[arg(env = crate::ENV_IMAGE, value_name = "IMAGE|@CONFIG")]
-    pub image: String,
+    /// Set network access permission for the container
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
+    pub network: Option<bool>,
+
+    /// Try to pass audio into the the container, security impact is unknown
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
+    pub audio: Option<bool>,
+
+    /// Passes wayland compositor through, pokes holes in sandbox, allows r/w access to clipboard
+    ///
+    /// If you want to pass through a specific wayland socket use env var ARCAM_WAYLAND_DISPLAY
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
+    pub wayland: Option<bool>,
+
+    /// Pass through ssh-agent socket
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
+    pub ssh_agent: Option<bool>,
+
+    /// Pass through session dbus socket, allows command execution on host!
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
+    pub session_bus: Option<bool>,
+
+    /// Pass through container port to host (both TCP and UDP)
+    ///
+    /// Not all ports are allowed with rootless podman
+    #[arg(short, long = "port", value_name = "PORT[:HOST_PORT]", value_parser = parse_ports, help_heading = START_HEADING_PERMISSIONS)]
+    pub ports: Vec<(u32, u32)>,
+
+    /// Add capabilities, or drop them with by prefixing `!cap`
+    ///
+    /// For more details about capabilities read `man 7 capabilities`
+    #[arg(long = "cap", value_name = "[!]CAPABILITY", help_heading = START_HEADING_PERMISSIONS)]
+    pub capabilities: Vec<String>,
+
+    /// File, image or config to use to start a container
+    #[arg(env = crate::ENV_IMAGE, value_parser = ConfigArg::parse, value_name = "FILE|IMAGE|@CONFIG")]
+    pub config: ConfigArg,
 
     /// Pass rest of args to engine verbatim
     #[arg(last = true)]
@@ -133,15 +184,11 @@ pub struct CmdShellArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdExecArgs {
-    /// Execute command using a shell, if not value is provided `/bin/sh` is used
-    ///
-    /// The shell will be used like `<shell> -c '<command..>'` so it must be compatible
+    /// Execute the command in a shell, if value is not specified then defaults to /bin/sh
     #[arg(long, default_missing_value = "/bin/sh", require_equals = true, num_args = 0..=1)]
     pub shell: Option<String>,
 
-    /// Execute command using login shell
-    /// All it does is adds `-l` flag to the shell cmd, so it may not work with
-    /// non-posix shells
+    /// Execute command in a login shell
     #[arg(long, requires = "shell")]
     pub login: bool,
 
@@ -158,6 +205,21 @@ pub struct CmdExecArgs {
 pub struct CmdExistsArgs {
     #[arg(value_name = "CONTAINER", default_value = "", env = crate::ENV_CONTAINER)]
     pub name: String,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct CmdConfigArgs {
+    /// Show all options for a config
+    #[clap(short, long, exclusive = true)]
+    pub options: bool,
+
+    /// Show example config
+    #[clap(short, long, exclusive = true)]
+    pub example: bool,
+
+    /// Path to file, name of image or @config to inspect
+    #[clap(value_parser = ConfigArg::parse, value_name = "FILE|IMAGE|@CONFIG", required_unless_present_any(["options", "example"]))]
+    pub config: Option<ConfigArg>,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -189,8 +251,8 @@ pub struct CmdKillArgs {
     #[arg(short, long)]
     pub yes: bool,
 
-    /// How many seconds to wait before killing the containers forcibly
-    #[arg(short, long, default_value_t = 20)]
+    /// Delay before container forcibly terminated (in seconds)
+    #[arg(short, long, default_value_t = 10)]
     pub timeout: u32,
 
     #[arg(value_name = "CONTAINER", default_value = "", env = crate::ENV_CONTAINER)]
@@ -198,44 +260,52 @@ pub struct CmdKillArgs {
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct CmdInitArgs {
-    // NOTE DO NOT ADD ARGUMENTS HERE
-    /// BASE64 encoded BSON data
-    pub args: String,
+pub struct CmdCompletionArgs {
+    /// Explicitly generate completions for specific shell
+    #[arg(long, value_enum, exclusive = true)]
+    pub shell: Option<clap_complete::Shell>,
+
+    /// Used to provide better completion
+    #[arg(hide = true)]
+    pub complete: Option<crate::commands::ShellCompletionType>,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum CliCommands {
-    /// Start a container in current directory, mounting it as the rw workspace
+    /// Start a container in current directory, mounting read-write
     Start(CmdStartArgs),
 
-    /// Enter the shell inside a running an owned container
+    /// Enter the shell inside a running container
+    #[clap(visible_alias = "enter")]
     Shell(CmdShellArgs),
 
-    /// Execute a command inside a running an owned container
+    /// Execute a command inside a running container
     Exec(CmdExecArgs),
 
     /// Check if container exists
     ///
-    /// Exit code is 0 if container exists otherwise 1
+    /// Exit code is 0 if container is running otherwise 1
     Exists(CmdExistsArgs),
 
-    /// Config related commands
-    #[command(subcommand)]
-    Config(ConfigCommands),
+    /// Inspect a config, can be used as syntax check
+    Config(CmdConfigArgs),
 
-    /// List running owned containers
+    /// List running containers
     List(CmdListArgs),
 
     /// Show container logs in journalctl
     Logs(CmdLogsArgs),
 
-    /// Stop running owned container
+    /// Stop running container
+    #[clap(visible_alias = "stop")]
     Kill(CmdKillArgs),
+
+    /// Shell autocompletion
+    Completion(CmdCompletionArgs),
 
     /// Init command used to setup the container
     #[command(hide = true)]
-    Init(CmdInitArgs),
+    Init,
 }
 
 #[cfg(test)]

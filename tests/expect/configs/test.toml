@@ -1,4 +1,0 @@
-[[config]]
-name = "test"
-image = "docker.io/library/debian:trixie-slim"
-

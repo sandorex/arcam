@@ -13,5 +13,4 @@ fn main() -> anyhow::Result<()> {
     Emitter::default()
         .add_instructions(&git2)?
         .emit()
-
 }

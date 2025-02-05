@@ -1,6 +1,9 @@
 mod engine;
 mod command;
 
+#[cfg(test)]
+pub mod tests;
+
 pub use engine::*;
 pub use command::*;
 
@@ -52,18 +55,7 @@ pub fn is_in_container() -> bool {
     use std::path::Path;
     use std::env;
 
-    return Path::new("/run/.containerenv").exists()
+    Path::new("/run/.containerenv").exists()
         || Path::new("/.dockerenv").exists()
         || env::var("container").is_ok()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::rand;
-
-    #[test]
-    fn test_rand() {
-        // just a sanity test
-        assert_ne!(rand(), rand());
-    }
 }

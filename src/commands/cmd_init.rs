@@ -1,37 +1,13 @@
 //! Contains all code that should run inside the container as the init
 
 use crate::util::command_extensions::*;
-use crate::{cli, FULL_VERSION};
+use crate::FULL_VERSION;
 use crate::prelude::*;
 use std::fs::OpenOptions;
 use std::{env, fs};
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::io::prelude::*;
-use base64::prelude::*;
-
-/// This file existing is a signal when container initialization is finished
-pub const INITALIZED_FLAG_FILE: &str = "/initialized";
-
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
-pub struct InitArgs {
-    pub on_init_pre: Vec<String>,
-    pub on_init_post: Vec<String>,
-    pub automatic_idle_shutdown: bool,
-}
-
-impl InitArgs {
-    pub fn decode(input: &str) -> Result<Self> {
-        let decoded = BASE64_STANDARD.decode(input)?;
-        Ok(bson::from_slice(&decoded)?)
-    }
-
-    pub fn encode(&self) -> Result<String> {
-        Ok(BASE64_STANDARD.encode(bson::to_vec(self)?))
-    }
-}
 
 /// Walk recursively collecting files/symlinks into one vec, dirs into another
 fn walk_dir(dir: &Path, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {
@@ -86,7 +62,7 @@ fn make_executable(path: &Path) -> Result<(), std::io::Error> {
 }
 
 // TODO create /tmp/.X11-unix just so its properly owned by root? and has correct permissions?
-fn initialization(_args: &InitArgs) -> Result<()> {
+fn initialization() -> Result<()> {
     println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
 
     let user = std::env::var("HOST_USER")
@@ -209,7 +185,7 @@ fn initialization(_args: &InitArgs) -> Result<()> {
 
         // NOTE fs::copy fails on broken symlinks
         if source.is_symlink() {
-            symlink(source.read_link().unwrap(), &dest)?;
+            symlink(source.read_link()?, &dest)?;
         } else {
             // NOTE it seems copy clones permissions as well so its fine
             fs::copy(&source, &dest)?;
@@ -265,7 +241,7 @@ fn initialization(_args: &InitArgs) -> Result<()> {
         }
     }
 
-    let init_dir = Path::new("/init.d");
+    let init_dir = Path::new(crate::INIT_D_DIR);
     if init_dir.exists() {
         let mut files: Vec<PathBuf> = vec![];
         for entry in init_dir.read_dir().unwrap().flatten() {
@@ -308,204 +284,51 @@ fn initialization(_args: &InitArgs) -> Result<()> {
     }
 
     // signalize that init is done
-    fs::write(INITALIZED_FLAG_FILE, "y")
-        .unwrap();
+    fs::write(crate::FLAG_FILE_INIT, "y")?;
 
     println!("Initialization finished");
 
     Ok(())
 }
 
-/// Parse PID and PPID from contents of `/proc/PID/stat` file
-fn parse_proc_stat(input: &str) -> (u64, u64) {
-    // FORMAT: PID (EXE_NAME) STATE PPID ...
-    // WARNING EXE_NAME can contain spaces, newlines basically anything
-
-    let pid = input.split_once(" ")
-        .unwrap()
-        .0
-        .parse::<u64>()
-        .unwrap();
-
-    // parse pid and ppid
-    let ppid = {
-        // remove everything before the executable name, cause its hard to parse
-        let rest = input.rsplit_once(") ").unwrap().1;
-
-        // split again and get the PPID
-        rest.split(" ")
-            .nth(1)
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
-    };
-
-    (pid, ppid)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_proc_stat() {
-        use super::parse_proc_stat;
-
-        // names to test the algorithm with
-        const NAMES: [&str; 4] = [
-            "arcam",
-            "((dw)",
-            ")) ) ) ",
-            r#") ;
-_)
-;w
-dw
-"#
-        ];
-
-        for name in NAMES {
-            assert_eq!(
-                parse_proc_stat(&format!(
-                    "{} ({}) S {} 1 1 0 -1 4194560 219 8424 0 3 1 8 7 7 20 0 2 0 87254147 75227136 893 18446744073709551615 94609717866496 94609719346301 140731732879504 0 0 0 0 4096 17475 0 0 0 17 11 0 0 0 0 0 94609719712240 94609719767160 94610004168704 140731732880722 140731732880935 140731732880935 140731732881393 0",
-                    69, name, 420
-                )),
-                (69, 420)
-            );
-        }
-    }
-}
-
-/// Get PIDs of all root processes (pid 1 is excluded)
-fn get_root_processes() -> Result<Vec<u64>> {
-    let mut root_pids: Vec<u64> = vec![];
-
-    // as container works bit weirdly each command ran from exec will have PPID
-    // of 0, so im manually filtering cause pgrep is not always available
-    for entry in fs::read_dir("/proc/")?.flatten() {
-        // skip non numeric filenames
-        if !entry.file_name().to_string_lossy().chars().all(|x| x.is_ascii_digit()) {
-            continue
-        }
-
-        // skip non-dir entries
-        match entry.file_type() {
-            Ok(x) if x.is_dir() => {},
-            _ => continue,
-        }
-
-        let (pid, ppid) = {
-            // read the /proc/PID/stat
-            let stat_file = fs::read_to_string(entry.path().join("stat"))?;
-
-            parse_proc_stat(&stat_file)
-        };
-
-        // ppid of 0 means its root process but ignore the init binary itself
-        if ppid == 0 && pid != 1 {
-            root_pids.push(pid);
+pub fn container_init() -> Result<()> {
+    // create needed directories
+    for dir in [
+        crate::ARCAM_DIR,
+        crate::INIT_D_DIR,
+    ] {
+        if !Path::new(dir).exists() {
+            std::fs::create_dir(dir)?;
         }
     }
 
-    Ok(root_pids)
-}
+    // small wrapper to run as root regardless if sudo is available
+    std::fs::write("/bin/asroot", r#"#!/bin/sh
+set -e
 
-pub fn container_init(cli_args: cli::CmdInitArgs) -> Result<()> {
-    // decode the encoded args
-    let args = match InitArgs::decode(&cli_args.args) {
-        Ok(x) => x,
-        Err(err) => {
-            return Err(anyhow!("Error decoding encoded args {:?}: {}", cli_args.args, err));
-        }
-    };
+if command -v sudo >/dev/null; then
+    sudo -u root -g root -- "$@"
+else
+    su -c "$*" -g root root
+fi
+"#)?;
+    make_executable(Path::new("/bin/asroot"))?;
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
+    // create the flag file to start preinit
+    std::fs::write(crate::FLAG_FILE_PRE_INIT, "y")?;
 
-    ctrlc::set_handler(move || {
-        println!("Termination signal received");
-
-        // stop the loop
-        r.store(false, Ordering::SeqCst);
-    }).expect("Error while setting signal handler");
-
-    // create the dir always
-    if !Path::new("/init.d").exists() {
-        std::fs::create_dir("/init.d").unwrap();
+    // wait for the flag file to be deleted to proceed
+    while std::fs::exists(crate::FLAG_FILE_PRE_INIT)? {
+        std::thread::sleep(std::time::Duration::from_millis(500));
     }
 
-    if !args.on_init_pre.is_empty() {
-        let path = Path::new("/init.d/00_on_init_pre.sh");
+    initialization()?;
 
-        // write the init commands to single file
-        fs::write(path, format!("#!/bin/sh\n{}",
-            args.on_init_pre.join("\n"))).unwrap();
-
-        make_executable(path).unwrap();
+    // just sleep forever, podman-init will kill it
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(60));
     }
 
-    if !args.on_init_post.is_empty() {
-        let path = Path::new("/init.d/99_on_init_post.sh");
-
-        // write the init commands to single file
-        fs::write(path, format!("#!/bin/sh\n{}",
-            args.on_init_post.join("\n"))).unwrap();
-
-        make_executable(path).unwrap();
-    }
-
-    initialization(&args)?;
-
-    // start thread to kill container if idle
-    if args.automatic_idle_shutdown {
-        let r = running.clone();
-
-        std::thread::spawn(move || {
-            while r.load(Ordering::SeqCst) {
-                // check every 10 minutes
-                std::thread::sleep(std::time::Duration::from_secs(30)); // temp 10s
-                // std::thread::sleep(std::time::Duration::from_secs(10 * 60));
-
-                let root_processes: Vec<u64> = get_root_processes()
-                    .unwrap();
-
-                // if there are not procesess then stop
-                if root_processes.len() == 0 {
-                    println!("Automatic shutdown commencing, no processes running");
-                    r.store(false, Ordering::SeqCst);
-                    break
-                }
-            }
-        });
-    }
-
-    // simply wait until container gets killed
-    while running.load(Ordering::SeqCst) {
-        // from my testing the delay from this does not really matter but an
-        // empty while loop generated a high cpu usage which is not ideal
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
-
-    // find leftover processes
-    // convert to string as command does not allow number arguments
-    let pids = get_root_processes()?
-        .iter()
-        .map(|x| x.to_string())
-        .collect::<Vec<_>>();
-
-    // TODO send the signal manually so there is no relience on kill command?
-    // do not run kill if there are no processes to kill
-    if !pids.is_empty() {
-        println!("Propagating signal to processes");
-
-        // to avoid more crates just use kill command
-        let _ = Command::new("kill")
-            // be verbose
-            // send TERM then KILL after 10s
-            .args(["--verbose", "--timeout", "10000", "KILL", "--signal", "TERM"])
-            .args(&pids)
-            .status()
-            .expect("Failed to execute kill");
-    }
-
-    println!("Goodbye!");
-
+    #[allow(unreachable_code)]
     Ok(())
 }
