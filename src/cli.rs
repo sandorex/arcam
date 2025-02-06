@@ -82,6 +82,12 @@ pub struct CmdStartArgs {
     #[arg(long)]
     pub shell: Option<String>,
 
+    /// Add devcontainer compatible feature
+    ///
+    /// For details check out https://containers.dev/features
+    #[arg(long)]
+    pub feature: Vec<String>,
+
     /// Path to directory which will be used as /etc/skel inside the container
     ///
     /// Used for static dotfiles that can be copied verbatim

@@ -4,7 +4,9 @@ mod commands;
 mod config;
 mod context;
 mod vars;
+mod devcontainers;
 
+use std::collections::HashMap;
 use clap::Parser;
 use cli::CliCommands;
 use util::Engine;

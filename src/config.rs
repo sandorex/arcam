@@ -52,6 +52,12 @@ code_docs_struct! {
         #[serde(default)]
         pub shell: Option<String>,
 
+        /// Devcontainer compatible features to install
+        ///
+        /// For details check out https://containers.dev/features
+        #[serde(default)]
+        pub features: Vec<String>,
+
         /// Set network access
         #[serde(default)]
         pub network: bool,
