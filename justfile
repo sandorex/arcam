@@ -1,3 +1,11 @@
+# release workflow
+#
+# 1. change version in Cargo.toml
+# 2. run cargo build
+# 3. git add Cargo.toml Cargo.lock
+# 4. git commit -m 'chore: bump version to X.X.X'
+# 5. just tag
+
 default:
     @just --list
 
