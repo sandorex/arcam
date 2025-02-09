@@ -61,7 +61,6 @@ fn make_executable(path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-// TODO create /tmp/.X11-unix just so its properly owned by root? and has correct permissions?
 fn initialization() -> Result<()> {
     println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
 
@@ -296,6 +295,7 @@ pub fn container_init() -> Result<()> {
     for dir in [
         crate::ARCAM_DIR,
         crate::INIT_D_DIR,
+        "/tmp/.X11-unix",
     ] {
         if !Path::new(dir).exists() {
             std::fs::create_dir(dir)?;

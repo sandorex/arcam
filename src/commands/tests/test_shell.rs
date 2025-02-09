@@ -8,7 +8,7 @@ fn test_cmd_shell_podman() -> Result<()> {
     let tempdir = test_temp_dir::test_temp_dir!();
 
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "start", "debian:trixie"])
+        .args(["start", "debian:trixie"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
@@ -22,7 +22,7 @@ fn test_cmd_shell_podman() -> Result<()> {
     let _container = podman_cleanup(container_name);
 
     let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-    c.args(["--engine=podman", "shell"]);
+    c.args(["shell"]);
     c.current_dir(tempdir.as_path_untracked());
 
     let mut pty = spawn_command(c, Some(5_000)).and_then(|p| {
@@ -65,7 +65,7 @@ fn test_cmd_start_shell_podman() -> Result<()> {
     println!("Container {:?}", container_name);
 
     let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-    c.args(["--engine=podman", "start", "--name", "test_arcam", "-E", "debian:trixie"]);
+    c.args(["start", "--name", "test_arcam", "-E", "debian:trixie"]);
     c.current_dir(tempdir.as_path_untracked());
 
     let mut pty = spawn_command(c, Some(5_000)).and_then(|p| {

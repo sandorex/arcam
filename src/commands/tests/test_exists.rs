@@ -7,7 +7,7 @@ fn test_cmd_exists_podman() -> Result<()> {
 
     // it should not exist yet
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "exists"])
+        .args(["exists"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .failure()
@@ -15,7 +15,7 @@ fn test_cmd_exists_podman() -> Result<()> {
 
     // create the container
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "start", "debian:trixie"])
+        .args(["start", "debian:trixie"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
@@ -30,14 +30,14 @@ fn test_cmd_exists_podman() -> Result<()> {
 
     // it should exist now
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "exists"])
+        .args(["exists"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
 
     // now test with the container name
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "exists", container_name])
+        .args(["exists", container_name])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();

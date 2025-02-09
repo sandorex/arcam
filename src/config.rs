@@ -123,12 +123,6 @@ code_docs_struct! {
         /// Environ vars are expanded
         #[serde(default)]
         pub engine_args_podman: Vec<String>,
-
-        /// Args passed to the engine, if its docker
-        ///
-        /// Environ vars are expanded
-        #[serde(default)]
-        pub engine_args_docker: Vec<String>,
     }
 }
 
@@ -137,7 +131,6 @@ impl Config {
     pub fn get_engine_args(&self, engine: &Engine) -> &Vec<String> {
         match engine.kind {
             crate::util::EngineKind::Podman => &self.engine_args_podman,
-            crate::util::EngineKind::Docker => &self.engine_args_docker,
         }
     }
 }
@@ -153,7 +146,6 @@ version = 1
 image = "fedora"
 engine_args = [ "default" ]
 engine_args_podman = [ "podman" ]
-engine_args_docker = [ "docker" ]
 "#;
 
         let result = ConfigFile::config_from_str(cfg_text);
@@ -164,7 +156,6 @@ engine_args_docker = [ "docker" ]
             image: "fedora".into(),
             engine_args: vec!["default".into()],
             engine_args_podman: vec!["podman".into()],
-            engine_args_docker: vec!["docker".into()],
 
             ..Default::default()
         });

@@ -8,7 +8,7 @@ use super::EngineKind;
 #[allow(unused_imports)]
 pub mod prelude {
     pub use super::Result;
-    pub use super::{podman_cleanup, docker_cleanup};
+    pub use super::podman_cleanup;
 }
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -23,7 +23,6 @@ impl Drop for ContainerCleanup {
     fn drop(&mut self) {
         let cmd_name = match self.engine {
             EngineKind::Podman => "podman",
-            EngineKind::Docker => "docker",
         };
 
         let exists = Command::new(cmd_name)
@@ -59,9 +58,3 @@ pub fn podman_cleanup(name: &str) -> ContainerCleanup {
     }
 }
 
-pub fn docker_cleanup(name: &str) -> ContainerCleanup {
-    ContainerCleanup {
-        engine: EngineKind::Docker,
-        name: name.to_string(),
-    }
-}

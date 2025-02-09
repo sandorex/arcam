@@ -1,10 +1,9 @@
-use std::{fmt::Display, process::Command};
+use std::fmt::Display;
 use super::executable_in_path;
 
 #[derive(Debug, Clone)]
 pub enum EngineKind {
     Podman,
-    Docker,
 }
 
 impl TryFrom<String> for EngineKind {
@@ -13,14 +12,12 @@ impl TryFrom<String> for EngineKind {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "podman" => Ok(Self::Podman),
-            "docker" => Ok(Self::Docker),
             _ => Err(()),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct Engine {
     /// Path to the engine, can also be name in PATH
     pub path: String,
@@ -35,42 +32,7 @@ impl Display for Engine {
     }
 }
 
-#[allow(dead_code)]
 impl Engine {
-    /// Detect which engine it is by executing `<engine> --version`
-    ///
-    /// If it is stupid but it works, it isn't stupid.
-    /// - Mercedes Lackey
-    pub fn detect(engine: &str) -> Option<Self> {
-        // output from `<engine> --version`
-        // docker: Docker version 27.1.1, build 6312585
-        // podman: podman version 5.1.2
-
-        let cmd = Command::new(engine)
-            .args(["--version"])
-            .output()
-            .expect("Could not execute engine");
-
-        // NOTE its important to make it lowercase
-        let stdout = String::from_utf8_lossy(&cmd.stdout).to_lowercase();
-
-        // convert first word into EngineKind, at least try to..
-        let kind = EngineKind::try_from(
-            stdout.split(" ")
-            .nth(0)
-            .unwrap_or("")
-            .to_string()
-        );
-
-        match kind {
-            Ok(x) => Some(Engine {
-                path: engine.to_string(),
-                kind: x,
-            }),
-            Err(_) => None,
-        }
-    }
-
     /// Finds first available engine, prioritizes podman!
     pub fn find_available_engine() -> Option<Self> {
         if executable_in_path("podman") {
@@ -78,15 +40,6 @@ impl Engine {
                 Self {
                     path: "podman".into(),
                     kind: EngineKind::Podman,
-                }
-            );
-        }
-
-        if executable_in_path("docker") {
-            return Some(
-                Self {
-                    path: "docker".into(),
-                    kind: EngineKind::Docker,
                 }
             );
         }

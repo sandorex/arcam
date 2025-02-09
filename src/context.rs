@@ -139,16 +139,24 @@ impl Context {
     }
 
     /// Execute engine command and get output back, the user is root!
-    pub fn engine_exec_root(&self, container: &str, cmd: Vec<&str>) -> Result<String> {
-        let cmd_result = self.engine_command()
-            .args(["exec", "--user", "root", "-it", container])
-            .args(&cmd)
+    pub fn engine_exec_root(&self, container: &str, command: Vec<&str>) -> Result<String> {
+        let mut cmd = self.engine_command();
+        cmd.args(["exec", "--user", "root", "-it", container]);
+        cmd.args(&command);
+
+        let cmd_result = cmd
             .output()
             .expect(crate::ENGINE_ERR_MSG);
 
+        // TODO print stdout and stderr if debugging mode
         let stdout = String::from_utf8_lossy(&cmd_result.stdout);
         if !cmd_result.status.success() {
-            return Err(anyhow!("Engine command {:?} exited with code {}", cmd, cmd_result.get_code()));
+            return Err(anyhow!(
+                "Engine command \"{} {}\" exited with code {}",
+                self.engine.to_string(),
+                cmd.get_args().collect::<Vec<_>>().join(std::ffi::OsStr::new(" ")).to_string_lossy(),
+                cmd_result.get_code(),
+            ));
         }
 
         Ok(stdout.to_string())

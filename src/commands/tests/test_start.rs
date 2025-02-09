@@ -6,7 +6,7 @@ fn test_cmd_start_podman() -> Result<()> {
     let tempdir = test_temp_dir::test_temp_dir!();
 
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "start", "debian:trixie"])
+        .args(["start", "debian:trixie"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
@@ -21,7 +21,7 @@ fn test_cmd_start_podman() -> Result<()> {
 
     // try to start another container in same directory
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "start", "debian:trixie"])
+        .args(["start", "debian:trixie"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .failure()

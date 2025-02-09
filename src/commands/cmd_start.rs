@@ -230,6 +230,7 @@ pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str)
     use std::process::Stdio;
 
     // write to file using tee
+    #[allow(clippy::zombie_processes)]
     let mut child = ctx.engine_command()
         .args(["exec", "-i", "--user", "root", container, "tee", &file.to_string_lossy()])
         .stdin(Stdio::piped()) // pipe into stdin but ignore stdout/stderr
@@ -436,7 +437,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     // engine specific args
     match ctx.engine.kind {
-        // TODO add docker equivalent
         EngineKind::Podman => {
             cmd.args([
                 "--userns=keep-id",
@@ -449,7 +449,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 "--tz=local",
             ]);
         },
-        EngineKind::Docker => unreachable!(),
     }
 
     // add the env vars

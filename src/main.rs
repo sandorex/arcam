@@ -33,21 +33,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     let get_ctx = || {
-        // find and detect engine
-        let engine: Engine = if let Some(chosen) = &args.engine {
-            // test if engine exists in PATH or as a literal path
-            if !(util::executable_in_path(chosen) || std::path::Path::new(chosen).exists()) {
-                return Err(anyhow!("Engine '{}' not found in PATH or filesystem", chosen));
-            }
-
-            Engine::detect(chosen).expect("Failed to detect engine kind")
-        } else if let Some(found) = Engine::find_available_engine() {
-            found
-        } else {
-            return Err(anyhow!("No compatible container engine found in PATH"));
-        };
-
-        Context::new(args.dry_run, engine)
+        Context::new(
+            args.dry_run,
+            Engine::find_available_engine().ok_or_else(|| anyhow!("Could not find podman in PATH"))?
+        )
     };
 
     match args.cmd {

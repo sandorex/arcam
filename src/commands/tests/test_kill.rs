@@ -9,7 +9,7 @@ fn test_cmd_kill_podman() -> Result<()> {
 
     // create the container
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "start", "debian:trixie"])
+        .args(["start", "debian:trixie"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
@@ -24,14 +24,14 @@ fn test_cmd_kill_podman() -> Result<()> {
 
     // it should exist now
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "exists"])
+        .args(["exists"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
 
     // test with --yes
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "kill", "-y", container_name])
+        .args(["kill", "-y", container_name])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
@@ -44,7 +44,7 @@ fn test_cmd_kill_interactive_podman() -> Result<()> {
     let tempdir = test_temp_dir::test_temp_dir!();
 
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "start", "debian:trixie"])
+        .args(["start", "debian:trixie"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
@@ -60,7 +60,7 @@ fn test_cmd_kill_interactive_podman() -> Result<()> {
     // try to kill to get the prompt
     let mut pty = {
         let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-        c.args(["--engine=podman", "kill", &container_name]);
+        c.args(["kill", &container_name]);
 
         spawn_command(c, Some(5_000))
     }?;
@@ -81,7 +81,7 @@ fn test_cmd_kill_interactive_podman() -> Result<()> {
     // run again and answer y
     let mut pty = {
         let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-        c.args(["--engine=podman", "kill", &container_name]);
+        c.args(["kill", &container_name]);
 
         spawn_command(c, Some(5_000))
     }?;

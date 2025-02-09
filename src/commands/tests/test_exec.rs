@@ -7,7 +7,7 @@ fn test_cmd_exec_podman() -> Result<()> {
 
     // create the container
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "start", "debian:trixie"])
+        .args(["start", "debian:trixie"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
@@ -22,7 +22,7 @@ fn test_cmd_exec_podman() -> Result<()> {
 
     // create file in cwd
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--engine=podman", "exec", container_name, "--", "touch", "file.txt"])
+        .args(["exec", container_name, "--", "touch", "file.txt"])
         .current_dir(tempdir.as_path_untracked())
         .assert()
         .success();
