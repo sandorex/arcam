@@ -17,7 +17,7 @@ fn test_cmd_start_podman() -> Result<()> {
     println!("Container {:?}", container_name);
 
     // kill container on drop
-    let _container = podman_cleanup(container_name);
+    let _container = Container::Podman(container_name);
 
     // try to start another container in same directory
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?

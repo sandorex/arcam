@@ -27,7 +27,7 @@ fn test_permissions_podman() -> Result<()> {
     println!("Container {:?}", container_name);
 
     // kill container on drop
-    let _container = podman_cleanup(container_name);
+    let _container = Container::Podman(container_name);
 
     // check if uid/gid are the same
     run(container_name, &["stat", "-c", "%u %g", "."])?

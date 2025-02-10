@@ -43,7 +43,7 @@ fn main() -> anyhow::Result<()> {
             return Err(anyhow!("Could not find podman in PATH"));
         }
 
-        Context::new(args.dry_run)
+        Context::new(args.dry_run, engine::Engine::Podman)
     };
 
     match args.cmd {

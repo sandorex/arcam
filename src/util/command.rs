@@ -102,9 +102,6 @@ impl CommandExt for Command {
             String::from_utf8_lossy(&output.stdout),
             output.status.to_string(),
         );
-        // log::debug!("stdout: {:?}", String::from_utf8_lossy(&output.stdout));
-        // log::debug!("stderr: {:?}", String::from_utf8_lossy(&output.stdout));
-        // log::debug!("Executing command {:?} (piped)", self.get_full_command());
 
         if output.status.success() {
             Ok(output)

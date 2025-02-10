@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use crate::config::Config;
+use crate::engine::Engine;
 use crate::prelude::*;
 use users::os::unix::UserExt;
 use crate::util::command_extensions::*;
@@ -20,6 +21,9 @@ pub struct Context {
 
     /// Directory where app related configuration files reside
     pub app_dir: PathBuf,
+
+    /// Engine to use
+    pub engine: Engine,
 }
 
 /// Get app configuration directory
@@ -47,8 +51,9 @@ fn get_app_dir() -> PathBuf {
 
 impl Context {
     /// Construct new context with current user
-    pub fn new(dry_run: bool) -> Result<Self> {
+    pub fn new(dry_run: bool, engine: Engine) -> Result<Self> {
         use users::{get_current_uid, get_user_by_uid};
+
         let uid = get_current_uid();
         let user = get_user_by_uid(uid)
             .ok_or(anyhow::anyhow!("Unable to find user by id {}", uid))?;
@@ -63,6 +68,7 @@ impl Context {
                 .with_context(|| "Failed to get current directory")?,
             dry_run,
             app_dir: get_app_dir(),
+            engine
         })
     }
 
@@ -138,11 +144,6 @@ impl Context {
             .run_get_output()
             .is_ok()
     }
-
-    // TODO inspect it and return all the data in json
-    // pub fn inspect_container() -> ? {
-    //
-    // }
 
     /// Gets value of label on a container if it is defined
     pub fn get_container_label(&self, container: &str, label: &str) -> Option<String> {

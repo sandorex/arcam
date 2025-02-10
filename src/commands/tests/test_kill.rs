@@ -20,7 +20,7 @@ fn test_cmd_kill_podman() -> Result<()> {
     println!("Container {:?}", container_name);
 
     // kill container on drop
-    let _container = podman_cleanup(container_name);
+    let _container = Container::Podman(container_name);
 
     // it should exist now
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
@@ -55,7 +55,7 @@ fn test_cmd_kill_interactive_podman() -> Result<()> {
     println!("Container {:?}", container_name);
 
     // kill container on drop
-    let _container = podman_cleanup(container_name);
+    let _container = Container::Podman(container_name);
 
     // try to kill to get the prompt
     let mut pty = {

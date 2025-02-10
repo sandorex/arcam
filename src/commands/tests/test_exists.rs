@@ -26,7 +26,7 @@ fn test_cmd_exists_podman() -> Result<()> {
     println!("Container {:?}", container_name);
 
     // kill container on drop
-    let _container = podman_cleanup(container_name);
+    let _container = Container::Podman(container_name);
 
     // it should exist now
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?

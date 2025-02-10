@@ -1,53 +1,34 @@
 //! Contains helper functions for tests
-use assert_cmd::Command;
 use std::error::Error;
+use crate::engine::Engine;
 
 #[allow(unused_imports)]
 pub mod prelude {
     pub use super::Result;
-    pub use super::podman_cleanup;
+    pub use super::Container;
 }
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
-/// RAII structure to kill container on drop
-pub struct ContainerCleanup {
-    name: String,
+pub enum Container<'a> {
+    Podman(&'a str),
 }
 
-impl Drop for ContainerCleanup {
+impl Drop for Container<'_> {
     fn drop(&mut self) {
-        let cmd_name = "podman";
+        match self {
+            Self::Podman(container) => {
+                // ignore it if the container does not exist
+                if !Engine::Podman.container_exists(container).unwrap() {
+                    return;
+                }
 
-        let exists = Command::new(cmd_name)
-            .args(["container", "exists", &self.name])
-            .assert()
-            .get_output()
-            .status
-            .success();
-
-        // ignore it if the container does not exist
-        if !exists {
-            return;
+                match Engine::Podman.stop_container(container) {
+                    Ok(_) => println!("Container {container:?} cleaned up successfully"),
+                    Err(_) => println!("Failed to clean up container {container:?}"),
+                }
+            }
         }
-
-        let cmd = Command::new(cmd_name)
-            .args(["container", "kill", &self.name])
-            .assert();
-
-        let cmd = cmd.get_output();
-
-        if cmd.status.success() {
-            println!("Container {:?} cleaned up successfully", self.name);
-        } else {
-            println!("Failed to clean up container {:?}", self.name);
-        }
-    }
-}
-
-pub fn podman_cleanup(name: &str) -> ContainerCleanup {
-    ContainerCleanup {
-        name: name.to_string(),
     }
 }
 

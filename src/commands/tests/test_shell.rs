@@ -19,7 +19,7 @@ fn test_cmd_shell_podman() -> Result<()> {
     println!("Container {:?}", container_name);
 
     // kill container on drop
-    let _container = podman_cleanup(container_name);
+    let _container = Container::Podman(container_name);
 
     let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     c.args(["shell"]);
@@ -61,7 +61,7 @@ fn test_cmd_start_shell_podman() -> Result<()> {
     let container_name = "test_arcam";
 
     // kill container on drop
-    let _container = podman_cleanup("test_arcam");
+    let _container = Container::Podman("test_arcam");
     println!("Container {:?}", container_name);
 
     let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;

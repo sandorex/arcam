@@ -1,0 +1,444 @@
+[
+     {
+          "Id": "78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa",
+          "Created": "2025-02-10T09:37:07.807524533+01:00",
+          "Path": "/run/podman-init",
+          "Args": [
+               "--",
+               "/arcam/exe",
+               "init"
+          ],
+          "State": {
+               "OciVersion": "1.2.0",
+               "Status": "running",
+               "Running": true,
+               "Paused": false,
+               "Restarting": false,
+               "OOMKilled": false,
+               "Dead": false,
+               "Pid": 5778,
+               "ConmonPid": 5775,
+               "ExitCode": 0,
+               "Error": "",
+               "StartedAt": "2025-02-10T09:37:08.003102808+01:00",
+               "FinishedAt": "0001-01-01T00:00:00Z",
+               "CgroupPath": "/user.slice/user-1000.slice/user@1000.service/user.slice/libpod-78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa.scope",
+               "CheckpointedAt": "0001-01-01T00:00:00Z",
+               "RestoredAt": "0001-01-01T00:00:00Z"
+          },
+          "Image": "86a5658fe1c05df756f375cf8c8d3f7ab19b19811792bb7baa82f4ddbd23d1f9",
+          "ImageDigest": "sha256:52ab3bb009758924c16bc7b4e72b82180445789f5ae79cf0366fe454b5a32a28",
+          "ImageName": "ghcr.io/sandorex/arcam-fedora:latest",
+          "Rootfs": "",
+          "Pod": "",
+          "ResolvConfPath": "/run/user/1000/containers/overlay-containers/78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa/userdata/resolv.conf",
+          "HostnamePath": "/run/user/1000/containers/overlay-containers/78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa/userdata/hostname",
+          "HostsPath": "/run/user/1000/containers/overlay-containers/78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa/userdata/hosts",
+          "StaticDir": "/home/sandorex/.local/share/containers/storage/overlay-containers/78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa/userdata",
+          "OCIConfigPath": "/home/sandorex/.local/share/containers/storage/overlay-containers/78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa/userdata/config.json",
+          "OCIRuntime": "crun",
+          "ConmonPidFile": "/run/user/1000/containers/overlay-containers/78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa/userdata/conmon.pid",
+          "PidFile": "/run/user/1000/containers/overlay-containers/78d8d26cc93cad9bddcfe52227353177511907ca1a326b391f7d1dff8146f0aa/userdata/pidfile",
+          "Name": "wrathful-arcam",
+          "RestartCount": 0,
+          "Driver": "overlay",
+          "MountLabel": "system_u:object_r:container_file_t:s0:c1022,c1023",
+          "ProcessLabel": "",
+          "AppArmorProfile": "",
+          "EffectiveCaps": [
+               "CAP_CHOWN",
+               "CAP_DAC_OVERRIDE",
+               "CAP_FOWNER",
+               "CAP_FSETID",
+               "CAP_KILL",
+               "CAP_NET_BIND_SERVICE",
+               "CAP_SETFCAP",
+               "CAP_SETGID",
+               "CAP_SETPCAP",
+               "CAP_SETUID",
+               "CAP_SYS_CHROOT"
+          ],
+          "BoundingCaps": [
+               "CAP_CHOWN",
+               "CAP_DAC_OVERRIDE",
+               "CAP_FOWNER",
+               "CAP_FSETID",
+               "CAP_KILL",
+               "CAP_NET_BIND_SERVICE",
+               "CAP_SETFCAP",
+               "CAP_SETGID",
+               "CAP_SETPCAP",
+               "CAP_SETUID",
+               "CAP_SYS_CHROOT"
+          ],
+          "ExecIDs": [
+               "1537ef48b64f98b3cec96e4d903eb9cceb7efeb189294926cb75e532ca510416"
+          ],
+          "GraphDriver": {
+               "Name": "overlay",
+               "Data": {
+                    "LowerDir": "/home/sandorex/.local/share/containers/storage/overlay/26371b68f4cda9c76119cc6ae2c398dfa0211091254127076936502726db6db2/diff",
+                    "MergedDir": "/home/sandorex/.local/share/containers/storage/overlay/43dece48d5035ffc1808d00a64451f7dd4ce08dcc31901e5b141ede7f84f9dac/merged",
+                    "UpperDir": "/home/sandorex/.local/share/containers/storage/overlay/43dece48d5035ffc1808d00a64451f7dd4ce08dcc31901e5b141ede7f84f9dac/diff",
+                    "WorkDir": "/home/sandorex/.local/share/containers/storage/overlay/43dece48d5035ffc1808d00a64451f7dd4ce08dcc31901e5b141ede7f84f9dac/work"
+               }
+          },
+          "Mounts": [
+               {
+                    "Type": "volume",
+                    "Name": "box-cargo",
+                    "Source": "/home/sandorex/.local/share/containers/storage/volumes/box-cargo/_data",
+                    "Destination": "/home/sandorex/.cargo/registry",
+                    "Driver": "local",
+                    "Mode": "",
+                    "Options": [
+                         "nosuid",
+                         "nodev",
+                         "rbind"
+                    ],
+                    "RW": true,
+                    "Propagation": "rprivate"
+               },
+               {
+                    "Type": "volume",
+                    "Name": "box-rustup",
+                    "Source": "/home/sandorex/.local/share/containers/storage/volumes/box-rustup/_data",
+                    "Destination": "/opt/rustup",
+                    "Driver": "local",
+                    "Mode": "",
+                    "Options": [
+                         "nosuid",
+                         "nodev",
+                         "rbind"
+                    ],
+                    "RW": true,
+                    "Propagation": "rprivate"
+               },
+               {
+                    "Type": "volume",
+                    "Name": "box-nvim",
+                    "Source": "/home/sandorex/.local/share/containers/storage/volumes/box-nvim/_data",
+                    "Destination": "/home/sandorex/.local/share/nvim",
+                    "Driver": "local",
+                    "Mode": "",
+                    "Options": [
+                         "nosuid",
+                         "nodev",
+                         "rbind"
+                    ],
+                    "RW": true,
+                    "Propagation": "rprivate"
+               },
+               {
+                    "Type": "bind",
+                    "Source": "/home/sandorex/.local/bin/arcam",
+                    "Destination": "/arcam/exe",
+                    "Driver": "",
+                    "Mode": "",
+                    "Options": [
+                         "nocopy",
+                         "rbind"
+                    ],
+                    "RW": false,
+                    "Propagation": "rprivate"
+               },
+               {
+                    "Type": "bind",
+                    "Source": "/usr/share/terminfo",
+                    "Destination": "/host/usr/share/terminfo",
+                    "Driver": "",
+                    "Mode": "",
+                    "Options": [
+                         "rbind"
+                    ],
+                    "RW": false,
+                    "Propagation": "rprivate"
+               },
+               {
+                    "Type": "bind",
+                    "Source": "/etc/terminfo",
+                    "Destination": "/host/etc/terminfo",
+                    "Driver": "",
+                    "Mode": "",
+                    "Options": [
+                         "rbind"
+                    ],
+                    "RW": false,
+                    "Propagation": "rprivate"
+               },
+               {
+                    "Type": "bind",
+                    "Source": "/mnt/slowmf/ws/projects/arcam",
+                    "Destination": "/home/sandorex/ws/arcam",
+                    "Driver": "",
+                    "Mode": "",
+                    "Options": [
+                         "rbind"
+                    ],
+                    "RW": true,
+                    "Propagation": "rprivate"
+               }
+          ],
+          "Dependencies": [],
+          "NetworkSettings": {
+               "EndpointID": "",
+               "Gateway": "",
+               "IPAddress": "",
+               "IPPrefixLen": 0,
+               "IPv6Gateway": "",
+               "GlobalIPv6Address": "",
+               "GlobalIPv6PrefixLen": 0,
+               "MacAddress": "",
+               "Bridge": "",
+               "SandboxID": "",
+               "HairpinMode": false,
+               "LinkLocalIPv6Address": "",
+               "LinkLocalIPv6PrefixLen": 0,
+               "Ports": {},
+               "SandboxKey": "/run/user/1000/netns/netns-d17c8fc1-f6d2-f5bf-e7d6-8f966f9c0344"
+          },
+          "Namespace": "",
+          "IsInfra": false,
+          "IsService": false,
+          "KubeExitCodePropagation": "invalid",
+          "lockNumber": 0,
+          "Config": {
+               "Hostname": "thorium",
+               "Domainname": "",
+               "User": "root",
+               "AttachStdin": false,
+               "AttachStdout": false,
+               "AttachStderr": false,
+               "Tty": false,
+               "OpenStdin": false,
+               "StdinOnce": false,
+               "Env": [
+                    "LANG=en_US.UTF-8",
+                    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    "XDG_RUNTIME_DIR=/run/user/1000",
+                    "ARCAM_VERSION=0.1.10",
+                    "NVIM_FORCE_OSC52=true",
+                    "HOST_USER_GID=1000",
+                    "TERMINFO_DIRS=/host/usr/share/terminfo:/host/etc/terminfo:/usr/share/terminfo:/etc/terminfo",
+                    "HOST_USER=sandorex",
+                    "HOST_USER_UID=1000",
+                    "LC_ALL=en_US.UTF-8",
+                    "CONTAINER_ENGINE=podman",
+                    "manager=podman",
+                    "RUSTUP_HOME=/opt/rustup",
+                    "container=oci",
+                    "arcam=arcam",
+                    "CONTAINER_NAME=wrathful-arcam",
+                    "HOSTNAME=thorium",
+                    "HOME=/root"
+               ],
+               "Cmd": [
+                    "init"
+               ],
+               "Image": "ghcr.io/sandorex/arcam-fedora:latest",
+               "Volumes": null,
+               "WorkingDir": "/",
+               "Entrypoint": [
+                    "/arcam/exe"
+               ],
+               "OnBuild": null,
+               "Labels": {
+                    "arcam": "0.1.10",
+                    "com.github.containers.toolbox": "true",
+                    "container_dir": "/home/sandorex/ws/arcam",
+                    "default_shell": "/bin/fish",
+                    "host_dir": "/mnt/slowmf/ws/projects/arcam"
+               },
+               "Annotations": {
+                    "io.container.manager": "libpod",
+                    "io.podman.annotations.autoremove": "TRUE",
+                    "io.podman.annotations.init": "TRUE",
+                    "io.podman.annotations.label": "disable",
+                    "io.podman.annotations.userns": "keep-id",
+                    "org.opencontainers.image.stopSignal": "15",
+                    "org.systemd.property.KillSignal": "15",
+                    "org.systemd.property.TimeoutStopUSec": "uint64 10000000",
+                    "run.oci.keep_original_groups": "1"
+               },
+               "StopSignal": "SIGTERM",
+               "HealthcheckOnFailureAction": "none",
+               "HealthLogDestination": "local",
+               "HealthcheckMaxLogCount": 5,
+               "HealthcheckMaxLogSize": 500,
+               "CreateCommand": [
+                    "podman",
+                    "run",
+                    "-d",
+                    "--rm",
+                    "--security-opt=label=disable",
+                    "--user=root",
+                    "--init",
+                    "--detach-keys=",
+                    "--name=wrathful-arcam",
+                    "--label=manager=podman",
+                    "--label=arcam=0.1.10",
+                    "--label=host_dir=/mnt/slowmf/ws/projects/arcam",
+                    "--label=container_dir=/home/sandorex/ws/arcam",
+                    "--label=default_shell=/bin/fish",
+                    "--env=arcam=arcam",
+                    "--env=ARCAM_VERSION=0.1.10",
+                    "--env=manager=podman",
+                    "--env=CONTAINER_ENGINE=podman",
+                    "--env=CONTAINER_NAME=wrathful-arcam",
+                    "--env=HOST_USER=sandorex",
+                    "--env=HOST_USER_UID=1000",
+                    "--env=HOST_USER_GID=1000",
+                    "--env=XDG_RUNTIME_DIR=/run/user/1000",
+                    "--volume=/mnt/slowmf/ws/projects/arcam:/home/sandorex/ws/arcam",
+                    "--volume=/home/sandorex/.local/bin/arcam:/arcam/exe:ro,nocopy",
+                    "--entrypoint=/arcam/exe",
+                    "--hostname=thorium",
+                    "--userns=keep-id",
+                    "--group-add=keep-groups",
+                    "--ulimit=host",
+                    "--tz=local",
+                    "--env=NVIM_FORCE_OSC52=true",
+                    "--volume=/usr/share/terminfo:/host/usr/share/terminfo:ro",
+                    "--volume=/etc/terminfo:/host/etc/terminfo:ro",
+                    "--env=TERMINFO_DIRS=/host/usr/share/terminfo:/host/etc/terminfo:/usr/share/terminfo:/etc/terminfo",
+                    "--volume=box-nvim:/home/sandorex/.local/share/nvim",
+                    "--volume=box-cargo:/home/sandorex/.cargo/registry",
+                    "--volume=box-rustup:/opt/rustup",
+                    "ghcr.io/sandorex/arcam-fedora",
+                    "init"
+               ],
+               "Timezone": "local",
+               "Umask": "0022",
+               "Timeout": 0,
+               "StopTimeout": 10,
+               "Passwd": true,
+               "sdNotifyMode": "container"
+          },
+          "HostConfig": {
+               "Binds": [
+                    "box-cargo:/home/sandorex/.cargo/registry:rw,rprivate,nosuid,nodev,rbind",
+                    "box-rustup:/opt/rustup:rw,rprivate,nosuid,nodev,rbind",
+                    "box-nvim:/home/sandorex/.local/share/nvim:rw,rprivate,nosuid,nodev,rbind",
+                    "/home/sandorex/.local/bin/arcam:/arcam/exe:ro,nocopy,rprivate,rbind",
+                    "/usr/share/terminfo:/host/usr/share/terminfo:ro,rprivate,rbind",
+                    "/etc/terminfo:/host/etc/terminfo:ro,rprivate,rbind",
+                    "/mnt/slowmf/ws/projects/arcam:/home/sandorex/ws/arcam:rw,rprivate,rbind"
+               ],
+               "CgroupManager": "systemd",
+               "CgroupMode": "private",
+               "ContainerIDFile": "",
+               "LogConfig": {
+                    "Type": "journald",
+                    "Config": null,
+                    "Path": "",
+                    "Tag": "",
+                    "Size": "0B"
+               },
+               "NetworkMode": "pasta",
+               "PortBindings": {},
+               "RestartPolicy": {
+                    "Name": "no",
+                    "MaximumRetryCount": 0
+               },
+               "AutoRemove": true,
+               "AutoRemoveImage": false,
+               "Annotations": {
+                    "io.container.manager": "libpod",
+                    "io.podman.annotations.autoremove": "TRUE",
+                    "io.podman.annotations.init": "TRUE",
+                    "io.podman.annotations.label": "disable",
+                    "io.podman.annotations.userns": "keep-id",
+                    "org.opencontainers.image.stopSignal": "15",
+                    "org.systemd.property.KillSignal": "15",
+                    "org.systemd.property.TimeoutStopUSec": "uint64 10000000",
+                    "run.oci.keep_original_groups": "1"
+               },
+               "VolumeDriver": "",
+               "VolumesFrom": null,
+               "CapAdd": [],
+               "CapDrop": [],
+               "Dns": [],
+               "DnsOptions": [],
+               "DnsSearch": [],
+               "ExtraHosts": [],
+               "GroupAdd": [],
+               "IpcMode": "shareable",
+               "Cgroup": "",
+               "Cgroups": "default",
+               "Links": null,
+               "OomScoreAdj": 0,
+               "PidMode": "private",
+               "Privileged": false,
+               "PublishAllPorts": false,
+               "ReadonlyRootfs": false,
+               "SecurityOpt": [
+                    "label=disable"
+               ],
+               "Tmpfs": {},
+               "UTSMode": "private",
+               "UsernsMode": "private",
+               "IDMappings": {
+                    "UidMap": [
+                         "0:1:1000",
+                         "1000:0:1",
+                         "1001:1001:64536"
+                    ],
+                    "GidMap": [
+                         "0:1:1000",
+                         "1000:0:1",
+                         "1001:1001:64536"
+                    ]
+               },
+               "ShmSize": 65536000,
+               "Runtime": "oci",
+               "ConsoleSize": [
+                    0,
+                    0
+               ],
+               "Isolation": "",
+               "CpuShares": 0,
+               "Memory": 0,
+               "NanoCpus": 0,
+               "CgroupParent": "user.slice",
+               "BlkioWeight": 0,
+               "BlkioWeightDevice": null,
+               "BlkioDeviceReadBps": null,
+               "BlkioDeviceWriteBps": null,
+               "BlkioDeviceReadIOps": null,
+               "BlkioDeviceWriteIOps": null,
+               "CpuPeriod": 0,
+               "CpuQuota": 0,
+               "CpuRealtimePeriod": 0,
+               "CpuRealtimeRuntime": 0,
+               "CpusetCpus": "",
+               "CpusetMems": "",
+               "Devices": [],
+               "DiskQuota": 0,
+               "KernelMemory": 0,
+               "MemoryReservation": 0,
+               "MemorySwap": 0,
+               "MemorySwappiness": 0,
+               "OomKillDisable": false,
+               "Init": true,
+               "PidsLimit": 2048,
+               "Ulimits": [
+                    {
+                         "Name": "RLIMIT_NOFILE",
+                         "Soft": 1048576,
+                         "Hard": 1048576
+                    },
+                    {
+                         "Name": "RLIMIT_NPROC",
+                         "Soft": 111136,
+                         "Hard": 111136
+                    }
+               ],
+               "CpuCount": 0,
+               "CpuPercent": 0,
+               "IOMaximumIOps": 0,
+               "IOMaximumBandwidth": 0,
+               "CgroupConf": null
+          }
+     }
+]
+
