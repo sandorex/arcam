@@ -1,9 +1,6 @@
 //! Contains helper functions for tests
-#![allow(dead_code)]
-
 use assert_cmd::Command;
 use std::error::Error;
-use super::EngineKind;
 
 #[allow(unused_imports)]
 pub mod prelude {
@@ -16,14 +13,11 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 /// RAII structure to kill container on drop
 pub struct ContainerCleanup {
     name: String,
-    engine: EngineKind,
 }
 
 impl Drop for ContainerCleanup {
     fn drop(&mut self) {
-        let cmd_name = match self.engine {
-            EngineKind::Podman => "podman",
-        };
+        let cmd_name = "podman";
 
         let exists = Command::new(cmd_name)
             .args(["container", "exists", &self.name])
@@ -53,7 +47,6 @@ impl Drop for ContainerCleanup {
 
 pub fn podman_cleanup(name: &str) -> ContainerCleanup {
     ContainerCleanup {
-        engine: EngineKind::Podman,
         name: name.to_string(),
     }
 }

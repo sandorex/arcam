@@ -1,10 +1,10 @@
-mod engine;
+// mod engine;
 mod command;
 
 #[cfg(test)]
 pub mod tests;
 
-pub use engine::*;
+// pub use engine::*;
 pub use command::*;
 
 /// Generate random number using `/dev/urandom`

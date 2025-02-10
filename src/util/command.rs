@@ -7,7 +7,6 @@ pub mod command_extensions {
     pub use super::{CommandExt, CommandOutputExt};
 }
 
-// TODO add output and status commands that print using log::debug!
 /// Simple extension trait to avoid duplicating code, allow easy conversion to `ExitCode`
 pub trait CommandOutputExt {
     /// Convert into `std::process::ExitCode` easily consistantly
@@ -33,6 +32,11 @@ impl CommandOutputExt for std::process::Output {
 pub trait CommandExt {
     /// Prints the command in readable and copy-able format
     fn print_escaped_cmd(&self);
+
+    // /// Returns prettily formatted shell command
+    // fn get_full_command_pretty() -> String;
+
+    fn get_full_command(&self) -> String;
 
     /// Wrapper around `status` to provide nice anyhow error
     fn run_interactive(&mut self) -> Result<std::process::ExitStatus>;
@@ -63,9 +67,19 @@ impl CommandExt for Command {
         }
     }
 
+    fn get_full_command(&self) -> String {
+        format!(
+            "{} {}",
+            self.get_program().to_string_lossy(),
+            self.get_args().collect::<Vec<_>>().join(std::ffi::OsStr::new(" ")).to_string_lossy(),
+        )
+    }
+
     fn run_interactive(&mut self) -> Result<std::process::ExitStatus> {
         let status = self.status()
             .with_context(|| anyhow!("Could not execute {:?}", self.get_program()))?;
+
+        log::debug!("Executing command {:?} (interactive)", self.get_full_command());
 
         if status.success() {
             Ok(status)
@@ -77,6 +91,20 @@ impl CommandExt for Command {
     fn run_get_output(&mut self) -> Result<std::process::Output> {
         let output = self.output()
             .with_context(|| anyhow!("Could not execute {:?}", self.get_program()))?;
+
+        log::debug!(
+        "Executing command {:?} (piped)
+  STDOUT: {:?}
+  STDERR: {:?}
+  STATUS: {:?}",
+            self.get_full_command(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stdout),
+            output.status.to_string(),
+        );
+        // log::debug!("stdout: {:?}", String::from_utf8_lossy(&output.stdout));
+        // log::debug!("stderr: {:?}", String::from_utf8_lossy(&output.stdout));
+        // log::debug!("Executing command {:?} (piped)", self.get_full_command());
 
         if output.status.success() {
             Ok(output)

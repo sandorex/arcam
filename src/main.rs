@@ -4,11 +4,11 @@ mod commands;
 mod config;
 mod context;
 mod vars;
-mod devcontainers;
+mod engine;
+// mod devcontainers;
 
 use clap::Parser;
 use cli::CliCommands;
-use util::Engine;
 use anyhow::anyhow;
 
 pub use vars::*;
@@ -39,11 +39,11 @@ fn main() -> anyhow::Result<()> {
     simple_logger::init_with_level(args.log_level)?;
 
     let get_ctx = || {
-        Context::new(
-            args.dry_run,
-            Engine::find_available_engine()
-                .ok_or_else(|| anyhow!("Could not find podman in PATH"))?
-        )
+        if !util::executable_in_path("podman") {
+            return Err(anyhow!("Could not find podman in PATH"));
+        }
+
+        Context::new(args.dry_run)
     };
 
     match args.cmd {

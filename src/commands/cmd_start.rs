@@ -1,5 +1,5 @@
 use crate::{APP_NAME, ENV_VAR_PREFIX, VERSION};
-use crate::util::{self, rand, EngineKind};
+use crate::util::{self, rand};
 use crate::prelude::*;
 use crate::util::command_extensions::*;
 use crate::cli::{CmdStartArgs, ConfigArg};
@@ -379,7 +379,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         };
 
         // expand vars in engine args and append to cli args
-        for i in config.engine_args.iter().chain(config.get_engine_args(&ctx.engine).iter()) {
+        for i in config.engine_args.iter() {
             cli_args.engine_args.push(
                 shellexpand::env_with_context_no_errors(&i, context_getter).to_string()
             );
@@ -420,11 +420,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     log::debug!("Using image {container_image:?}");
 
     // allow dry-run regardless if the container exists
-    if !ctx.dry_run {
-        // quit pre-emptively if container already exists
-        if ctx.get_container_status(&container_name).is_some() {
-            return Err(anyhow!("Container {:?} already exists", container_name));
-        }
+    if !ctx.dry_run && ctx.engine_container_exists(&container_name) {
+        return Err(anyhow!("Container with name {:?} already exists", container_name));
     }
 
     // set default shell to bash if not set already
@@ -434,7 +431,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     log::info!("Using {:?} as the shell", cli_args.shell);
 
-    let mut cmd = Command::new(&ctx.engine.path);
+    let mut cmd = ctx.engine_command();
     cmd.args([
         "run", "-d", "--rm",
         "--security-opt=label=disable",
@@ -450,15 +447,15 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     cmd.args([
         format!("--name={}", container_name),
-        format!("--label=manager={}", ctx.engine),
+        // format!("--label=manager={}", ctx.engine),
         format!("--label={}={}", APP_NAME, VERSION),
         format!("--label={}={}", crate::CONTAINER_LABEL_HOST_DIR, ctx.cwd.to_string_lossy()),
         format!("--label={}={}", crate::CONTAINER_LABEL_CONTAINER_DIR, main_project_dir),
         format!("--label={}={}", crate::CONTAINER_LABEL_USER_SHELL, cli_args.shell.as_ref().unwrap()),
         format!("--env={0}={0}", APP_NAME),
         format!("--env={}={}", ENV_VAR_PREFIX!("VERSION"), VERSION),
-        format!("--env=manager={}", ctx.engine),
-        format!("--env=CONTAINER_ENGINE={}", ctx.engine),
+        // format!("--env=manager={}", ctx.engine),
+        // format!("--env=CONTAINER_ENGINE={}", ctx.engine),
         format!("--env=CONTAINER_NAME={}", container_name),
         format!("--env=HOST_USER={}", ctx.user),
         format!("--env=HOST_USER_UID={}", ctx.user_id),
@@ -471,21 +468,21 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!("--hostname={}", get_hostname()?),
     ]);
 
-    // engine specific args
-    match ctx.engine.kind {
-        EngineKind::Podman => {
-            cmd.args([
-                "--userns=keep-id",
-                "--group-add=keep-groups",
+    // // engine specific args
+    // match ctx.engine.kind {
+    //     EngineKind::Podman => {
+    cmd.args([
+        "--userns=keep-id",
+        "--group-add=keep-groups",
 
-                // the default ulimit is low
-                "--ulimit=host",
+        // the default ulimit is low
+        "--ulimit=host",
 
-                // use same timezone as host
-                "--tz=local",
-            ]);
-        },
-    }
+        // use same timezone as host
+        "--tz=local",
+    ]);
+    //     },
+    // }
 
     // add the env vars
     for e in &cli_args.env {

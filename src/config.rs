@@ -4,7 +4,6 @@ use code_docs::{code_docs_struct, DocumentedStruct};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use crate::util::Engine;
 
 // TODO how do i do code_docs with the enum?
 // TODO use this everywhere
@@ -133,21 +132,6 @@ code_docs_struct! {
         /// Environ vars are expanded
         #[serde(default)]
         pub engine_args: Vec<String>,
-
-        /// Args passed to the engine, if its podman
-        ///
-        /// Environ vars are expanded
-        #[serde(default)]
-        pub engine_args_podman: Vec<String>,
-    }
-}
-
-impl Config {
-    /// Get engine args for specific engine
-    pub fn get_engine_args(&self, engine: &Engine) -> &Vec<String> {
-        match engine.kind {
-            crate::util::EngineKind::Podman => &self.engine_args_podman,
-        }
     }
 }
 
@@ -161,7 +145,6 @@ mod tests {
 version = 1
 image = "fedora"
 engine_args = [ "default" ]
-engine_args_podman = [ "podman" ]
 "#;
 
         let result = ConfigFile::config_from_str(cfg_text);
@@ -171,7 +154,6 @@ engine_args_podman = [ "podman" ]
         assert_eq!(result_ok, Config {
             image: "fedora".into(),
             engine_args: vec!["default".into()],
-            engine_args_podman: vec!["podman".into()],
 
             ..Default::default()
         });

@@ -12,7 +12,7 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
 
             cli_args.name = containers.first().unwrap().clone();
         }
-    } else if !ctx.dry_run && ctx.get_container_status(&cli_args.name).is_none() {
+    } else if !ctx.dry_run && ctx.engine_container_exists(&cli_args.name) {
         return Err(anyhow!("Container {:?} does not exist", &cli_args.name));
     }
 
