@@ -10,8 +10,11 @@ use std::path::{Path, PathBuf};
 fn get_hostname() -> Result<String> {
     // try to get hostname from env var
     if let Ok(env_hostname) = std::env::var("HOSTNAME") {
+        log::debug!("Getting hostname from environ");
         return Ok(env_hostname);
     }
+
+    log::debug!("Getting hostname using hostname command");
 
     // then as a fallback use hostname executable
     let cmd = Command::new("hostname")
@@ -21,7 +24,7 @@ fn get_hostname() -> Result<String> {
     let hostname = String::from_utf8_lossy(&cmd.stdout);
 
     if !cmd.status.success() || hostname.is_empty() {
-        panic!("Unable to get hostname from host");
+        return Err(anyhow!("Unable to get hostname from host"));
     }
 
     Ok(hostname.trim().into())
@@ -48,9 +51,12 @@ fn generate_name() -> String {
 fn find_terminfo() -> Vec<String> {
     let mut args: Vec<String> = vec![];
 
+    log::debug!("Looking for terminfo directories on host system");
+
     let mut existing: Vec<String> = vec![];
     for x in ["/usr/share/terminfo", "/usr/lib/terminfo", "/etc/terminfo"] {
         if std::path::Path::new(x).exists() {
+            log::debug!("Found {x:?}");
             args.push(format!("--volume={0}:/host{0}:ro", x));
             existing.push(x.into());
         }
@@ -110,6 +116,8 @@ fn mount_wayland(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) -> R
         if let Ok(wayland_display) = std::env::var(crate::ENV_WAYLAND_DISPLAY).or(std::env::var("WAYLAND_DISPLAY")) {
             let socket_path = format!("/run/user/{}/{}", ctx.user_id, wayland_display);
             if Path::new(&socket_path).exists() {
+                log::debug!("Found wayland socket at {socket_path:?}");
+
                 // TODO pass XDG_CURRENT_DESKTOP XDG_SESSION_TYPE
                 cmd.args([
                     format!("--volume={0}:{0}", socket_path),
@@ -155,6 +163,8 @@ fn mount_additional_mounts(ws_dir: &Path, cli_args: &CmdStartArgs, cmd: &mut Com
             // get the absolute path
             let mount = mount.canonicalize().unwrap();
 
+            log::debug!("Mounting additional mount {mount:?}");
+
             cmd.arg(format!("--volume={}:{}/{}", mount.to_string_lossy(), ws_dir.to_string_lossy(), mount.file_name().unwrap().to_string_lossy()));
         } else {
             return Err(anyhow!("Mountpoint {:?} does not exist", mount));
@@ -174,6 +184,8 @@ fn mount_audio(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) -> Res
                 format!("--volume={0}:{0}", socket_path),
                 format!("--env=PULSE_SERVER=unix:{}", socket_path),
             ]);
+
+            log::debug!("Pulseaudio socket found at {socket_path:?}");
         } else {
             return Err(anyhow!("Could not find pulseaudio socket to pass to the container"));
         }
@@ -190,6 +202,8 @@ fn mount_ssh_agent(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) ->
                     format!("--volume={}:/run/user/{}/ssh-auth", ssh_sock, ctx.user_id),
                     format!("--env=SSH_AUTH_SOCK=/run/user/{}/ssh-auth", ctx.user_id),
                 ]);
+
+                log::debug!("ssh-agent socket found at {ssh_sock:?}");
             } else {
                 return Err(anyhow!("Socket does not exist at {:?} (ssh-agent)", ssh_sock));
             }
@@ -210,6 +224,8 @@ fn mount_session_bus(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
                         format!("--volume={}:/run/user/{}/bus", dbus_sock, ctx.user_id),
                         format!("--env=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{}/bus", ctx.user_id),
                     ]);
+
+                    log::debug!("Session dbus socket found at {dbus_sock:?}");
                 } else {
                     return Err(anyhow!("Socket does not exist at {:?} (session bus)", dbus_sock));
                 }
@@ -228,6 +244,8 @@ fn mount_session_bus(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
 pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str) -> Result<()> {
     use std::io::Write;
     use std::process::Stdio;
+
+    log::trace!("Writing data to file {file:?}");
 
     // write to file using tee
     #[allow(clippy::zombie_processes)]
@@ -284,9 +302,12 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     let mut persist: Vec<(String, String)> = vec![];
     let mut persist_user: Vec<(String, String)> = vec![];
 
+    log::debug!("Container name set to {container_name:?}");
+
     // TODO shellexpand env expansion should error out!
     if let ConfigArg::Image(image) = &cli_args.config {
         // no config used
+
         container_image = image.to_string();
         on_init_pre = "".into();
         on_init_post = "".into();
@@ -294,8 +315,14 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         // get config from file or by name
         let config = match &cli_args.config {
             ConfigArg::Image(_) => unreachable!(),
-            ConfigArg::File(file) => crate::config::ConfigFile::config_from_file(file)?,
-            ConfigArg::Config(config_name) => ctx.find_config(config_name)?,
+            ConfigArg::File(file) => {
+                log::debug!("Loading config file {:?}", file);
+                crate::config::ConfigFile::config_from_file(file)?
+            },
+            ConfigArg::Config(config_name) => {
+                log::debug!("Loading config @{:?}", config_name);
+                ctx.find_config(config_name)?
+            },
         };
 
         if let Some(host_pre_init) = &config.host_pre_init {
@@ -342,7 +369,12 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 "RAND" | "RANDOM" => Some(rand().to_string()),
 
                 // fallback to environ
-                _ => std::env::var(input).ok(),
+                _ => if let Ok(var) = std::env::var(input) {
+                    Some(var)
+                } else {
+                    log::warn!("Could not expand {input:?} in config");
+                    None
+                },
             }
         };
 
@@ -385,6 +417,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         on_init_post = cli_args.on_init_post.join("\n") + &config.on_init_post.unwrap_or_default();
     }
 
+    log::debug!("Using image {container_image:?}");
+
     // allow dry-run regardless if the container exists
     if !ctx.dry_run {
         // quit pre-emptively if container already exists
@@ -397,6 +431,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     if cli_args.shell.is_none() {
         cli_args.shell = Some("/bin/bash".into());
     }
+
+    log::info!("Using {:?} as the shell", cli_args.shell);
 
     let mut cmd = Command::new(&ctx.engine.path);
     cmd.args([
@@ -508,6 +544,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         "init",
     ]);
 
+    // TODO log whole command if TRACE
+
     if ctx.dry_run {
         cmd.print_escaped_cmd();
 
@@ -526,7 +564,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         let id = id.trim();
 
         // check if file exists in the container, used for flag files
-        let file_exists = |file: &str| -> Result<bool> {
+        let container_file_exists = |file: &str| -> Result<bool> {
+            log::trace!("Testing for existance of {file:?}");
+
             let cmd = ctx.engine_command()
                 .args(["exec", id, "test", "-f", file])
                 .output()
@@ -542,11 +582,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 x => Err(anyhow!("Unknown error during container initialization ({})", x)),
             }
         };
-
-        // wait until container finishes pre-initialization
-        while !file_exists(crate::FLAG_FILE_PRE_INIT)? {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
 
         // write pre init script into the container
         if !on_init_pre.is_empty() {
@@ -589,15 +624,26 @@ asroot chown "$USER:$USER" {0}
             write_to_file(&ctx, id, &path, &buffer)?;
         }
 
+        log::trace!("Waiting for container preinitalization");
+
+        // wait until container finishes pre-initialization
+        while !container_file_exists(crate::FLAG_FILE_PRE_INIT)? {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
         // remove pre-init flag to start initalization
         ctx.engine_exec_root(id, vec!["rm", crate::FLAG_FILE_PRE_INIT])?;
 
+        log::trace!("Waiting for container initialization");
+
         // wait until container finishes initialization
-        while !file_exists(crate::FLAG_FILE_INIT)? {
+        while !container_file_exists(crate::FLAG_FILE_INIT)? {
             std::thread::sleep(std::time::Duration::from_millis(300));
         }
 
         if cli_args.enter {
+            log::debug!("Launching shell");
+
             // launch shell right away
             crate::commands::open_shell(ctx, crate::cli::CmdShellArgs {
                 name: container_name,

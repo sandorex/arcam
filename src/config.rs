@@ -6,6 +6,16 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use crate::util::Engine;
 
+// TODO how do i do code_docs with the enum?
+// TODO use this everywhere
+// #[derive(Debug, Clone, PartialEq, Default, Deserialize, Serialize)]
+// pub enum ConfigFileNew {
+//     #[serde(rename = "1")]
+//     V1 {
+//
+//     }
+// }
+
 /// Whole config file
 #[derive(Debug, Clone, PartialEq, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

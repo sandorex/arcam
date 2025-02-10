@@ -6,7 +6,6 @@ mod context;
 mod vars;
 mod devcontainers;
 
-use std::collections::HashMap;
 use clap::Parser;
 use cli::CliCommands;
 use util::Engine;
@@ -31,13 +30,19 @@ fn main() -> anyhow::Result<()> {
             return Err(anyhow!("Running init outside a container is dangerous, qutting.."));
         }
 
+        // always enable maximum verbosity in container init
+        simple_logger::init_with_level(log::Level::max())?;
+
         return commands::container_init();
     }
+
+    simple_logger::init_with_level(args.log_level)?;
 
     let get_ctx = || {
         Context::new(
             args.dry_run,
-            Engine::find_available_engine().ok_or_else(|| anyhow!("Could not find podman in PATH"))?
+            Engine::find_available_engine()
+                .ok_or_else(|| anyhow!("Could not find podman in PATH"))?
         )
     };
 
@@ -55,6 +60,10 @@ fn main() -> anyhow::Result<()> {
         } else {
             // i do not want to create a context when i dont need it here
             commands::shell_completion_generation(x)?
+        },
+        #[cfg(debug_assertions)]
+        CliCommands::Test => {
+            println!("Test!");
         },
         CliCommands::Init => unreachable!(),
     };

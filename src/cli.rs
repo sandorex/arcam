@@ -14,6 +14,10 @@ pub struct Cli {
     #[arg(long)]
     pub dry_run: bool,
 
+    /// Increase verbosity
+    #[arg(short, long, value_name = "Error|Warn|Info|Debug|Trace", default_value_t = log::Level::Warn)]
+    pub log_level: log::Level,
+
     #[command(subcommand)]
     pub cmd: CliCommands,
 }
@@ -291,6 +295,7 @@ pub enum CliCommands {
     Config(CmdConfigArgs),
 
     /// List running containers
+    #[clap(visible_alias = "ls")]
     List(CmdListArgs),
 
     /// Show container logs in journalctl
@@ -302,6 +307,10 @@ pub enum CliCommands {
 
     /// Shell autocompletion
     Completion(CmdCompletionArgs),
+
+    /// Test function, enabled only in debug builds
+    #[cfg(debug_assertions)]
+    Test,
 
     /// Init command used to setup the container
     #[command(hide = true)]

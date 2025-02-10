@@ -108,9 +108,13 @@ impl Context {
 
     /// Get containers running in cwd
     pub fn get_cwd_container(&self) -> Option<Vec<String>> {
-        let cmd = self.engine_command()
-            .args(["container", "ls", "--format", "{{.Names}}", "--sort", "created"])
-            .args(["--filter".into(), format!("label={}={}", crate::CONTAINER_LABEL_HOST_DIR, self.cwd.to_string_lossy())])
+        let mut cmd = self.engine_command();
+        cmd.args(["container", "ls", "--format", "{{.Names}}", "--sort", "created"]);
+        cmd.args(["--filter".into(), format!("label={}={}", crate::CONTAINER_LABEL_HOST_DIR, self.cwd.to_string_lossy())]);
+
+        log::trace!("Looking for container in CWD ({:?})", self.cwd);
+
+        let cmd = cmd
             .output()
             .expect(crate::ENGINE_ERR_MSG);
 
@@ -144,6 +148,12 @@ impl Context {
         cmd.args(["exec", "--user", "root", "-it", container]);
         cmd.args(&command);
 
+        log::trace!(
+            "Executing engine root cmd \"{} {}\"",
+            self.engine.to_string(),
+            cmd.get_args().collect::<Vec<_>>().join(std::ffi::OsStr::new(" ")).to_string_lossy()
+        );
+
         let cmd_result = cmd
             .output()
             .expect(crate::ENGINE_ERR_MSG);
@@ -172,6 +182,8 @@ impl Context {
 
     /// Gets value of label on a container if it is defined
     pub fn get_container_label(&self, container: &str, label: &str) -> Option<String> {
+        log::trace!("Getting label {label:?} from container {container:?}");
+
         let key = format!(".Config.Labels.{}", label);
 
         // this looks like a mess as i need to escape curly braces
@@ -202,6 +214,8 @@ impl Context {
 
     /// Get container status if it exists
     pub fn get_container_status(&self, container: &str) -> Option<ContainerStatus> {
+        log::trace!("Getting container {container:?} status");
+
         let cmd = self.engine_command()
             .args(["container", "inspect", container, "--format", "{{.State.Status}}"])
             .output()

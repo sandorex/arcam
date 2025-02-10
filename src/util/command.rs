@@ -7,6 +7,7 @@ pub mod command_extensions {
     pub use super::{CommandExt, CommandOutputExt};
 }
 
+// TODO add output and status commands that print using log::debug!
 /// Simple extension trait to avoid duplicating code, allow easy conversion to `ExitCode`
 pub trait CommandOutputExt {
     /// Convert into `std::process::ExitCode` easily consistantly

@@ -2,8 +2,8 @@
 
 use crate::prelude::*;
 use reqwest::header::ACCEPT;
-use serde::{Deserialize, Deserializer};
-use std::{collections::HashMap, rc::Weak};
+use serde::Deserialize;
+use std::collections::HashMap;
 
 //   "annotations": {
 //     "dev.containers.metadata": "{\"id\":\"anaconda\",\"version\":\"1.0.12\",\"name\":\"Anaconda\",\"documentationURL\":\"https://github.com/devcontainers/features/tree/main/src/anaconda\",\"options\":{\"version\":{\"type\":\"string\",\"proposals\":[\"latest\"],\"default\":\"latest\",\"description\":\"Select or enter an anaconda version.\"}},\"containerEnv\":{\"CONDA_DIR\":\"/usr/local/conda\",\"PATH\":\"/usr/local/conda/bin:${PATH}\"},\"installsAfter\":[\"ghcr.io/devcontainers/features/common-utils\"]}",
@@ -20,7 +20,6 @@ pub struct ManifestConfig {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct ManifestLayer {
     #[serde(rename = "mediaType")]
     media_type: String,
@@ -30,7 +29,6 @@ pub struct ManifestLayer {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct ManifestV2 {
     #[serde(rename = "schemaVersion")]
     schema_version: u32,
@@ -42,7 +40,6 @@ pub struct ManifestV2 {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub enum Manifest {
     V2(ManifestV2),
 }
@@ -60,11 +57,94 @@ impl Manifest {
 
         let config = match version {
             2 => Manifest::V2(serde_json::from_value::<ManifestV2>(val)?),
-            _ => return Err(anyhow!("Unknown schema version {:?}", version)),
+            _ => return Err(anyhow!("Unsupported schema version {:?}", version)),
         };
 
         Ok(config)
     }
+}
+
+/// All customizations except arcam are ignored
+#[derive(Debug, Deserialize)]
+pub struct Customization {
+    // TODO allow arcam customizations in this?
+    arcam: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Feature {
+    // these are ordered as in the schema file
+    #[serde(rename = "capAdd")]
+    capability_add: Vec<String>,
+
+    #[serde(rename = "containerEnv")]
+    container_environ: HashMap<String, String>,
+
+    customizations: Customization,
+
+    description: String,
+
+    #[serde(rename = "documentationURL")]
+    documentation_url: String,
+
+    keywords: Vec<String>,
+
+    entrypoint: String,
+
+    id: String,
+
+    init: bool,
+
+    #[serde(rename = "installsAfter")]
+    installs_after: Vec<String>,
+
+    // TODO its an object
+    #[serde(rename = "dependsOn")]
+    depends_on: HashMap<String, serde_json::Value>,
+
+    #[serde(rename = "licenseURL")]
+    license_url: String,
+
+    // TODO its array of objects
+    mounts: Vec<serde_json::Value>,
+
+    name: String,
+
+    // TODO this is also a weird object
+    options: serde_json::Value,
+
+    privileged: bool,
+
+    #[serde(rename = "securityOpt")]
+    security_opt: Vec<String>,
+
+    version: String,
+
+    // TODO useless?
+    #[serde(rename = "legacyIds")]
+    legacy_ids: serde_json::Value,
+
+    deprecated: bool,
+
+    // TODO object, string or array of strinsg
+    #[serde(rename = "securityOpt")]
+    on_create_cmd: serde_json::Value,
+
+    // TODO same as on_create_cmd
+    #[serde(rename = "updateContentCommand")]
+    update_content_cmd: serde_json::Value,
+
+    // TODO same as on_create_cmd
+    #[serde(rename = "postCreateCommand")]
+    post_create_cmd: serde_json::Value,
+
+    // TODO same as on_create_cmd
+    #[serde(rename = "postStartCommand")]
+    post_start_cmd: serde_json::Value,
+
+    // TODO same as on_create_cmd
+    #[serde(rename = "postAttachCommand")]
+    post_attach_cmd: serde_json::Value,
 }
 
 // #[derive(Debug, Default)]
@@ -108,4 +188,6 @@ pub fn oci_fetch_manifest(client: &reqwest::blocking::Client, repository: &str, 
         Err(anyhow!("Could not get manifest for \"{}:{}\" from repository {:?}", namespace, tag, repository))
     }
 }
+
+// pub fn oci_pull()
 
