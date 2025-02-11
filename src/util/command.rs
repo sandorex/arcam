@@ -29,6 +29,8 @@ impl CommandOutputExt for std::process::Output {
     }
 }
 
+// TODO create a function that calls log if appropriate with the command but does not impede other
+// logic, for output/status/spawn
 pub trait CommandExt {
     /// Prints the command in readable and copy-able format
     fn print_escaped_cmd(&self);

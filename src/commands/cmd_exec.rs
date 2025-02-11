@@ -61,3 +61,40 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use assert_cmd::Command;
+    use crate::engine::Engine;
+    use super::super::test_utils::prelude::*;
+
+    #[test]
+    fn cmd_exec_podman() -> Result<()> {
+        let tempdir = tempfile::tempdir()?;
+
+        // create the container
+        let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["start", "debian:trixie"])
+            .current_dir(tempdir.path())
+            .assert()
+            .success();
+
+        let container = Container {
+            engine: Engine::Podman,
+            container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+        };
+
+        // create file in cwd
+        Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["exec", &container, "--", "touch", "file.txt"])
+            .current_dir(tempdir.path())
+            .assert()
+            .success();
+
+        assert!(tempdir.path().join("file.txt").exists(), "File not created");
+
+        Ok(())
+    }
+
+    // TODO test environment passing and --shell
+}

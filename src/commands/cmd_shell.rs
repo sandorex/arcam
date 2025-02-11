@@ -60,3 +60,101 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+    use assert_cmd::prelude::*;
+    use crate::engine::Engine;
+
+    use super::super::test_utils::prelude::*;
+    use rexpect::session::{PtyReplSession, spawn_command};
+
+    #[test]
+    fn cmd_shell_podman() -> Result<()> {
+        let tempdir = tempfile::tempdir()?;
+
+        let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["start", "debian:trixie"])
+            .current_dir(tempdir.path())
+            .assert()
+            .success();
+
+        let _container = Container {
+            engine: Engine::Podman,
+            container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+        };
+
+        let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+        c.args(["shell"]);
+        c.current_dir(tempdir.path());
+
+        let mut pty = spawn_command(c, Some(5_000)).and_then(|p| {
+            let mut session = PtyReplSession {
+                prompt: "$".to_owned(),
+                pty_session: p,
+                quit_command: Some("exit".to_owned()),
+                echo_on: true,
+            };
+
+            // wait until the prompt appears
+            session.wait_for_prompt()?;
+
+            // set prompt to something simple
+            session.send_line("export PS1='$ '")?;
+
+            // wait for prompt again
+            session.wait_for_prompt()?;
+
+            Ok(session)
+        })?;
+
+        // check if its running properly
+        pty.send_line("echo $ARCAM_VERSION")?;
+        pty.exp_string(env!("CARGO_PKG_VERSION"))?;
+        pty.wait_for_prompt()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn cmd_start_shell_podman() -> Result<()> {
+        let tempdir = tempfile::tempdir()?;
+
+        let container = Container {
+            engine: Engine::Podman,
+            container: "test_arcam".to_string(),
+        };
+
+        let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+        c.args(["start", "--name", &container, "-E", "debian:trixie"]);
+        c.current_dir(tempdir.path());
+
+        let mut pty = spawn_command(c, Some(5_000)).and_then(|p| {
+            let mut session = PtyReplSession {
+                prompt: "$".to_owned(),
+                pty_session: p,
+                quit_command: Some("exit".to_owned()),
+                echo_on: true,
+            };
+
+            // wait until the prompt appears
+            session.wait_for_prompt()?;
+
+            // set prompt to something simple
+            session.send_line("export PS1='$ '")?;
+
+            // wait for prompt again
+            session.wait_for_prompt()?;
+
+            Ok(session)
+        })?;
+
+        // check if its running properly
+        pty.send_line("echo $ARCAM_VERSION")?;
+        pty.exp_string(env!("CARGO_PKG_VERSION"))?;
+        pty.wait_for_prompt()?;
+
+        Ok(())
+    }
+}

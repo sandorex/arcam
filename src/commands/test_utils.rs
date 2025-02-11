@@ -1,10 +1,3 @@
-mod test_start;
-mod test_exists;
-// mod test_kill;
-// mod test_exec;
-// mod test_shell;
-// mod test_permissions;
-
 use std::{fmt::{Debug, Display}, ops::Deref};
 
 use crate::engine::Engine;

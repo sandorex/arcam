@@ -2,7 +2,6 @@ use assert_cmd::Command;
 use super::prelude::*;
 use crate::engine::Engine;
 
-// TODO move this into cmd_exists.rs
 #[test]
 fn cmd_exists_podman() -> Result<()> {
     let tempdir = tempfile::tempdir()?;
