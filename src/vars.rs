@@ -16,6 +16,9 @@ pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VER
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
 pub const APP_NAME_UPPERCASE: &str = env!("CARGO_PKG_NAME_UPPERCASE");
 
+/// Container label used to detect if container is made by arcam
+pub const CONTAINER_LABEL_APP: &str = env!("CARGO_PKG_NAME");
+
 /// Container label used to specify the host directory where container was started
 pub const CONTAINER_LABEL_HOST_DIR: &str = "host_dir";
 
@@ -24,6 +27,9 @@ pub const CONTAINER_LABEL_CONTAINER_DIR: &str = "container_dir";
 
 /// Container label used to specify default shell
 pub const CONTAINER_LABEL_USER_SHELL: &str = "default_shell";
+
+/// Set log level from the environ
+pub const ENV_LOG_LEVEL: &str = "LOG_LEVEL";
 
 /// Wayland socket to pass through
 pub const ENV_WAYLAND_DISPLAY: &str = ENV_VAR_PREFIX!("WAYLAND_DISPLAY");

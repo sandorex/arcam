@@ -47,16 +47,18 @@ impl Engine {
         Command::new(self.name())
     }
 
-    pub fn get_containers(&self, label: &str, value: Option<&str>) -> Result<Vec<String>> {
+    pub fn get_containers(&self, labels: Vec<(&str, Option<&str>)>) -> Result<Vec<String>> {
         let mut cmd = self.command();
 
         // just print names of the containers
         cmd.args(["container", "ls", "--format", "{{ .Names }}"]);
 
-        if let Some(value) = value {
-            cmd.arg(format!("--filter={label}={value}"));
-        } else {
-            cmd.arg(format!("--filter={label}"));
+        for (key, val) in labels {
+            if let Some(val) = val {
+                cmd.arg(format!("--filter=label={key}={val}"));
+            } else {
+                cmd.arg(format!("--filter=label={key}"));
+            }
         }
 
         let output = cmd.run_get_output()?;
@@ -99,81 +101,6 @@ impl Engine {
         Ok(())
     }
 }
-
-// #[derive(Debug)]
-// pub struct Podman {
-//     pub path: String,
-// }
-//
-// impl Engine for Podman {
-//     fn name() -> &'static str {
-//         "podman"
-//     }
-//
-//     fn exec<T: AsRef<std::ffi::OsStr>>(&self, container: &str, command: &[T]) -> Result<String> {
-//         let output = self.command()
-//             .args(["exec", "--user", "root", container])
-//             .args(command)
-//             .run_get_output()?;
-//
-//         Ok(String::from_utf8_lossy(&output.stdout).to_string())
-//     }
-//
-//     fn command(&self) -> Command {
-//         Command::new(&self.path)
-//     }
-//
-//     fn get_containers(&self, label: &str, value: Option<&str>) -> Result<Vec<String>> {
-//         let mut cmd = self.command();
-//
-//         // just print names of the containers
-//         cmd.args(["container", "ls", "--format", "{{ .Names }}"]);
-//
-//         if let Some(value) = value {
-//             cmd.arg(format!("--filter={label}={value}"));
-//         } else {
-//             cmd.arg(format!("--filter={label}"));
-//         }
-//
-//         let output = cmd.run_get_output()?;
-//
-//         Ok(String::from_utf8_lossy(&output.stdout).lines().map(|x| x.to_string()).collect())
-//     }
-//
-//     fn inspect_container(&self, container: &str) -> Result<impl ContainerInfo> {
-//         let output = self.command()
-//             .args(["inspect", container])
-//             .run_get_output()?;
-//
-//         let stdout = String::from_utf8_lossy(&output.stdout);
-//
-//         Ok(
-//             serde_json::from_str::<PodmanContainerInfo>(&stdout)
-//                 .with_context(|| "Error parsing output from \"podman inspect\"")?
-//         )
-//     }
-//
-//     fn container_exists(&self, container: &str) -> Result<bool> {
-//         let output = self.command()
-//             .args(["exists", container])
-//             .output()?;
-//
-//         match output.get_code() {
-//             0 => Ok(true),
-//             1 => Ok(false),
-//             _ => Err(anyhow!("Error checking if container {:?} exists", container)),
-//         }
-//     }
-//
-//     fn stop_container(&self, container: &str) -> Result<()> {
-//         // gentle shutdown, terminates by default after 10s
-//         self.command()
-//             .args(["container", "stop", container])
-//             .run_interactive()?;
-//
-//         Ok(())
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

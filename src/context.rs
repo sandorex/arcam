@@ -123,6 +123,13 @@ impl Context {
         }
     }
 
+    /// Get all owned containers in this directory
+    pub fn get_cwd_containers(&self) -> Result<Vec<String>> {
+        self.engine.get_containers(vec![
+            (crate::CONTAINER_LABEL_HOST_DIR, Some(&self.cwd.to_string_lossy())),
+        ])
+    }
+
     /// Creates `std::process::Command` with engine
     pub fn engine_command(&self) -> std::process::Command {
         std::process::Command::new("podman")

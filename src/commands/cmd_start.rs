@@ -6,6 +6,7 @@ use crate::cli::{CmdStartArgs, ConfigArg};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+// TODO move all these helper functions elsewhere so this file is not that big
 /// Get hostname from system using `hostname` command
 fn get_hostname() -> Result<String> {
     // try to get hostname from env var
@@ -287,11 +288,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     let main_project_dir: String = format!("{}/{}", ws_dir.to_string_lossy(), ctx.cwd.file_name().unwrap().to_string_lossy());
 
     // get containers in this cwd, i do not care if it fails
-    if let Some(x) = ctx.get_cwd_container() {
-        // check if any are running
-        if !x.is_empty() {
-            return Err(anyhow!(r#"There are containers running in current directory: {}"#, x.join(" ")));
-        }
+    let cwd_containers = ctx.get_cwd_containers()?;
+    if !cwd_containers.is_empty() {
+        return Err(anyhow!("There are containers running in current directory: {:?}", cwd_containers.join(" ")))
     }
 
     // prefer cli name over random one
@@ -447,15 +446,15 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     cmd.args([
         format!("--name={}", container_name),
-        // format!("--label=manager={}", ctx.engine),
+        format!("--label=manager={}", ctx.engine),
         format!("--label={}={}", APP_NAME, VERSION),
         format!("--label={}={}", crate::CONTAINER_LABEL_HOST_DIR, ctx.cwd.to_string_lossy()),
         format!("--label={}={}", crate::CONTAINER_LABEL_CONTAINER_DIR, main_project_dir),
         format!("--label={}={}", crate::CONTAINER_LABEL_USER_SHELL, cli_args.shell.as_ref().unwrap()),
         format!("--env={0}={0}", APP_NAME),
         format!("--env={}={}", ENV_VAR_PREFIX!("VERSION"), VERSION),
-        // format!("--env=manager={}", ctx.engine),
-        // format!("--env=CONTAINER_ENGINE={}", ctx.engine),
+        format!("--env=manager={}", ctx.engine),
+        format!("--env=CONTAINER_ENGINE={}", ctx.engine),
         format!("--env=CONTAINER_NAME={}", container_name),
         format!("--env=HOST_USER={}", ctx.user),
         format!("--env=HOST_USER_UID={}", ctx.user_id),

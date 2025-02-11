@@ -11,7 +11,7 @@ mod cmd_completion_helper;
 mod cmd_init;
 
 #[cfg(test)]
-mod tests;
+pub mod tests;
 
 pub use cmd_start::start_container;
 pub use cmd_shell::open_shell;

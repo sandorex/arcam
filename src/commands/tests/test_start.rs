@@ -1,36 +1,30 @@
 use assert_cmd::Command;
-use crate::util::tests::prelude::*;
+use crate::engine::Engine;
+use super::prelude::*;
 
+// TODO move test into cmd_start.rs
 #[test]
-fn test_cmd_start_podman() -> Result<()> {
-    let tempdir = test_temp_dir::test_temp_dir!();
+fn cmd_start_podman() -> Result<()> {
+    let tempdir = tempfile::tempdir()?;
 
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
         .args(["start", "debian:trixie"])
-        .current_dir(tempdir.as_path_untracked())
+        .current_dir(tempdir.path())
         .assert()
         .success();
 
-    let container_name = String::from_utf8_lossy(&cmd.get_output().stdout);
-    let container_name = container_name.trim();
-
-    println!("Container {:?}", container_name);
-
-    // kill container on drop
-    let _container = Container::Podman(container_name);
+    let container = Container {
+        engine: Engine::Podman,
+        container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+    };
 
     // try to start another container in same directory
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["start", "debian:trixie"])
-        .current_dir(tempdir.as_path_untracked())
+        .args(["start", "--name", &container, "debian:trixie"])
+        .current_dir(tempdir.path())
         .assert()
         .failure()
-        .stderr(format!("Error: There are containers running in current directory: {}\n", container_name));
-
-    Command::new("podman")
-        .args(["container", "exists", container_name])
-        .assert()
-        .success();
+        .stderr(format!("Error: There are containers running in current directory: {:?}\n", container));
 
     Ok(())
 }

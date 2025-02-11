@@ -15,7 +15,7 @@ pub struct Cli {
     pub dry_run: bool,
 
     /// Increase verbosity
-    #[arg(short, long, value_name = "Error|Warn|Info|Debug|Trace", default_value_t = log::Level::Warn)]
+    #[arg(short, long, value_name = "Error|Warn|Info|Debug|Trace", default_value_t = log::Level::Warn, env = crate::ENV_LOG_LEVEL)]
     pub log_level: log::Level,
 
     #[command(subcommand)]

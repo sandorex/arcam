@@ -1,14 +1,16 @@
 use assert_cmd::Command;
-use crate::util::tests::prelude::*;
+use super::prelude::*;
+use crate::engine::Engine;
 
+// TODO move this into cmd_exists.rs
 #[test]
-fn test_cmd_exists_podman() -> Result<()> {
-    let tempdir = test_temp_dir::test_temp_dir!();
+fn cmd_exists_podman() -> Result<()> {
+    let tempdir = tempfile::tempdir()?;
 
-    // it should not exist yet
+    // no cwd containers yet
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
         .args(["exists"])
-        .current_dir(tempdir.as_path_untracked())
+        .current_dir(tempdir.path())
         .assert()
         .failure()
         .code(1);
@@ -16,29 +18,27 @@ fn test_cmd_exists_podman() -> Result<()> {
     // create the container
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
         .args(["start", "debian:trixie"])
-        .current_dir(tempdir.as_path_untracked())
+        .current_dir(tempdir.path())
         .assert()
         .success();
 
-    let container_name = String::from_utf8_lossy(&cmd.get_output().stdout);
-    let container_name = container_name.trim();
+    let container = Container {
+        engine: Engine::Podman,
+        container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+    };
 
-    println!("Container {:?}", container_name);
+    assert!(!container.is_empty(), "Container name is empty");
 
-    // kill container on drop
-    let _container = Container::Podman(container_name);
+    // test with explicitly set container_name
+    Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+        .args(["exists", &container])
+        .assert()
+        .success();
 
-    // it should exist now
+    // detect container from cwd
     Command::cargo_bin(env!("CARGO_BIN_NAME"))?
         .args(["exists"])
-        .current_dir(tempdir.as_path_untracked())
-        .assert()
-        .success();
-
-    // now test with the container name
-    Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["exists", container_name])
-        .current_dir(tempdir.as_path_untracked())
+        .current_dir(tempdir.path())
         .assert()
         .success();
 
