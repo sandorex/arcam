@@ -1,5 +1,5 @@
 use crate::cli;
-use crate::util::command_extensions::*;
+use crate::command_extensions::*;
 use crate::prelude::*;
 
 pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()> {
@@ -66,7 +66,7 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
 mod tests {
     use assert_cmd::Command;
     use crate::engine::Engine;
-    use super::super::test_utils::prelude::*;
+    use crate::tests_prelude::*;
 
     #[test]
     fn cmd_exec_podman() -> Result<()> {

@@ -3,8 +3,7 @@ mod util;
 use util::*;
 use crate::{APP_NAME, ENV_VAR_PREFIX, VERSION};
 use crate::prelude::*;
-use crate::util::rand;
-use crate::util::command_extensions::*;
+use crate::command_extensions::*;
 use crate::cli::{CmdStartArgs, ConfigArg};
 use std::path::PathBuf;
 
@@ -66,7 +65,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 buf += host_pre_init;
 
                 // write to temp file
-                let path = format!("/tmp/a{}{}", rand(), rand());
+                let path = format!("/tmp/a{}{}", crate::rand(), crate::rand());
                 std::fs::write(&path, buf)?;
 
                 let argv0 = std::env::args().next().unwrap();
@@ -98,7 +97,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 "PWD" | "CWD" => Some(pwd.to_string()),
                 "HOME" => Some(home.to_string()),
                 "CONTAINER" | "CONTAINER_NAME" => Some(container_name.clone()),
-                "RAND" | "RANDOM" => Some(rand().to_string()),
+                "RAND" | "RANDOM" => Some(crate::rand().to_string()),
 
                 // fallback to environ
                 _ => if let Ok(var) = std::env::var(input) {
@@ -152,7 +151,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     log::debug!("Using image {container_image:?}");
 
     // allow dry-run regardless if the container exists
-    if !ctx.dry_run && ctx.engine_container_exists(&container_name) {
+    if !ctx.dry_run && ctx.engine.container_exists(&container_name)? {
         return Err(anyhow!("Container with name {:?} already exists", container_name));
     }
 
@@ -163,7 +162,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     log::info!("Using {:?} as the shell", cli_args.shell);
 
-    let mut cmd = ctx.engine_command();
+    let mut cmd = ctx.engine.command();
     cmd.args([
         "run", "-d", "--rm",
         "--security-opt=label=disable",
@@ -290,7 +289,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         let container_file_exists = |file: &str| -> Result<bool> {
             log::trace!("Testing for existance of {file:?}");
 
-            let cmd = ctx.engine_command()
+            let cmd = ctx.engine.command()
                 .args(["exec", id, "test", "-f", file])
                 .output()
                 .expect(crate::ENGINE_ERR_MSG);
@@ -355,7 +354,7 @@ asroot chown "$USER:$USER" {0}
         }
 
         // remove pre-init flag to start initalization
-        ctx.engine_exec_root(id, vec!["rm", crate::FLAG_FILE_PRE_INIT])?;
+        ctx.engine.exec(id, &["rm", crate::FLAG_FILE_PRE_INIT])?;
 
         log::trace!("Waiting for container initialization");
 
@@ -385,7 +384,7 @@ asroot chown "$USER:$USER" {0}
 mod tests {
     use assert_cmd::Command;
     use crate::engine::Engine;
-    use super::super::test_utils::prelude::*;
+    use crate::tests_prelude::*;
 
     #[test]
     fn cmd_start_podman() -> Result<()> {

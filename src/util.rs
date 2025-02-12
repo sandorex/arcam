@@ -1,7 +1,3 @@
-mod command;
-
-pub use command::*;
-
 /// Generate random number using `/dev/urandom`
 pub fn rand() -> u32 {
     use std::io::Read;

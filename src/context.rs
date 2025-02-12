@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::engine::Engine;
 use crate::prelude::*;
 use users::os::unix::UserExt;
-use crate::util::command_extensions::*;
+use crate::command_extensions::*;
 
 /// Context used throughout the application
 #[derive(Debug)]
@@ -98,6 +98,7 @@ impl Context {
     }
 
     /// Get containers running in cwd
+    #[deprecated]
     pub fn get_cwd_container(&self) -> Option<Vec<String>> {
         let output = self.engine_command()
             .args(["container", "lss", "--format", "{{.Names}}", "--sort", "created"])
@@ -131,11 +132,13 @@ impl Context {
     }
 
     /// Creates `std::process::Command` with engine
+    #[deprecated]
     pub fn engine_command(&self) -> std::process::Command {
         std::process::Command::new("podman")
     }
 
     /// Execute engine command and get output back, the user is root!
+    #[deprecated]
     pub fn engine_exec_root(&self, container: &str, command: Vec<&str>) -> Result<String> {
         let cmd = self.engine_command()
             .args(["exec", "--user", "root", "-it", container])
@@ -145,6 +148,7 @@ impl Context {
         Ok(String::from_utf8_lossy(&cmd.stdout).to_string())
     }
 
+    #[deprecated]
     pub fn engine_container_exists(&self, container: &str) -> bool {
         self.engine_command()
             .args(["container", "exists", container])
@@ -153,6 +157,7 @@ impl Context {
     }
 
     /// Gets value of label on a container if it is defined
+    #[deprecated]
     pub fn get_container_label(&self, container: &str, label: &str) -> Option<String> {
         log::trace!("Getting label {label:?} from container {container:?}");
 

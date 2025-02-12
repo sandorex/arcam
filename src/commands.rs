@@ -10,9 +10,6 @@ mod cmd_completion_generator;
 mod cmd_completion_helper;
 mod cmd_init;
 
-#[cfg(test)]
-pub mod test_utils;
-
 pub use cmd_start::start_container;
 pub use cmd_shell::open_shell;
 pub use cmd_exec::container_exec;

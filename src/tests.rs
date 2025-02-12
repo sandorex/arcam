@@ -1,10 +1,12 @@
-use std::{fmt::{Debug, Display}, ops::Deref};
+mod test_permissions;
 
+use std::{fmt::{Debug, Display}, ops::Deref};
 use crate::engine::Engine;
+use anyhow::Result;
 
 // NOTE: This test is not useless, it prevents running tests on outdated main binary
 #[test]
-fn test_sanity() -> Result<(), Box<dyn std::error::Error>> {
+fn test_sanity() -> Result<()> {
     assert_cmd::Command::cargo_bin(env!("CARGO_BIN_NAME"))?
         .args(["--version"])
         .assert()
@@ -16,8 +18,9 @@ fn test_sanity() -> Result<(), Box<dyn std::error::Error>> {
 
 #[allow(unused)]
 pub mod prelude {
-    pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+    pub use anyhow::Result;
     pub use super::Container;
+    pub use crate::engine::Engine;
 }
 
 /// RAII guard to stop running containers

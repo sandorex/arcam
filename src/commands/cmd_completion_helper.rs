@@ -1,5 +1,5 @@
 use crate::cli::CmdCompletionArgs;
-use crate::util::command_extensions::*;
+use crate::command_extensions::*;
 use crate::prelude::*;
 
 /// Used to run autocompletion functions

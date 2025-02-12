@@ -19,7 +19,7 @@ pub fn container_exists(ctx: Context, cli_args: cli::CmdExistsArgs) -> Result<()
 #[cfg(test)]
 mod tests {
     use assert_cmd::Command;
-    use super::super::test_utils::prelude::*;
+    use crate::tests_prelude::*;
     use crate::engine::Engine;
 
     #[test]

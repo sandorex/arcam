@@ -1,7 +1,6 @@
 use crate::cli;
 use crate::prelude::*;
-use crate::util::command_extensions::*;
-use crate::util;
+use crate::command_extensions::*;
 
 pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()> {
     // try to find container in current directory
@@ -26,7 +25,7 @@ pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()
         }
     }
 
-    if !cli_args.yes && !util::prompt(format!("Are you sure you want to kill container {:?} ?", &cli_args.name).as_str()) {
+    if !cli_args.yes && !crate::prompt(format!("Are you sure you want to kill container {:?} ?", &cli_args.name).as_str()) {
         return Err(anyhow!("Cancelled by user."));
     }
 
@@ -48,8 +47,7 @@ mod tests {
     use std::process::Command;
     use assert_cmd::prelude::*;
     use crate::engine::Engine;
-
-    use super::super::test_utils::prelude::*;
+    use crate::tests_prelude::*;
     use rexpect::session::spawn_command;
 
     #[test]

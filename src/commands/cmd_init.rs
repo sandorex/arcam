@@ -1,6 +1,6 @@
 //! Contains all code that should run inside the container as the init
 
-use crate::util::command_extensions::*;
+use crate::command_extensions::*;
 use crate::FULL_VERSION;
 use crate::prelude::*;
 use std::fs::OpenOptions;

@@ -5,19 +5,26 @@ mod config;
 mod context;
 mod vars;
 mod engine;
-// mod devcontainers;
+mod command_ext;
+
+#[cfg(test)]
+mod tests;
 
 use clap::Parser;
 use cli::CliCommands;
 use anyhow::anyhow;
 
 pub use vars::*;
+pub use util::*;
 pub use context::Context;
+pub use command_ext::command_extensions;
+
+#[cfg(test)]
+pub use tests::prelude as tests_prelude;
 
 pub mod prelude {
     // NOTE: anyhow context is renamed cause it clashes with Context
     pub use anyhow::{anyhow, Context as AnyhowContext, Result};
-
     pub use crate::context::Context;
 }
 

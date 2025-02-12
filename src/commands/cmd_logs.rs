@@ -1,4 +1,4 @@
-use crate::util::command_extensions::*;
+use crate::command_extensions::*;
 use crate::cli;
 use crate::prelude::*;
 
