@@ -31,19 +31,16 @@ pub mod prelude {
 fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
 
+    simple_logger::init_with_level(args.log_level)?;
+
     // init and healthcheck do not need context
     if let CliCommands::Init = args.cmd {
         if !util::is_in_container() {
             return Err(anyhow!("Running init outside a container is dangerous, qutting.."));
         }
 
-        // always enable maximum verbosity in container init
-        simple_logger::init_with_level(log::Level::max())?;
-
         return commands::container_init();
     }
-
-    simple_logger::init_with_level(args.log_level)?;
 
     let get_ctx = || {
         if !util::executable_in_path("podman") {
@@ -67,10 +64,6 @@ fn main() -> anyhow::Result<()> {
         } else {
             // i do not want to create a context when i dont need it here
             commands::shell_completion_generation(x)?
-        },
-        #[cfg(debug_assertions)]
-        CliCommands::Test => {
-            println!("Test!");
         },
         CliCommands::Init => unreachable!(),
     };

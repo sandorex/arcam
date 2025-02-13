@@ -249,12 +249,12 @@ pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str)
 
     // write to file using tee
     #[allow(clippy::zombie_processes)]
-    let mut child = ctx.engine_command()
+    let mut child = ctx.engine.command()
         .args(["exec", "-i", "--user", "root", container, "tee", &file.to_string_lossy()])
         .stdin(Stdio::piped()) // pipe into stdin but ignore stdout/stderr
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn()
+        .log_spawn(log::Level::Debug)
         .expect(crate::ENGINE_ERR_MSG);
 
     let mut stdin = child.stdin.take()

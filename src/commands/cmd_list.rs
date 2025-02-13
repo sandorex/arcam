@@ -2,8 +2,9 @@ use crate::command_extensions::*;
 use crate::prelude::*;
 use crate::cli::CmdListArgs;
 
+// TODO this could be reworked with inspect and actually getting the information
 pub fn print_containers(ctx: Context, args: CmdListArgs) -> Result<()> {
-    let mut cmd = ctx.engine_command();
+    let mut cmd = ctx.engine.command();
     cmd.args([
         "container", "ls",
         "--filter", format!("label={}", crate::APP_NAME).as_str(),
@@ -17,16 +18,12 @@ pub fn print_containers(ctx: Context, args: CmdListArgs) -> Result<()> {
     }
 
     if ctx.dry_run {
-        cmd.print_escaped_cmd();
-
-        Ok(())
+        cmd.log(log::Level::Error);
     } else if args.raw {
         // just run it raw
-        cmd.run_interactive()?;
-
-        Ok(())
+        cmd.log_status_anyhow(log::Level::Debug)?;
     } else {
-        let output = cmd.run_get_output()?;
+        let output = cmd.log_output(log::Level::Debug)?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         for (index, line) in stdout.lines().enumerate() {
@@ -48,7 +45,7 @@ pub fn print_containers(ctx: Context, args: CmdListArgs) -> Result<()> {
                 println!("  ports: {}", ports);
             }
         }
-
-        Ok(())
     }
+
+    Ok(())
 }

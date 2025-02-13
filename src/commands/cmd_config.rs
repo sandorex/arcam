@@ -1,19 +1,20 @@
 use crate::cli::{ConfigArg, CmdConfigArgs};
 use crate::config::{Config, ConfigFile};
 use crate::prelude::*;
+use crate::command_extensions::*;
 use code_docs::DocumentedStruct;
 
 fn get_image_config(ctx: &Context, image: &str) -> Result<String> {
-    let cmd = ctx.engine_command()
+    let cmd = ctx.engine.command()
         .args(["image", "exists", image])
-        .output()
+        .log_output(log::Level::Debug)
         .expect(crate::ENGINE_ERR_MSG);
 
     if !cmd.status.success() {
         return Err(anyhow!("Image {:?} does not exist", image));
     }
 
-    let mut cmd = ctx.engine_command();
+    let mut cmd = ctx.engine.command();
     cmd.args([
         "run", "--rm", "-it",
         // basically just cat the file, should be pretty portable
@@ -23,7 +24,7 @@ fn get_image_config(ctx: &Context, image: &str) -> Result<String> {
     ]);
 
     let output = cmd
-        .output()
+        .log_output(log::Level::Debug)
         .expect(crate::ENGINE_ERR_MSG);
 
     if !output.status.success() {

@@ -3,7 +3,7 @@ use clap::{Args, Parser, Subcommand};
 use crate::{config::Config, Context, FULL_VERSION};
 
 const AFTER_HELP: &str = concat!(
-    "For help visit the git repository\n", env!("CARGO_PKG_REPOSITORY")
+    "For help visit the git repository\n   ", env!("CARGO_PKG_REPOSITORY")
 );
 
 /// Sandboxed development container manager, with focus on security by default
@@ -276,14 +276,14 @@ pub struct CmdCompletionArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum CliCommands {
-    /// Start a container in current directory, mounting read-write
+    /// Start a container in current directory, mounting it rw
     Start(CmdStartArgs),
 
     /// Enter the shell inside a running container
     #[clap(visible_alias = "enter")]
     Shell(CmdShellArgs),
 
-    /// Execute a command inside a running container
+    /// Execute a command inside a running container as the user
     Exec(CmdExecArgs),
 
     /// Check if container exists
@@ -308,9 +308,6 @@ pub enum CliCommands {
     /// Shell autocompletion
     Completion(CmdCompletionArgs),
 
-    /// Test function, enabled only in debug builds
-    #[cfg(debug_assertions)]
-    Test,
 
     /// Init command used to setup the container
     #[command(hide = true)]

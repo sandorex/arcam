@@ -76,7 +76,7 @@ impl Engine {
         let output = self.command()
             .args(["exec", "--user", "root", container])
             .args(command)
-            .run_get_output()?;
+            .log_output(log::Level::Debug)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
@@ -101,7 +101,7 @@ impl Engine {
             }
         }
 
-        let output = cmd.run_get_output()?;
+        let output = cmd.log_output(log::Level::Debug)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).lines().map(|x| x.to_string()).collect())
     }
@@ -113,7 +113,7 @@ impl Engine {
         let output = self.command()
             .args(["container", "inspect"])
             .args(containers)
-            .run_get_output()?;
+            .log_output(log::Level::Debug)?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -154,7 +154,7 @@ impl Engine {
         // image goes last
         cmd.arg(image);
 
-        let output = cmd.run_get_output()?;
+        let output = cmd.log_output(log::Level::Debug)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
@@ -166,7 +166,7 @@ impl Engine {
         // gentle shutdown, terminates by default after 10s
         self.command()
             .args(["container", "stop", container])
-            .run_interactive()?;
+            .log_status(log::Level::Debug)?;
 
         Ok(())
     }

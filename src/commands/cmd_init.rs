@@ -106,8 +106,7 @@ fn initialization() -> Result<()> {
                 "--no-create-home",
                 &user,
             ])
-            .status()
-            .expect("Error executing useradd")
+            .log_status_anyhow(log::Level::Debug)?
     } else {
         println!("Modifying user {:?}", user);
 
@@ -117,8 +116,7 @@ fn initialization() -> Result<()> {
                 "--shell", shell,
                 &user,
             ])
-            .status()
-            .expect("Error executing usermod")
+            .log_status_anyhow(log::Level::Debug)?
     };
 
     if !cmd.success() {
@@ -142,7 +140,7 @@ fn initialization() -> Result<()> {
         println!("Recreating font cache");
 
         let cmd = Command::new("fc-cache")
-            .status();
+            .log_status(log::Level::Debug);
 
         match cmd {
             Ok(x) => if !x.success() {
@@ -264,21 +262,17 @@ fn initialization() -> Result<()> {
             println!("Executing script {:?}", file);
 
             // use sudo if available
-            let cmd = if has_sudo {
+            if has_sudo {
                 Command::new("sudo")
                     .args(["-u", &user])
                     .arg(&file)
-                    .status()?
+                    .log_status_anyhow(log::Level::Debug)
             } else {
                 Command::new("su")
                     .args([&user, "-c"])
                     .arg(&file)
-                    .status()?
-            };
-
-            if !cmd.success() {
-                eprintln!("Script {:?} has failed with exit code {}", file, cmd.get_code());
-            }
+                    .log_status_anyhow(log::Level::Debug)
+            }.with_context(|| anyhow!("Script {:?} has failed", file))?;
         }
     }
 

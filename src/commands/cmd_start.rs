@@ -266,10 +266,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         "init",
     ]);
 
-    // TODO log whole command if TRACE
-
     if ctx.dry_run {
-        cmd.print_escaped_cmd();
+        cmd.log(log::Level::Error);
 
         Ok(())
     } else {
@@ -291,7 +289,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
             let cmd = ctx.engine.command()
                 .args(["exec", id, "test", "-f", file])
-                .output()
+                .log_output(log::Level::Debug)
                 .expect(crate::ENGINE_ERR_MSG);
 
             match cmd.get_code() {

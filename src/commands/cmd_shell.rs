@@ -23,44 +23,33 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
         return Err(anyhow!("Container {:?} is not owned by {}", cli_args.name, crate::APP_NAME));
     };
 
-    let args = {
-        let Some(user_shell) = container_info.get_label(crate::CONTAINER_LABEL_USER_SHELL) else {
-            return Err(anyhow!("Container {:?} does not have label {:?}", cli_args.name, crate::CONTAINER_LABEL_USER_SHELL));
-        };
+    let mut cmd = ctx.engine.command();
 
-        // TODO share the env with exec command so its consistent
-        vec![
-            "exec".into(), "-it".into(),
-            format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
-            format!("--env=HOME=/home/{}", ctx.user),
-            format!("--env=SHELL={}", user_shell),
-            "--workdir".into(), ws_dir.to_string(),
-            "--user".into(), ctx.user.clone(),
-            cli_args.name.clone(),
-            // NOTE: workaround to always source ~/.profile, even if shell is a script or non posix
-            // like fish shell or nushell
-            "sh".into(), "-l".into(), "-c".into(), format!("exec {}", user_shell),
-        ]
+    let Some(user_shell) = container_info.get_label(crate::CONTAINER_LABEL_USER_SHELL) else {
+        return Err(anyhow!("Container {:?} does not have label {:?}", cli_args.name, crate::CONTAINER_LABEL_USER_SHELL));
     };
 
-    let mut cmd = ctx.engine.command();
-    cmd.args(args);
+    // TODO share the env with exec command so its consistent
+    cmd.args([
+        "exec".into(), "-it".into(),
+        format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
+        format!("--env=HOME=/home/{}", ctx.user),
+        format!("--env=SHELL={}", user_shell),
+        "--workdir".into(), ws_dir.to_string(),
+        "--user".into(), ctx.user.clone(),
+        cli_args.name.clone(),
+        // NOTE: workaround to always source ~/.profile, even if shell is a script or non posix
+        // like fish shell or nushell
+        "sh".into(), "-l".into(), "-c".into(), format!("exec {}", user_shell),
+    ]);
 
     if ctx.dry_run {
-        cmd.print_escaped_cmd();
-
-        Ok(())
+        cmd.log(log::Level::Error);
     } else {
-        let cmd = cmd
-            .status()
-            .expect(crate::ENGINE_ERR_MSG);
-
-        if cmd.success() {
-            Ok(())
-        } else {
-            Err(anyhow!("Shell exited with error code {}", cmd))
-        }
+        cmd.log_status_anyhow(log::Level::Debug)?;
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
