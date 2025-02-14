@@ -11,7 +11,14 @@ macro_rules! ENV_VAR_PREFIX {
 pub const ENGINE_ERR_MSG: &str = "Failed to execute engine";
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_DESCRIBE"), " (", env!("VERGEN_GIT_BRANCH"), ")");
+pub const FULL_VERSION: &str = concat!(
+    env!("CARGO_PKG_VERSION"),
+    "-",
+    env!("VERGEN_GIT_DESCRIBE"),
+    " (",
+    env!("VERGEN_GIT_BRANCH"),
+    ")"
+);
 
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
 pub const APP_NAME_UPPERCASE: &str = env!("CARGO_PKG_NAME_UPPERCASE");

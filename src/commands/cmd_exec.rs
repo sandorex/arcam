@@ -8,7 +8,9 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
     if cli_args.name.is_empty() {
         let containers = ctx.get_cwd_containers()?;
         if containers.is_empty() {
-            return Err(anyhow!("Could not find a running container in current directory"));
+            return Err(anyhow!(
+                "Could not find a running container in current directory"
+            ));
         }
 
         cli_args.name = containers.first().unwrap().clone();
@@ -21,7 +23,11 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
 
     // check if container is owned
     let Some(ws_dir) = container_info.get_label(crate::CONTAINER_LABEL_CONTAINER_DIR) else {
-        return Err(anyhow!(anyhow!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME)));
+        return Err(anyhow!(anyhow!(
+            "Container {:?} is not owned by {}",
+            &cli_args.name,
+            crate::APP_NAME
+        )));
     };
 
     let mut cmd = ctx.engine.command();
@@ -29,7 +35,10 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
     cmd.args([
         format!("--workdir={}", ws_dir),
         format!("--user={}", ctx.user),
-        format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
+        format!(
+            "--env=TERM={}",
+            std::env::var("TERM").unwrap_or("xterm".into())
+        ),
     ]);
 
     if let Some(shell) = &cli_args.shell {
@@ -64,9 +73,9 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use assert_cmd::Command;
     use crate::engine::Engine;
     use crate::tests_prelude::*;
+    use assert_cmd::Command;
 
     #[test]
     fn cmd_exec_podman() -> Result<()> {
@@ -81,7 +90,9 @@ mod tests {
 
         let container = Container {
             engine: Engine::Podman,
-            container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+            container: String::from_utf8_lossy(&cmd.get_output().stdout)
+                .trim()
+                .to_string(),
         };
 
         // create file in cwd

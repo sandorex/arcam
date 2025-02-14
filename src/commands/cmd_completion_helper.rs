@@ -25,14 +25,19 @@ pub fn shell_completion_helper(ctx: Context, cli_args: CmdCompletionArgs) -> Res
                     println!("@{}", name);
                 }
             }
-        },
+        }
 
         ShellCompletionType::Container => {
-            let output = ctx.engine.command()
+            let output = ctx
+                .engine
+                .command()
                 .args([
-                    "container", "ls",
-                    "--filter", format!("label={}", crate::APP_NAME).as_str(),
-                    "--format", "{{.Names}}",
+                    "container",
+                    "ls",
+                    "--filter",
+                    format!("label={}", crate::APP_NAME).as_str(),
+                    "--format",
+                    "{{.Names}}",
                 ])
                 .log_output(log::Level::Debug)?;
 
@@ -41,9 +46,8 @@ pub fn shell_completion_helper(ctx: Context, cli_args: CmdCompletionArgs) -> Res
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 print!("{}", stdout);
             }
-        },
+        }
     }
 
     Ok(())
 }
-

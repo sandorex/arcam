@@ -1,9 +1,9 @@
 use crate::cli::CmdCompletionArgs;
 use crate::prelude::*;
+use clap::CommandFactory;
+use clap_complete::{generate, Shell};
 use std::io::IsTerminal;
 use std::io::Write;
-use clap::CommandFactory;
-use clap_complete::{Shell, generate};
 
 fn gen(shell: Shell, buf: &mut dyn Write) {
     let mut cmd = crate::cli::Cli::command();
@@ -35,7 +35,9 @@ pub fn shell_completion_generation(cli_args: CmdCompletionArgs) -> Result<()> {
     }
 
     // use requested shell or detect automatically
-    let shell = if let Some(shell) = cli_args.shell { shell } else {
+    let shell = if let Some(shell) = cli_args.shell {
+        shell
+    } else {
         detect_shell()?
     };
 

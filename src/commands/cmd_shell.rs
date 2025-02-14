@@ -1,14 +1,16 @@
-use crate::engine::ContainerInfo;
-use crate::prelude::*;
 use crate::cli;
 use crate::command_extensions::*;
+use crate::engine::ContainerInfo;
+use crate::prelude::*;
 
 pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
     // try to find container in current directory
     if cli_args.name.is_empty() {
         let containers = ctx.get_cwd_containers()?;
         if containers.is_empty() {
-            return Err(anyhow!("Could not find a running container in current directory"));
+            return Err(anyhow!(
+                "Could not find a running container in current directory"
+            ));
         }
 
         cli_args.name = containers.first().unwrap().clone();
@@ -20,27 +22,44 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
     let container_info = container_info.first().unwrap();
 
     let Some(ws_dir) = container_info.get_label(crate::CONTAINER_LABEL_CONTAINER_DIR) else {
-        return Err(anyhow!("Container {:?} is not owned by {}", cli_args.name, crate::APP_NAME));
+        return Err(anyhow!(
+            "Container {:?} is not owned by {}",
+            cli_args.name,
+            crate::APP_NAME
+        ));
     };
 
     let mut cmd = ctx.engine.command();
 
     let Some(user_shell) = container_info.get_label(crate::CONTAINER_LABEL_USER_SHELL) else {
-        return Err(anyhow!("Container {:?} does not have label {:?}", cli_args.name, crate::CONTAINER_LABEL_USER_SHELL));
+        return Err(anyhow!(
+            "Container {:?} does not have label {:?}",
+            cli_args.name,
+            crate::CONTAINER_LABEL_USER_SHELL
+        ));
     };
 
     // TODO share the env with exec command so its consistent
     cmd.args([
-        "exec".into(), "-it".into(),
-        format!("--env=TERM={}", std::env::var("TERM").unwrap_or("xterm".into())),
+        "exec".into(),
+        "-it".into(),
+        format!(
+            "--env=TERM={}",
+            std::env::var("TERM").unwrap_or("xterm".into())
+        ),
         format!("--env=HOME=/home/{}", ctx.user),
         format!("--env=SHELL={}", user_shell),
-        "--workdir".into(), ws_dir.to_string(),
-        "--user".into(), ctx.user.clone(),
+        "--workdir".into(),
+        ws_dir.to_string(),
+        "--user".into(),
+        ctx.user.clone(),
         cli_args.name.clone(),
         // NOTE: workaround to always source ~/.profile, even if shell is a script or non posix
         // like fish shell or nushell
-        "sh".into(), "-l".into(), "-c".into(), format!("exec {}", user_shell),
+        "sh".into(),
+        "-l".into(),
+        "-c".into(),
+        format!("exec {}", user_shell),
     ]);
 
     if ctx.dry_run {
@@ -54,10 +73,10 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
-    use assert_cmd::prelude::*;
     use crate::tests_prelude::*;
-    use rexpect::session::{PtyReplSession, spawn_command};
+    use assert_cmd::prelude::*;
+    use rexpect::session::{spawn_command, PtyReplSession};
+    use std::process::Command;
 
     #[test]
     fn cmd_shell_podman() -> Result<()> {
@@ -71,7 +90,9 @@ mod tests {
 
         let _container = Container {
             engine: Engine::Podman,
-            container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+            container: String::from_utf8_lossy(&cmd.get_output().stdout)
+                .trim()
+                .to_string(),
         };
 
         let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;

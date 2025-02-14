@@ -1,10 +1,10 @@
 //! Engine specific abstraction
 
-use std::fmt::Display;
-use serde::Deserialize;
-use crate::prelude::*;
 use crate::command_extensions::*;
+use crate::prelude::*;
+use serde::Deserialize;
 use std::collections::HashMap;
+use std::fmt::Display;
 
 /// Engine agnostic container info
 pub trait ContainerInfo {
@@ -25,7 +25,7 @@ pub trait ContainerInfo {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Engine {
-    Podman
+    Podman,
 }
 
 impl Display for Engine {
@@ -69,11 +69,16 @@ impl Engine {
     }
 
     /// Execute command as root inside a container
-    pub fn exec<T: AsRef<std::ffi::OsStr>>(&self, container: &str, command: &[T]) -> Result<String> {
+    pub fn exec<T: AsRef<std::ffi::OsStr>>(
+        &self,
+        container: &str,
+        command: &[T],
+    ) -> Result<String> {
         assert!(!container.is_empty());
         assert!(!command.is_empty());
 
-        let output = self.command()
+        let output = self
+            .command()
             .args(["exec", "--user", "root", container])
             .args(command)
             .log_output(log::Level::Debug)?;
@@ -103,24 +108,26 @@ impl Engine {
 
         let output = cmd.log_output(log::Level::Debug)?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).lines().map(|x| x.to_string()).collect())
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|x| x.to_string())
+            .collect())
     }
 
     /// Inspects containers and returns the data associated
     pub fn inspect_containers(&self, containers: Vec<&str>) -> Result<Vec<impl ContainerInfo>> {
         assert!(!containers.is_empty());
 
-        let output = self.command()
+        let output = self
+            .command()
             .args(["container", "inspect"])
             .args(containers)
             .log_output(log::Level::Debug)?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
-        Ok(
-            serde_json::from_str::<Vec<PodmanContainerInfo>>(&stdout)
-                .with_context(|| "Error parsing output from \"podman inspect\"")?
-        )
+        Ok(serde_json::from_str::<Vec<PodmanContainerInfo>>(&stdout)
+            .with_context(|| "Error parsing output from \"podman inspect\"")?)
     }
 
     /// Check if container exists, should be faster than `inspect_container`
@@ -128,14 +135,18 @@ impl Engine {
         assert!(!container.is_empty());
 
         // TODO log this with log::trace!
-        let output = self.command()
+        let output = self
+            .command()
             .args(["container", "exists", container])
             .output()?;
 
         match output.get_code() {
             0 => Ok(true),
             1 => Ok(false),
-            _ => Err(anyhow!("Error checking if container {:?} exists", container)),
+            _ => Err(anyhow!(
+                "Error checking if container {:?} exists",
+                container
+            )),
         }
     }
 
@@ -189,10 +200,19 @@ mod tests {
                 config: PodmanContainerInfoConfig {
                     labels: HashMap::from([
                         ("arcam".to_string(), "0.1.10".to_string()),
-                        ("com.github.containers.toolbox".to_string(), "true".to_string()),
-                        ("container_dir".to_string(), "/home/sandorex/ws/arcam".to_string()),
+                        (
+                            "com.github.containers.toolbox".to_string(),
+                            "true".to_string()
+                        ),
+                        (
+                            "container_dir".to_string(),
+                            "/home/sandorex/ws/arcam".to_string()
+                        ),
                         ("default_shell".to_string(), "/bin/fish".to_string()),
-                        ("host_dir".to_string(), "/mnt/slowmf/ws/projects/arcam".to_string()),
+                        (
+                            "host_dir".to_string(),
+                            "/mnt/slowmf/ws/projects/arcam".to_string()
+                        ),
                     ]),
                 },
             }

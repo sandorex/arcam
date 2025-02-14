@@ -18,9 +18,9 @@ pub fn container_exists(ctx: Context, cli_args: cli::CmdExistsArgs) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use assert_cmd::Command;
-    use crate::tests_prelude::*;
     use crate::engine::Engine;
+    use crate::tests_prelude::*;
+    use assert_cmd::Command;
 
     #[test]
     fn cmd_exists_podman() -> Result<()> {
@@ -43,7 +43,9 @@ mod tests {
 
         let container = Container {
             engine: Engine::Podman,
-            container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+            container: String::from_utf8_lossy(&cmd.get_output().stdout)
+                .trim()
+                .to_string(),
         };
 
         assert!(!container.is_empty(), "Container name is empty");

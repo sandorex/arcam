@@ -8,9 +8,10 @@ fn main() -> anyhow::Result<()> {
         .build()?;
 
     // cause i cannot figure out how to uppercase a str literal at compile time
-    println!("cargo::rustc-env=CARGO_PKG_NAME_UPPERCASE={}", env!("CARGO_PKG_NAME").to_ascii_uppercase());
+    println!(
+        "cargo::rustc-env=CARGO_PKG_NAME_UPPERCASE={}",
+        env!("CARGO_PKG_NAME").to_ascii_uppercase()
+    );
 
-    Emitter::default()
-        .add_instructions(&git2)?
-        .emit()
+    Emitter::default().add_instructions(&git2)?.emit()
 }

@@ -1,9 +1,10 @@
-use std::path::PathBuf;
-use clap::{Args, Parser, Subcommand};
 use crate::{config::Config, Context, FULL_VERSION};
+use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
 
 const AFTER_HELP: &str = concat!(
-    "For help visit the git repository\n   ", env!("CARGO_PKG_REPOSITORY")
+    "For help visit the git repository\n   ",
+    env!("CARGO_PKG_REPOSITORY")
 );
 
 /// Sandboxed development container manager, with focus on security by default
@@ -55,7 +56,9 @@ impl ConfigArg {
             || input.starts_with(".")       // ex. .arcam.toml
             || input.starts_with("/")       // ex. /etc/arcam/configs/something.toml
             || input.starts_with("~/")      // ex. ~/.config/arcam/configs/something.toml
-            || input.ends_with(".toml") {   // well no image is gonna end with .toml? right?
+            || input.ends_with(".toml")
+        {
+            // well no image is gonna end with .toml? right?
             // it must be a path
             Ok(Self::File(PathBuf::from(input)))
         } else if let Some(config_name) = input.strip_prefix("@") {

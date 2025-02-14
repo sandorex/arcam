@@ -1,7 +1,7 @@
 //! Contains everything related to container configuration
 
-use code_docs::{code_docs_struct, DocumentedStruct};
 use anyhow::{Context, Result};
+use code_docs::{code_docs_struct, DocumentedStruct};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -151,11 +151,14 @@ engine_args = [ "default" ]
         assert!(result.is_ok(), "result is err: {}", result.unwrap_err());
         let result_ok = result.unwrap();
 
-        assert_eq!(result_ok, Config {
-            image: "fedora".into(),
-            engine_args: vec!["default".into()],
+        assert_eq!(
+            result_ok,
+            Config {
+                image: "fedora".into(),
+                engine_args: vec!["default".into()],
 
-            ..Default::default()
-        });
+                ..Default::default()
+            }
+        );
     }
 }

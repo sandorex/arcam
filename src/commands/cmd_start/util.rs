@@ -1,8 +1,8 @@
-use crate::APP_NAME;
-use crate::util;
-use crate::prelude::*;
-use crate::command_extensions::*;
 use crate::cli::CmdStartArgs;
+use crate::command_extensions::*;
+use crate::prelude::*;
+use crate::util;
+use crate::APP_NAME;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -35,11 +35,13 @@ pub fn generate_name() -> String {
     const ADJECTIVES_ENGLISH: &str = include_str!("adjectives.txt");
 
     let adjectives: Vec<&str> = ADJECTIVES_ENGLISH.lines().collect();
-    let adjective = adjectives.get(util::rand() as usize % adjectives.len()).unwrap();
+    let adjective = adjectives
+        .get(util::rand() as usize % adjectives.len())
+        .unwrap();
 
     // allow custom container suffix but default to bin name
-    let suffix = std::env::var(crate::ENV_CONTAINER_SUFFIX)
-        .unwrap_or_else(|_| APP_NAME.to_string());
+    let suffix =
+        std::env::var(crate::ENV_CONTAINER_SUFFIX).unwrap_or_else(|_| APP_NAME.to_string());
 
     format!("{}-{}", adjective, suffix)
 }
@@ -113,7 +115,9 @@ pub fn mount_wayland(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
     // try to pass through wayland socket
     if cli_args.wayland.unwrap_or(false) {
         // prefer ARCAM_WAYLAND_DISPLAY
-        if let Ok(wayland_display) = std::env::var(crate::ENV_WAYLAND_DISPLAY).or(std::env::var("WAYLAND_DISPLAY")) {
+        if let Ok(wayland_display) =
+            std::env::var(crate::ENV_WAYLAND_DISPLAY).or(std::env::var("WAYLAND_DISPLAY"))
+        {
             let socket_path = format!("/run/user/{}/{}", ctx.user_id, wayland_display);
             if Path::new(&socket_path).exists() {
                 log::debug!("Found wayland socket at {socket_path:?}");
@@ -124,7 +128,10 @@ pub fn mount_wayland(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
                     format!("--env=WAYLAND_DISPLAY={}", wayland_display),
                 ]);
             } else {
-                return Err(anyhow!("Could not find the wayland socket {:?}", socket_path));
+                return Err(anyhow!(
+                    "Could not find the wayland socket {:?}",
+                    socket_path
+                ));
             }
 
             // add fonts just in case
@@ -133,30 +140,40 @@ pub fn mount_wayland(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
             // legacy ~/.fonts
             let home_dot_fonts = ctx.user_home.join(".fonts");
             if home_dot_fonts.exists() {
-                cmd.arg(format!("--volume={}:/usr/share/fonts/host_dot:ro", home_dot_fonts.to_string_lossy()));
+                cmd.arg(format!(
+                    "--volume={}:/usr/share/fonts/host_dot:ro",
+                    home_dot_fonts.to_string_lossy()
+                ));
             }
 
             // font dir ~/.local/share/fonts
-            let home_dot_local_fonts = ctx.user_home.join(".local")
-                .join("share")
-                .join("fonts");
+            let home_dot_local_fonts = ctx.user_home.join(".local").join("share").join("fonts");
 
             if home_dot_local_fonts.exists() {
-                cmd.arg(format!("--volume={}:/usr/share/fonts/host_local:ro", home_dot_local_fonts.to_string_lossy()));
+                cmd.arg(format!(
+                    "--volume={}:/usr/share/fonts/host_local:ro",
+                    home_dot_local_fonts.to_string_lossy()
+                ));
             }
         } else {
-            return Err(anyhow!("Could not pass through wayland socket as WAYLAND_DISPLAY is not defined"));
+            return Err(anyhow!(
+                "Could not pass through wayland socket as WAYLAND_DISPLAY is not defined"
+            ));
         }
     }
 
     Ok(())
 }
 
-pub fn mount_additional_mounts(ws_dir: &Path, cli_args: &CmdStartArgs, cmd: &mut Command) -> Result<()> {
+pub fn mount_additional_mounts(
+    ws_dir: &Path,
+    cli_args: &CmdStartArgs,
+    cmd: &mut Command,
+) -> Result<()> {
     for m in &cli_args.mount {
         let mount = Path::new(m);
         if mount.exists() {
-            if ! mount.is_dir() {
+            if !mount.is_dir() {
                 return Err(anyhow!("Mountpoint {:?} is not a directory", mount));
             }
 
@@ -165,7 +182,12 @@ pub fn mount_additional_mounts(ws_dir: &Path, cli_args: &CmdStartArgs, cmd: &mut
 
             log::debug!("Mounting additional mount {mount:?}");
 
-            cmd.arg(format!("--volume={}:{}/{}", mount.to_string_lossy(), ws_dir.to_string_lossy(), mount.file_name().unwrap().to_string_lossy()));
+            cmd.arg(format!(
+                "--volume={}:{}/{}",
+                mount.to_string_lossy(),
+                ws_dir.to_string_lossy(),
+                mount.file_name().unwrap().to_string_lossy()
+            ));
         } else {
             return Err(anyhow!("Mountpoint {:?} does not exist", mount));
         }
@@ -187,7 +209,9 @@ pub fn mount_audio(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) ->
 
             log::debug!("Pulseaudio socket found at {socket_path:?}");
         } else {
-            return Err(anyhow!("Could not find pulseaudio socket to pass to the container"));
+            return Err(anyhow!(
+                "Could not find pulseaudio socket to pass to the container"
+            ));
         }
     }
 
@@ -205,10 +229,15 @@ pub fn mount_ssh_agent(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command
 
                 log::debug!("ssh-agent socket found at {ssh_sock:?}");
             } else {
-                return Err(anyhow!("Socket does not exist at {:?} (ssh-agent)", ssh_sock));
+                return Err(anyhow!(
+                    "Socket does not exist at {:?} (ssh-agent)",
+                    ssh_sock
+                ));
             }
         } else {
-            return Err(anyhow!("Could not pass through ssh-agent as SSH_AUTH_SOCK is not defined"));
+            return Err(anyhow!(
+                "Could not pass through ssh-agent as SSH_AUTH_SOCK is not defined"
+            ));
         }
     }
 
@@ -222,18 +251,29 @@ pub fn mount_session_bus(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Comma
                 if Path::new(&dbus_sock).exists() {
                     cmd.args([
                         format!("--volume={}:/run/user/{}/bus", dbus_sock, ctx.user_id),
-                        format!("--env=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{}/bus", ctx.user_id),
+                        format!(
+                            "--env=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{}/bus",
+                            ctx.user_id
+                        ),
                     ]);
 
                     log::debug!("Session dbus socket found at {dbus_sock:?}");
                 } else {
-                    return Err(anyhow!("Socket does not exist at {:?} (session bus)", dbus_sock));
+                    return Err(anyhow!(
+                        "Socket does not exist at {:?} (session bus)",
+                        dbus_sock
+                    ));
                 }
             } else {
-                return Err(anyhow!("Invalid format for DBUS_SESSION_BUS_ADDRESS={:?}", dbus_addr));
+                return Err(anyhow!(
+                    "Invalid format for DBUS_SESSION_BUS_ADDRESS={:?}",
+                    dbus_addr
+                ));
             }
         } else {
-            return Err(anyhow!("Could not pass through session bus as DBUS_SESSION_BUS_ADDRESS is not defined"));
+            return Err(anyhow!(
+                "Could not pass through session bus as DBUS_SESSION_BUS_ADDRESS is not defined"
+            ));
         }
     }
 
@@ -249,15 +289,27 @@ pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str)
 
     // write to file using tee
     #[allow(clippy::zombie_processes)]
-    let mut child = ctx.engine.command()
-        .args(["exec", "-i", "--user", "root", container, "tee", &file.to_string_lossy()])
+    let mut child = ctx
+        .engine
+        .command()
+        .args([
+            "exec",
+            "-i",
+            "--user",
+            "root",
+            container,
+            "tee",
+            &file.to_string_lossy(),
+        ])
         .stdin(Stdio::piped()) // pipe into stdin but ignore stdout/stderr
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .log_spawn(log::Level::Debug)
         .expect(crate::ENGINE_ERR_MSG);
 
-    let mut stdin = child.stdin.take()
+    let mut stdin = child
+        .stdin
+        .take()
         .with_context(|| anyhow!("Failed to open child stdin"))?;
 
     stdin.write_all(content.as_bytes())?;
@@ -270,7 +322,10 @@ pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str)
     if result.success() {
         Ok(())
     } else {
-        Err(anyhow!("Error writing to file {:?} in container ({})", file, result.get_code()))
+        Err(anyhow!(
+            "Error writing to file {:?} in container ({})",
+            file,
+            result.get_code()
+        ))
     }
 }
-

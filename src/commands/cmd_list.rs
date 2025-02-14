@@ -1,20 +1,31 @@
+use crate::cli::CmdListArgs;
 use crate::command_extensions::*;
 use crate::prelude::*;
-use crate::cli::CmdListArgs;
 
 // TODO this could be reworked with inspect and actually getting the information
 pub fn print_containers(ctx: Context, args: CmdListArgs) -> Result<()> {
     let mut cmd = ctx.engine.command();
     cmd.args([
-        "container", "ls",
-        "--filter", format!("label={}", crate::APP_NAME).as_str(),
-        "--format", format!("{{{{.Names}}}}\t{{{{.Image}}}}\t{{{{.Labels.{}}}}}\t{{{{.Ports}}}}", crate::CONTAINER_LABEL_HOST_DIR).as_str(),
+        "container",
+        "ls",
+        "--filter",
+        format!("label={}", crate::APP_NAME).as_str(),
+        "--format",
+        format!(
+            "{{{{.Names}}}}\t{{{{.Image}}}}\t{{{{.Labels.{}}}}}\t{{{{.Ports}}}}",
+            crate::CONTAINER_LABEL_HOST_DIR
+        )
+        .as_str(),
     ]);
 
     // filter the container by host_dir
     if args.here {
         cmd.arg("--filter");
-        cmd.arg(format!("label={}={}", crate::CONTAINER_LABEL_HOST_DIR, ctx.cwd.to_string_lossy()));
+        cmd.arg(format!(
+            "label={}={}",
+            crate::CONTAINER_LABEL_HOST_DIR,
+            ctx.cwd.to_string_lossy()
+        ));
     }
 
     if ctx.dry_run {
@@ -39,7 +50,16 @@ pub fn print_containers(ctx: Context, args: CmdListArgs) -> Result<()> {
                 println!();
             }
 
-            println!("Container {:?} at {:?} {}", name, ws, if std::path::Path::new(ws) == ctx.cwd { "*" } else { " " });
+            println!(
+                "Container {:?} at {:?} {}",
+                name,
+                ws,
+                if std::path::Path::new(ws) == ctx.cwd {
+                    "*"
+                } else {
+                    " "
+                }
+            );
             println!("  image: {:?}", image);
             if !ports.is_empty() {
                 println!("  ports: {}", ports);

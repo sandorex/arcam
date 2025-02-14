@@ -1,14 +1,16 @@
 use crate::cli;
+use crate::command_extensions::*;
 use crate::engine::ContainerInfo;
 use crate::prelude::*;
-use crate::command_extensions::*;
 
 pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()> {
     // try to find container in current directory
     if cli_args.name.is_empty() {
         let containers = ctx.get_cwd_containers()?;
         if containers.is_empty() {
-            return Err(anyhow!("Could not find a running container in current directory"));
+            return Err(anyhow!(
+                "Could not find a running container in current directory"
+            ));
         }
 
         cli_args.name = containers.first().unwrap().clone();
@@ -22,12 +24,24 @@ pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()
 
         // check if container is owned
         if !container_info.has_label(crate::CONTAINER_LABEL_APP) {
-            return Err(anyhow!("Container {:?} is not owned by {}", &cli_args.name, crate::APP_NAME));
+            return Err(anyhow!(
+                "Container {:?} is not owned by {}",
+                &cli_args.name,
+                crate::APP_NAME
+            ));
         }
     }
 
     // prompt user
-    if !cli_args.yes && !crate::prompt(format!("Are you sure you want to kill container {:?} ?", &cli_args.name).as_str()) {
+    if !cli_args.yes
+        && !crate::prompt(
+            format!(
+                "Are you sure you want to kill container {:?} ?",
+                &cli_args.name
+            )
+            .as_str(),
+        )
+    {
         return Err(anyhow!("Cancelled by user."));
     }
 
@@ -46,11 +60,11 @@ pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
-    use assert_cmd::prelude::*;
     use crate::engine::Engine;
     use crate::tests_prelude::*;
+    use assert_cmd::prelude::*;
     use rexpect::session::spawn_command;
+    use std::process::Command;
 
     #[test]
     fn cmd_kill_podman() -> Result<()> {
@@ -65,7 +79,9 @@ mod tests {
 
         let container = Container {
             engine: Engine::Podman,
-            container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+            container: String::from_utf8_lossy(&cmd.get_output().stdout)
+                .trim()
+                .to_string(),
         };
 
         // it should exist now
@@ -97,7 +113,9 @@ mod tests {
 
         let container = Container {
             engine: Engine::Podman,
-            container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+            container: String::from_utf8_lossy(&cmd.get_output().stdout)
+                .trim()
+                .to_string(),
         };
 
         // try to kill to get the prompt
@@ -109,7 +127,10 @@ mod tests {
         }?;
 
         let (_, matched) = pty.exp_regex(r#"\"(.+)\".*\[y/N\]"#)?;
-        assert!(matched.contains(&*container), "Wrong container name in prompt?");
+        assert!(
+            matched.contains(&*container),
+            "Wrong container name in prompt?"
+        );
 
         // send enter? so i check the default action
         pty.send_line("")?;
@@ -130,7 +151,10 @@ mod tests {
         }?;
 
         let (_, matched) = pty.exp_regex(r#"\"(.+)\".*\[y/N\]"#)?;
-        assert!(matched.contains(&*container), "Wrong container name in prompt?");
+        assert!(
+            matched.contains(&*container),
+            "Wrong container name in prompt?"
+        );
 
         // send enter? so i check the default action
         pty.send_line("y")?;

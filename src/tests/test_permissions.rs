@@ -1,6 +1,6 @@
+use crate::tests_prelude::*;
 use assert_cmd::Command;
 use users::{get_current_gid, get_current_uid};
-use crate::tests_prelude::*;
 
 fn run(container_name: &str, command: &[&str]) -> Result<Command> {
     let mut cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?;
@@ -23,7 +23,9 @@ fn test_permissions_podman() -> Result<()> {
 
     let container = Container {
         engine: Engine::Podman,
-        container: String::from_utf8_lossy(&cmd.get_output().stdout).trim().to_string(),
+        container: String::from_utf8_lossy(&cmd.get_output().stdout)
+            .trim()
+            .to_string(),
     };
 
     // check if uid/gid are the same

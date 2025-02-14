@@ -3,8 +3,8 @@ use std::process::{Child, Command, ExitStatus, Output};
 
 #[allow(unused_imports)]
 pub mod command_extensions {
-    pub use std::process::Command;
     pub use super::{CommandExt, CommandOutputExt};
+    pub use std::process::Command;
 }
 
 /// Simple extension trait to avoid duplicating code, allow easy conversion to `ExitCode`
@@ -79,7 +79,10 @@ impl CommandExt for Command {
         format!(
             "{} {}",
             self.get_program().to_string_lossy(),
-            self.get_args().collect::<Vec<_>>().join(std::ffi::OsStr::new(" ")).to_string_lossy(),
+            self.get_args()
+                .collect::<Vec<_>>()
+                .join(std::ffi::OsStr::new(" "))
+                .to_string_lossy(),
         )
     }
 
@@ -108,8 +111,14 @@ impl CommandExt for Command {
     fn log_output_anyhow(&mut self, level: log::Level) -> Result<Output> {
         match self.log_output(level) {
             Ok(output) if output.status.success() => Ok(output),
-            Ok(output) => Err(anyhow!("Command {:?} failed with code {:?}", self.get_full_command(), output.status)),
-            Err(err) => Err(err).with_context(|| anyhow!("Command {:?} failed", self.get_full_command()))
+            Ok(output) => Err(anyhow!(
+                "Command {:?} failed with code {:?}",
+                self.get_full_command(),
+                output.status
+            )),
+            Err(err) => {
+                Err(err).with_context(|| anyhow!("Command {:?} failed", self.get_full_command()))
+            }
         }
     }
 
@@ -136,19 +145,21 @@ impl CommandExt for Command {
     fn log_status_anyhow(&mut self, level: log::Level) -> Result<ExitStatus> {
         match self.log_status(level) {
             Ok(status) if status.success() => Ok(status),
-            Ok(status) => Err(anyhow!("Command {:?} failed with code {:?}", self.get_full_command(), status)),
-            Err(err) => Err(err).with_context(|| anyhow!("Command {:?} failed", self.get_full_command()))
+            Ok(status) => Err(anyhow!(
+                "Command {:?} failed with code {:?}",
+                self.get_full_command(),
+                status
+            )),
+            Err(err) => {
+                Err(err).with_context(|| anyhow!("Command {:?} failed", self.get_full_command()))
+            }
         }
     }
 
     fn log_spawn(&mut self, level: log::Level) -> std::io::Result<Child> {
         let child = self.spawn();
         match child.as_ref() {
-            Ok(_) => log::log!(
-                level,
-                "Command {:?} (spawn)",
-                self.get_full_command(),
-            ),
+            Ok(_) => log::log!(level, "Command {:?} (spawn)", self.get_full_command(),),
             Err(err) => log::log!(
                 level,
                 "Command {:?} (spawn)\n  ERROR {:?}",

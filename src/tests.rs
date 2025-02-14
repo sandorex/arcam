@@ -1,8 +1,11 @@
 mod test_permissions;
 
-use std::{fmt::{Debug, Display}, ops::Deref};
 use crate::engine::Engine;
 use anyhow::Result;
+use std::{
+    fmt::{Debug, Display},
+    ops::Deref,
+};
 
 // NOTE: This test is not useless, it prevents running tests on outdated main binary
 #[test]
@@ -18,9 +21,9 @@ fn test_sanity() -> Result<()> {
 
 #[allow(unused)]
 pub mod prelude {
-    pub use anyhow::Result;
     pub use super::Container;
     pub use crate::engine::Engine;
+    pub use anyhow::Result;
 }
 
 /// RAII guard to stop running containers
@@ -48,9 +51,9 @@ impl Drop for Container {
 }
 
 impl Deref for Container {
-   type Target = String;
+    type Target = String;
 
-   fn deref(&self) -> &Self::Target {
-       &self.container
-   }
+    fn deref(&self) -> &Self::Target {
+        &self.container
+    }
 }

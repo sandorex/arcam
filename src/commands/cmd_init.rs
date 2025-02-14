@@ -1,13 +1,13 @@
 //! Contains all code that should run inside the container as the init
 
 use crate::command_extensions::*;
-use crate::FULL_VERSION;
 use crate::prelude::*;
+use crate::FULL_VERSION;
 use std::fs::OpenOptions;
-use std::{env, fs};
+use std::io::prelude::*;
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::io::prelude::*;
+use std::{env, fs};
 
 /// Walk recursively collecting files/symlinks into one vec, dirs into another
 fn walk_dir(dir: &Path, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {
@@ -29,7 +29,7 @@ fn walk_dir(dir: &Path, files: &mut Vec<PathBuf>, dirs: &mut Vec<PathBuf>) {
                         // all other files are errors cause they should not be there
                         eprintln!("Invalid file type at {:?}", clean_path);
                     }
-                },
+                }
                 Err(x) => eprintln!("Could not determine file type: {}", x),
             },
             Err(x) => eprintln!("Error while reading directory: {}", x),
@@ -64,12 +64,9 @@ fn make_executable(path: &Path) -> Result<(), std::io::Error> {
 fn initialization() -> Result<()> {
     println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
 
-    let user = std::env::var("HOST_USER")
-        .context("HOST_USER is undefined")?;
-    let uid = std::env::var("HOST_USER_UID")
-        .context("HOST_USER_UID is undefined")?;
-    let gid = std::env::var("HOST_USER_GID")
-        .context("HOST_USER_GID is undefined")?;
+    let user = std::env::var("HOST_USER").context("HOST_USER is undefined")?;
+    let uid = std::env::var("HOST_USER_UID").context("HOST_USER_UID is undefined")?;
+    let gid = std::env::var("HOST_USER_GID").context("HOST_USER_GID is undefined")?;
 
     let uid_u: u32 = uid.parse().unwrap();
     let gid_u: u32 = gid.parse().unwrap();
@@ -99,9 +96,12 @@ fn initialization() -> Result<()> {
 
         Command::new("useradd")
             .args([
-                "--shell", shell,
-                "--home-dir", &home,
-                "--uid", &uid,
+                "--shell",
+                shell,
+                "--home-dir",
+                &home,
+                "--uid",
+                &uid,
                 "--user-group",
                 "--no-create-home",
                 &user,
@@ -111,11 +111,7 @@ fn initialization() -> Result<()> {
         println!("Modifying user {:?}", user);
 
         Command::new("usermod")
-            .args([
-                "--home", &home,
-                "--shell", shell,
-                &user,
-            ])
+            .args(["--home", &home, "--shell", shell, &user])
             .log_status_anyhow(log::Level::Debug)?
     };
 
@@ -127,25 +123,24 @@ fn initialization() -> Result<()> {
 
     // create the home directory if missing
     if !Path::new(&home).exists() {
-        fs::create_dir(&home)
-            .context("Failed to create user home")?;
+        fs::create_dir(&home).context("Failed to create user home")?;
     }
 
     // make sure its own by the user
-    chown(&home, Some(uid_u), Some(gid_u))
-        .context("Failed to chown user home directory")?;
+    chown(&home, Some(uid_u), Some(gid_u)).context("Failed to chown user home directory")?;
 
     // generate font cache just in case
     {
         println!("Recreating font cache");
 
-        let cmd = Command::new("fc-cache")
-            .log_status(log::Level::Debug);
+        let cmd = Command::new("fc-cache").log_status(log::Level::Debug);
 
         match cmd {
-            Ok(x) => if !x.success() {
-                return Err(anyhow!("Failed to regenerate font cache"));
-            },
+            Ok(x) => {
+                if !x.success() {
+                    return Err(anyhow!("Failed to regenerate font cache"));
+                }
+            }
             // some images may not have it so im just gonna ignore it
             Err(_) => println!("Failed to execute fc-cache, ignoring error.."),
         }
@@ -202,8 +197,7 @@ fn initialization() -> Result<()> {
         chown(&dest, Some(uid_u), Some(gid_u))?;
 
         // set permission
-        let mut perm = fs::symlink_metadata(&dest)?
-            .permissions();
+        let mut perm = fs::symlink_metadata(&dest)?.permissions();
 
         perm.set_mode(0o700);
 
@@ -214,9 +208,7 @@ fn initialization() -> Result<()> {
     if has_sudo {
         println!("Enabling passwordless sudo for everyone");
 
-        let mut file = OpenOptions::new()
-            .append(true)
-            .open("/etc/sudoers")?;
+        let mut file = OpenOptions::new().append(true).open("/etc/sudoers")?;
 
         // disable hostname resolving
         writeln!(file, "Defaults !fqdn")?;
@@ -243,12 +235,18 @@ fn initialization() -> Result<()> {
         let mut files: Vec<PathBuf> = vec![];
         for entry in init_dir.read_dir().unwrap().flatten() {
             // make sure its executable
-            if !entry.metadata().is_ok_and(|x| x.permissions().mode() & 0o111 != 0) {
+            if !entry
+                .metadata()
+                .is_ok_and(|x| x.permissions().mode() & 0o111 != 0)
+            {
                 make_executable(&entry.path())?;
             }
 
             // accept both files and symlinks
-            if !entry.file_type().is_ok_and(|x| x.is_file() || x.is_symlink()) {
+            if !entry
+                .file_type()
+                .is_ok_and(|x| x.is_file() || x.is_symlink())
+            {
                 continue;
             }
 
@@ -272,7 +270,8 @@ fn initialization() -> Result<()> {
                     .args([&user, "-c"])
                     .arg(&file)
                     .log_status_anyhow(log::Level::Debug)
-            }.with_context(|| anyhow!("Script {:?} has failed", file))?;
+            }
+            .with_context(|| anyhow!("Script {:?} has failed", file))?;
         }
     }
 
@@ -286,18 +285,16 @@ fn initialization() -> Result<()> {
 
 pub fn container_init() -> Result<()> {
     // create needed directories
-    for dir in [
-        crate::ARCAM_DIR,
-        crate::INIT_D_DIR,
-        "/tmp/.X11-unix",
-    ] {
+    for dir in [crate::ARCAM_DIR, crate::INIT_D_DIR, "/tmp/.X11-unix"] {
         if !Path::new(dir).exists() {
             std::fs::create_dir(dir)?;
         }
     }
 
     // small wrapper to run as root regardless if sudo is available
-    std::fs::write("/bin/asroot", r#"#!/bin/sh
+    std::fs::write(
+        "/bin/asroot",
+        r#"#!/bin/sh
 set -e
 
 if command -v sudo >/dev/null; then
@@ -305,7 +302,8 @@ if command -v sudo >/dev/null; then
 else
     su -c "$*" -g root root
 fi
-"#)?;
+"#,
+    )?;
     make_executable(Path::new("/bin/asroot"))?;
 
     // create the flag file to start preinit

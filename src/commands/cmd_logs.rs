@@ -1,5 +1,5 @@
-use crate::command_extensions::*;
 use crate::cli;
+use crate::command_extensions::*;
 use crate::prelude::*;
 
 pub fn print_logs(ctx: Context, mut cli_args: cli::CmdLogsArgs) -> Result<()> {
@@ -7,7 +7,9 @@ pub fn print_logs(ctx: Context, mut cli_args: cli::CmdLogsArgs) -> Result<()> {
     if cli_args.name.is_empty() {
         let containers = ctx.get_cwd_containers()?;
         if containers.is_empty() {
-            return Err(anyhow!("Could not find a running container in current directory"));
+            return Err(anyhow!(
+                "Could not find a running container in current directory"
+            ));
         }
 
         cli_args.name = containers.first().unwrap().clone();

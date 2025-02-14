@@ -4,12 +4,10 @@ pub fn rand() -> u32 {
 
     const ERR_MSG: &str = "Error reading /dev/urandom";
 
-    let mut rng = std::fs::File::open("/dev/urandom")
-        .expect(ERR_MSG);
+    let mut rng = std::fs::File::open("/dev/urandom").expect(ERR_MSG);
 
     let mut buffer = [0u8; 4];
-    rng.read_exact(&mut buffer)
-        .expect(ERR_MSG);
+    rng.read_exact(&mut buffer).expect(ERR_MSG);
 
     u32::from_be_bytes(buffer)
 }
@@ -24,10 +22,12 @@ pub fn prompt(prompt: &str) -> bool {
 
     let _ = std::io::stdout().flush();
 
-    std::io::stdin().read_line(&mut s).expect("Could not read stdin");
+    std::io::stdin()
+        .read_line(&mut s)
+        .expect("Could not read stdin");
     s = s.trim().to_string();
 
-    matches!(s.to_lowercase().as_str(), "y"|"yes")
+    matches!(s.to_lowercase().as_str(), "y" | "yes")
 }
 
 /// Check whether executable exists in PATH
@@ -43,8 +43,8 @@ pub fn executable_in_path(cmd: &str) -> bool {
 
 /// Check if running inside a container
 pub fn is_in_container() -> bool {
-    use std::path::Path;
     use std::env;
+    use std::path::Path;
 
     Path::new("/run/.containerenv").exists()
         || Path::new("/.dockerenv").exists()
