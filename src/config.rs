@@ -5,16 +5,6 @@ use code_docs::{code_docs_struct, DocumentedStruct};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-// TODO how do i do code_docs with the enum?
-// TODO use this everywhere
-// #[derive(Debug, Clone, PartialEq, Default, Deserialize, Serialize)]
-// pub enum ConfigFileNew {
-//     #[serde(rename = "1")]
-//     V1 {
-//
-//     }
-// }
-
 /// Whole config file
 #[derive(Debug, Clone, PartialEq, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -48,7 +38,6 @@ code_docs_struct! {
     #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
     #[serde(deny_unknown_fields)]
     pub struct Config {
-        // TODO redo these comments so they are easy to understand even for non-rust programmers
         /// Image used for the container
         pub image: String,
 

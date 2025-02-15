@@ -302,6 +302,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         "init",
     ]);
 
+    // TODO check if image exists and pull it interactively
+
     if ctx.dry_run {
         cmd.log(log::Level::Error);
 

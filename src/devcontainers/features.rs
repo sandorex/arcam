@@ -1,11 +1,9 @@
 //! Everything that has to do with devcontainer features
 
+use ureq::{http::{header::{ACCEPT, AUTHORIZATION}, Response}, Body};
 use super::structure::Manifest;
 use crate::prelude::*;
 use std::collections::HashMap;
-
-const HEADER_ACCEPT: &str = "Accept";
-const HEADER_AUTHORIZATION: &str = "Authorization";
 
 // TODO add error context to all functions in this fiel
 
@@ -41,8 +39,8 @@ pub fn oci_fetch_manifest(
     let mut resp = ureq::get(format!(
         "https://{repository}/v2/{namespace}/manifests/{tag}"
     ))
-    .header("Accept", "application/vnd.oci.image.manifest.v1+json")
-    .header("Authorization", format!("Bearer {token}"))
+    .header(ACCEPT, "application/vnd.oci.image.manifest.v1+json")
+    .header(AUTHORIZATION, format!("Bearer {token}"))
     .call()?;
 
     if resp.status().is_success() {
@@ -50,15 +48,34 @@ pub fn oci_fetch_manifest(
         Manifest::from_str(&text)
     } else {
         Err(anyhow!(
-            "Could not get manifest for \"{}:{}\" from repository {:?}",
+            "Could not get manifest for \"{}:{}\" from repository {:?} (status {})",
             namespace,
             tag,
-            repository
+            repository,
+            resp.status()
         ))
     }
 }
 
 /// Pulls OCI blob and returns the response
+fn oci_pull_blob(
+    token: &str,
+    repository: &str,
+    namespace: &str,
+    digest: &str,
+    media_type: &str,
+) -> Result<Response<Body>> {
+    Ok(
+        ureq::get(format!(
+                "https://{repository}/v2/{namespace}/blobs/{digest}"
+        ))
+        .header(ACCEPT, media_type)
+        .header(AUTHORIZATION, format!("Bearer {token}"))
+        .call()?
+    )
+}
+
+/// Downloads blob as path
 pub fn oci_download_blob(
     token: &str,
     repository: &str,
@@ -67,16 +84,13 @@ pub fn oci_download_blob(
     media_type: &str,
     path: &str,
 ) -> Result<()> {
-    let mut response = ureq::get(format!(
-        "https://{repository}/v2/{namespace}/blobs/{digest}"
-    ))
-    .header("Accept", media_type)
-    .header("Authorization", format!("Bearer {token}"))
-    .call()?;
+    let mut response = oci_pull_blob(token, repository, namespace, digest, media_type)?;
 
-    // write data to file
-    let mut file = std::fs::File::create(path)?;
-    std::io::copy(&mut response.body_mut().as_reader(), &mut file)?;
+    let mut file = std::fs::File::create_new(path)
+        .with_context(|| anyhow!("Creating file {:?}", path))?;
+
+    std::io::copy(&mut response.body_mut().as_reader(), &mut file)
+        .with_context(|| anyhow!("Writing blob to {:?}", path))?;
 
     Ok(())
 }
