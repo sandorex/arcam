@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-pub struct ManifestConfig {
+pub struct OCIManifestConfig {
     #[serde(rename = "mediaType")]
     pub media_type: String,
     pub digest: String,
@@ -20,7 +20,7 @@ pub struct ManifestConfig {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ManifestLayer {
+pub struct OCIManifestLayer {
     #[serde(rename = "mediaType")]
     pub media_type: String,
     pub digest: String,
@@ -29,22 +29,22 @@ pub struct ManifestLayer {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ManifestV2 {
+pub struct OCIManifestV2 {
     #[serde(rename = "schemaVersion")]
     pub schema_version: u32,
     #[serde(rename = "mediaType")]
     pub media_type: String,
-    pub config: ManifestConfig,
-    pub layers: Vec<ManifestLayer>,
+    pub config: OCIManifestConfig,
+    pub layers: Vec<OCIManifestLayer>,
     pub annotations: HashMap<String, String>,
 }
 
 #[derive(Debug)]
-pub enum Manifest {
-    V2(ManifestV2),
+pub enum OCIManifest {
+    V2(OCIManifestV2),
 }
 
-impl Manifest {
+impl OCIManifest {
     pub fn from_str(input: &str) -> Result<Self> {
         // parse everything as generic json
         let val = serde_json::from_str::<serde_json::Value>(input)?;
@@ -60,7 +60,7 @@ impl Manifest {
             .with_context(|| anyhow!("Schema version is not an u64"))?;
 
         let config = match version {
-            2 => Manifest::V2(serde_json::from_value::<ManifestV2>(input)?),
+            2 => OCIManifest::V2(serde_json::from_value::<OCIManifestV2>(input)?),
             _ => return Err(anyhow!("Unsupported schema version {:?}", version)),
         };
 
@@ -76,7 +76,8 @@ impl Manifest {
 // }
 
 #[derive(Debug, Deserialize)]
-pub enum ArrayString {
+#[serde(untagged)]
+pub enum ArrayOrString {
     String(String),
     Array(Vec<String>),
 }
@@ -89,14 +90,15 @@ pub enum ArrayString {
 /// Object: All lifecycle scripts have been extended to support object types to allow for parallel execution
 /// (source: https://containers.dev/implementors/json_reference/#formatting-string-vs-array-properties)
 #[derive(Debug, Deserialize)]
-pub enum ArrayStringObject {
-    ArrayString(ArrayString),
-    Object(HashMap<String, ArrayString>),
+#[serde(untagged)]
+pub enum ExecCommands {
+    String(String),
+    Array(Vec<String>),
+    Object(HashMap<String, ArrayOrString>),
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Feature {
-    // // these are ordered as in the schema file
+pub struct FeatureManifest {
     // #[serde(rename = "capAdd")]
     // pub capability_add: Vec<String>,
     //
@@ -136,15 +138,15 @@ pub struct Feature {
 
     // TODO object, string or array of strinsg
     #[serde(rename = "securityOpt")]
-    pub on_create_cmd: ArrayStringObject,
+    pub on_create_cmd: ExecCommands,
 
     // TODO same as on_create_cmd
     #[serde(rename = "postCreateCommand")]
-    pub post_create_cmd: ArrayStringObject,
+    pub post_create_cmd: ExecCommands,
 
     // TODO same as on_create_cmd
     #[serde(rename = "postStartCommand")]
-    pub post_start_cmd: ArrayStringObject,
+    pub post_start_cmd: ExecCommands,
     // TODO this one is not possible atm
     // // TODO same as on_create_cmd
     // #[serde(rename = "postAttachCommand")]
