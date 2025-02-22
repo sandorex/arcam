@@ -98,7 +98,7 @@ pub struct CmdStartArgs {
     ///
     /// For details check out https://containers.dev/features
     #[arg(long, value_parser = Feature::parse_cli)]
-    pub feature: Feature,
+    pub feature: Vec<Feature>,
 
     /// Path to directory which will be used as /etc/skel inside the container
     ///
