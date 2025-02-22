@@ -302,6 +302,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         "init",
     ]);
 
+    // TODO resolve features
+    let _ = resolve_features(&ctx, &cli_args)?;
+
     // TODO check if image exists and pull it interactively
 
     if ctx.dry_run {

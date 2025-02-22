@@ -2,6 +2,8 @@ use crate::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+pub const ANNOTATION_FEATURE_METADATA: &str = "dev.containers.metadata";
+
 //   "annotations": {
 //     "dev.containers.metadata": "{\"id\":\"anaconda\",\"version\":\"1.0.12\",\"name\":\"Anaconda\",\"documentationURL\":\"https://github.com/devcontainers/features/tree/main/src/anaconda\",\"options\":{\"version\":{\"type\":\"string\",\"proposals\":[\"latest\"],\"default\":\"latest\",\"description\":\"Select or enter an anaconda version.\"}},\"containerEnv\":{\"CONDA_DIR\":\"/usr/local/conda\",\"PATH\":\"/usr/local/conda/bin:${PATH}\"},\"installsAfter\":[\"ghcr.io/devcontainers/features/common-utils\"]}",
 //     "com.github.package.type": "devcontainer_feature"

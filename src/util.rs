@@ -93,6 +93,7 @@ pub fn tsort<T: Graph>(graph: Vec<&T>) -> Vec<&T> {
     result
 }
 
+// TODO do proper test
 #[cfg(test)]
 mod tests {
     use std::fmt::Debug;

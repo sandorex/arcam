@@ -1,7 +1,7 @@
 //! Everything that has to do with devcontainer features
 
 use ureq::{http::{header::{ACCEPT, AUTHORIZATION}, Response}, Body};
-use super::structure::OCIManifest;
+use super::structure::{FeatureManifest, OCIManifest, ANNOTATION_FEATURE_METADATA};
 use crate::prelude::*;
 use std::{collections::HashMap, str::FromStr};
 
@@ -16,6 +16,43 @@ pub enum Feature {
         namespace: String,
         tag: Option<String>,
     },
+}
+
+impl Feature {
+    pub fn manifest(&self) -> Result<FeatureManifest> {
+        match self {
+            Self::Local(x) => {
+                let path = std::path::Path::new(x)
+                    .join("devcontainer-feature.json");
+
+                if !path.exists() {
+                    return Err(anyhow!("Could not find devcontainer-feature.json in feature {x:?}"));
+                }
+
+                let contents = std::fs::read_to_string(&path)
+                    .with_context(|| anyhow!("Could not read file {path:?}"))?;
+
+                Ok(serde_json::from_str::<FeatureManifest>(&contents)
+                    .with_context(|| anyhow!("Could not deserialize feature manifest {path:?}"))?)
+            },
+            Self::Remote { repository, namespace, tag } => {
+                let token = oci_get_token(repository, namespace)?;
+                let tag = tag.clone().map_or_else(|| "latest".to_string(), |x| x.to_string());
+                let OCIManifest::V2(oci_manifest) = oci_fetch_manifest(&token, repository, namespace, &tag)?;
+
+                // TODO log this for debugging
+
+                // parse feature manifest from label on oci manifest
+                let metadata = oci_manifest.annotations.get(ANNOTATION_FEATURE_METADATA)
+                    .with_context(|| anyhow!("Could not read feature metadata annotation in OCI manifest"))?;
+
+                let metadata = serde_json::from_str::<FeatureManifest>(&metadata)
+                    .with_context(|| anyhow!("Error parsing feature metadata from annotation"))?;
+
+                Ok(metadata)
+            },
+        }
+    }
 }
 
 impl Feature {
