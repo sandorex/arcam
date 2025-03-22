@@ -11,7 +11,7 @@ mod vars;
 #[cfg(test)]
 mod tests;
 
-use anyhow::anyhow;
+use anyhow::{Result, anyhow};
 use clap::Parser;
 use cli::CliCommands;
 
@@ -29,12 +29,9 @@ pub mod prelude {
     pub use anyhow::{anyhow, Context as AnyhowContext, Result};
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
     let args = cli::Cli::parse();
-
     simple_logger::init_with_level(args.log_level)?;
-
-
 
     let get_ctx = || {
         if !util::executable_in_path("podman") {

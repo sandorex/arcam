@@ -1,11 +1,16 @@
 //! Everything that has to do with devcontainer features
 
-use super::structure::FeatureManifest;
-use crate::prelude::*;
-use std::{collections::HashMap, path::Path, str::FromStr};
+use base64::Engine;
 
+use super::structure::FeatureManifest;
+use crate::{prelude::*, util};
+use std::path::{Path, PathBuf};
+
+const FEATURE_MANIFEST_FILENAME: &str = "devcontainer-feature.json";
+
+/// Path to a feature, local, remote, OCI or not
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Feature {
+pub enum FeaturePath {
     /// Feature contained on local filesystem
     Local(String),
 
@@ -14,52 +19,14 @@ pub enum Feature {
         tag: Option<String>,
     },
 
-    // OCI {
-    //     repository: String,
-    //     namespace: String,
-    //     tag: Option<String>,
-    // },
+    OCI {
+        repository: String,
+        namespace: String,
+        tag: Option<String>,
+    },
 }
 
-impl Feature {
-    /// Get manifest for the feature, temp_dir is used for storing
-    pub fn get_manifest(&self, temp_dir: &Path) -> Result<FeatureManifest> {
-        match self {
-            Self::Local(x) => {
-                let path = Path::new(x)
-                    .join("devcontainer-feature.json");
-
-                if !path.exists() {
-                    return Err(anyhow!("Could not find devcontainer-feature.json in feature {x:?}"));
-                }
-
-                let contents = std::fs::read_to_string(&path)
-                    .with_context(|| anyhow!("Could not read file {path:?}"))?;
-
-                Ok(serde_json::from_str::<FeatureManifest>(&contents)
-                    .with_context(|| anyhow!("Could not deserialize feature manifest {path:?}"))?)
-            },
-            Self::Git { .. } => todo!(),
-        }
-    }
-}
-
-pub fn read_manifest(feature_dir: &Path) -> Result<FeatureManifest> {
-    let path = feature_dir
-        .join("devcontainer-feature.json");
-
-    if !path.exists() {
-        return Err(anyhow!("Could not find devcontainer-feature.json in feature {feature_dir:?}"));
-    }
-
-    let contents = std::fs::read_to_string(&path)
-        .with_context(|| anyhow!("Could not read file {path:?}"))?;
-
-    Ok(serde_json::from_str::<FeatureManifest>(&contents)
-        .with_context(|| anyhow!("Could not deserialize feature manifest {path:?}"))?)
-}
-
-impl Feature {
+impl FeaturePath {
     pub fn parse(input: &str) -> Result<Self> {
         if input.starts_with("./") || input.starts_with("/") {
             Ok(Self::Local(input.to_string()))
@@ -91,92 +58,81 @@ impl Feature {
     }
 }
 
-pub fn oci_get_token(repository: &str, namespace: &str) -> Result<String> {
-    match repository {
-        "ghcr.io" => ureq::get("https://ghcr.io/token")
-            .query_pairs(vec![
-                ("service", "ghcr.io"),
-                ("scope", &format!("repository:{namespace}:pull")),
-            ])
-            .call()?
-            .body_mut()
-            .read_json::<HashMap<String, String>>()?
-            .get("token")
-            .cloned()
-            .ok_or_else(|| anyhow!("No token returned from \"https://{repository}/token\"")),
+/// This is a feature that was already fetched, and exists physically
+#[derive(Debug, Clone, PartialEq)]
+pub struct Feature {
+    pub feature_path: FeaturePath,
+    pub path: PathBuf,
+    pub is_oci: bool,
+}
 
-        _ => {
-            return Err(anyhow::anyhow!(
-                "Unknown repository {:?} cannot get token",
-                repository
-            ))
+impl Feature {
+    /// Caches the feature into the directory
+    pub fn cache_feature(feature_path: FeaturePath, cache_dir: &Path) -> Result<Self> {
+        match feature_path {
+            FeaturePath::Local(ref path) => {
+                let path = PathBuf::from(path);
+
+                if !path.exists() {
+                    return Err(anyhow!("Local feature does not exist at {path:?}"));
+                }
+
+                // do not copy local features
+                Ok(Self {
+                    feature_path,
+                    is_oci: path.join(FEATURE_MANIFEST_FILENAME).exists(),
+                    path,
+                })
+            },
+            FeaturePath::Git { ref url, ref tag } => {
+                use base64::prelude::BASE64_STANDARD;
+
+                // use url and tag encoded as base64 for cache
+                let path = if let Some(ref tag) = tag {
+                    cache_dir.join(format!(
+                        "{}_{}",
+                        BASE64_STANDARD.encode(&url),
+                        BASE64_STANDARD.encode(&tag),
+                    ))
+                } else {
+                    cache_dir.join(format!(
+                        "{}",
+                        BASE64_STANDARD.encode(&url),
+                    ))
+                };
+
+                // if the path does not exist then clone it
+                // TODO ensure the it is not an empty directory
+                if !path.exists() {
+                    // TODO maybe replace with git2 crate for the progress bar etc?
+                    util::git_clone(&path, &url, tag.as_deref())?;
+                }
+
+                Ok(Self {
+                    feature_path,
+                    is_oci: path.join(FEATURE_MANIFEST_FILENAME).exists(),
+                    path,
+                })
+            },
+            FeaturePath::OCI { .. } => todo!(),
         }
     }
-}
 
-pub fn oci_fetch_manifest(
-    token: &str,
-    repository: &str,
-    namespace: &str,
-    tag: &str,
-) -> Result<OCIManifest> {
-    let mut resp = ureq::get(format!(
-        "https://{repository}/v2/{namespace}/manifests/{tag}"
-    ))
-    .header(ACCEPT, "application/vnd.oci.image.manifest.v1+json")
-    .header(AUTHORIZATION, format!("Bearer {token}"))
-    .call()?;
+    pub fn read_manifest(&self) -> Result<FeatureManifest> {
+        assert!(self.is_oci);
 
-    if resp.status().is_success() {
-        let text = resp.body_mut().read_to_string()?;
-        OCIManifest::from_str(&text)
-    } else {
-        Err(anyhow!(
-            "Could not get manifest for \"{}:{}\" from repository {:?} (status {})",
-            namespace,
-            tag,
-            repository,
-            resp.status()
-        ))
+        let file_path = self.path.join(FEATURE_MANIFEST_FILENAME);
+
+        if !file_path.exists() {
+            return Err(anyhow!("Could not find devcontainer-feature.json in feature {:?}", self.path));
+        }
+
+        let contents = std::fs::read_to_string(&file_path)
+            .with_context(|| anyhow!("Could not read file {file_path:?}"))?;
+
+        Ok(serde_json::from_str::<FeatureManifest>(&contents)
+            .with_context(|| anyhow!("Could not deserialize feature manifest {file_path:?}"))?)
     }
-}
-
-/// Pulls OCI blob and returns the response
-fn oci_pull_blob(
-    token: &str,
-    repository: &str,
-    namespace: &str,
-    digest: &str,
-    media_type: &str,
-) -> Result<Response<Body>> {
-    Ok(
-        ureq::get(format!(
-                "https://{repository}/v2/{namespace}/blobs/{digest}"
-        ))
-        .header(ACCEPT, media_type)
-        .header(AUTHORIZATION, format!("Bearer {token}"))
-        .call()?
-    )
-}
-
-/// Downloads blob as path
-pub fn oci_download_blob(
-    token: &str,
-    repository: &str,
-    namespace: &str,
-    digest: &str,
-    media_type: &str,
-    path: &str,
-) -> Result<()> {
-    let mut response = oci_pull_blob(token, repository, namespace, digest, media_type)?;
-
-    let mut file = std::fs::File::create_new(path)
-        .with_context(|| anyhow!("Creating file {:?}", path))?;
-
-    std::io::copy(&mut response.body_mut().as_reader(), &mut file)
-        .with_context(|| anyhow!("Writing blob to {:?}", path))?;
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -184,33 +140,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_feature_parse() {
+    fn feature_path_parse() {
         assert_eq!(
-            Feature::parse_cli("/feature/local"),
-            Ok(Feature::Local("/feature/local".to_string()))
+            FeaturePath::parse_cli("/feature/local"),
+            Ok(FeaturePath::Local("/feature/local".to_string()))
         );
 
         assert_eq!(
-            Feature::parse_cli("./feature/local"),
-            Ok(Feature::Local("./feature/local".to_string()))
+            FeaturePath::parse_cli("./feature/local"),
+            Ok(FeaturePath::Local("./feature/local".to_string()))
         );
 
         assert_eq!(
-            Feature::parse_cli("ghcr.io/devcontainers/features/anaconda:1.0.12"),
-            Ok(Feature::Remote {
-                repository: "ghcr.io".to_string(),
-                namespace: "/devcontainers/features/anaconda".to_string(),
-                tag: Some("1.0.12".to_string()),
+            FeaturePath::parse_cli("git://github.com/sandorex/config"),
+            Ok(FeaturePath::Git {
+                url: "github.com/sandorex/config".to_string(),
+                tag: None,
             })
         );
 
         assert_eq!(
-            Feature::parse_cli("ghcr.io/devcontainers/features/anaconda"),
-            Ok(Feature::Remote {
-                repository: "ghcr.io".to_string(),
-                namespace: "/devcontainers/features/anaconda".to_string(),
+            FeaturePath::parse_cli("git://github.com/sandorex/config#dev"),
+            Ok(FeaturePath::Git {
+                url: "github.com/sandorex/config".to_string(),
+                tag: Some("dev".to_string()),
+            })
+        );
+
+        assert_eq!(
+            FeaturePath::parse_cli("git@github.com:sandorex/config.git"),
+            Ok(FeaturePath::Git {
+                url: "git@github.com:sandorex/config.git".to_string(),
                 tag: None,
+            })
+        );
+
+        assert_eq!(
+            FeaturePath::parse_cli("git@github.com:sandorex/config.git#v1.0"),
+            Ok(FeaturePath::Git {
+                url: "git@github.com:sandorex/config.git".to_string(),
+                tag: Some("v1.0".to_string()),
             })
         );
     }
 }
+

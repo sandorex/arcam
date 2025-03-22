@@ -1,7 +1,8 @@
+use std::path::Path;
 use crate::command_ext::command_extensions::*;
 
 /// Clones git repository using external git, tag is either a branch or a tag
-pub fn git_clone(path: &str, repository: &str, tag: Option<&str>) -> anyhow::Result<()> {
+pub fn git_clone(path: &Path, repository: &str, tag: Option<&str>) -> anyhow::Result<()> {
     let mut command = Command::new("git");
 
     command.args(["clone", "--depth", "1"]);
@@ -10,7 +11,8 @@ pub fn git_clone(path: &str, repository: &str, tag: Option<&str>) -> anyhow::Res
         command.args(["--branch", tag]);
     }
 
-    command.args(["--", repository, path]);
+    command.args(["--", repository]);
+    command.arg(path);
 
     // allows easy debugging by printing stdout
     if log::log_enabled!(log::Level::Debug) {

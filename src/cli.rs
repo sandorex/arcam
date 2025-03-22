@@ -1,4 +1,4 @@
-use crate::{config::Config, devcontainers::features::Feature, Context, FULL_VERSION};
+use crate::{config::Config, devcontainers::features::FeaturePath, Context, FULL_VERSION};
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -90,20 +90,8 @@ pub struct CmdStartArgs {
     #[arg(long)]
     pub shell: Option<String>,
 
-    // TODO update the docs
-    /// Add devcontainer compatible feature, supported formats:
-    ///
-    ///   1. Absolute or relative path to feature (`/my/feature` or `./my/feature`)
-    ///
-    ///   3. Git repository with tag/sha in two formats:
-    ///     TODO
-    ///
-    ///   2. URL to feature in OCI repository (`ghcr.io/devcontainers/features/anaconda:1.0.0`)
-    ///      with the version/tag being optional
-    ///
-    /// For details check out https://containers.dev/features
-    #[arg(long, value_parser = Feature::parse_cli, help_heading = START_HEADING_EXPERIMENTAL)]
-    pub feature: Vec<Feature>,
+    #[arg(long, value_name = "DIR|GIT|OCI", value_parser = FeaturePath::parse_cli, help_heading = START_HEADING_EXPERIMENTAL)]
+    pub feature: Vec<FeaturePath>,
 
     /// Path to directory which will be used as /etc/skel inside the container
     ///
