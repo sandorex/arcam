@@ -1,28 +1,32 @@
 //! Everything that has to do with devcontainer features
 
-use ureq::{http::{header::{ACCEPT, AUTHORIZATION}, Response}, Body};
-use super::structure::{FeatureManifest, OCIManifest, ANNOTATION_FEATURE_METADATA};
+use super::structure::FeatureManifest;
 use crate::prelude::*;
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, path::Path, str::FromStr};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Feature {
     /// Feature contained on local filesystem
     Local(String),
 
-    /// Feature that is on remote server
-    Remote {
-        repository: String,
-        namespace: String,
+    Git {
+        url: String,
         tag: Option<String>,
     },
+
+    // OCI {
+    //     repository: String,
+    //     namespace: String,
+    //     tag: Option<String>,
+    // },
 }
 
 impl Feature {
-    pub fn manifest(&self) -> Result<FeatureManifest> {
+    /// Get manifest for the feature, temp_dir is used for storing
+    pub fn get_manifest(&self, temp_dir: &Path) -> Result<FeatureManifest> {
         match self {
             Self::Local(x) => {
-                let path = std::path::Path::new(x)
+                let path = Path::new(x)
                     .join("devcontainer-feature.json");
 
                 if !path.exists() {
@@ -35,53 +39,48 @@ impl Feature {
                 Ok(serde_json::from_str::<FeatureManifest>(&contents)
                     .with_context(|| anyhow!("Could not deserialize feature manifest {path:?}"))?)
             },
-            Self::Remote { repository, namespace, tag } => {
-                let token = oci_get_token(repository, namespace)?;
-                let tag = tag.clone().map_or_else(|| "latest".to_string(), |x| x.to_string());
-                let OCIManifest::V2(oci_manifest) = oci_fetch_manifest(&token, repository, namespace, &tag)?;
-
-                // TODO log this for debugging
-
-                // parse feature manifest from label on oci manifest
-                let metadata = oci_manifest.annotations.get(ANNOTATION_FEATURE_METADATA)
-                    .with_context(|| anyhow!("Could not read feature metadata annotation in OCI manifest"))?;
-
-                let metadata = serde_json::from_str::<FeatureManifest>(&metadata)
-                    .with_context(|| anyhow!("Error parsing feature metadata from annotation"))?;
-
-                Ok(metadata)
-            },
+            Self::Git { .. } => todo!(),
         }
     }
+}
+
+pub fn read_manifest(feature_dir: &Path) -> Result<FeatureManifest> {
+    let path = feature_dir
+        .join("devcontainer-feature.json");
+
+    if !path.exists() {
+        return Err(anyhow!("Could not find devcontainer-feature.json in feature {feature_dir:?}"));
+    }
+
+    let contents = std::fs::read_to_string(&path)
+        .with_context(|| anyhow!("Could not read file {path:?}"))?;
+
+    Ok(serde_json::from_str::<FeatureManifest>(&contents)
+        .with_context(|| anyhow!("Could not deserialize feature manifest {path:?}"))?)
 }
 
 impl Feature {
     pub fn parse(input: &str) -> Result<Self> {
         if input.starts_with("./") || input.starts_with("/") {
-            // TODO check if valid path?
             Ok(Self::Local(input.to_string()))
+        } else if let Some(input) = input.strip_prefix("git://") {
+            // split at `#` to allow specifying the branch/tag
+            let (url, tag) = input
+                .split_once("#")
+                .map_or_else(|| (input.to_string(), None),
+                             |(x, y)| (x.to_string(), Some(y.to_string())));
+
+            Ok(Self::Git { url, tag })
+        } else if input.starts_with("git@") {
+            // split at `#` to allow specifying the branch/tag
+            let (url, tag) = input
+                .split_once("#")
+                .map_or_else(|| (input.to_string(), None),
+                             |(x, y)| (x.to_string(), Some(y.to_string())));
+
+            Ok(Self::Git { url, tag })
         } else {
-            // split at colon for the tag/version
-            let (input, tag) = input
-                .split_once(":")
-                .map_or_else(|| (input, None), |(x, y)| (x, Some(y)));
-
-            // uri cant parse if no scheme
-            let input = format!("https://{input}");
-
-            let Ok(uri) = ureq::http::Uri::from_str(&input) else {
-                return Err(anyhow!("Invalid URI {:?}", input));
-            };
-
-            let Some(host) = uri.host() else {
-                return Err(anyhow!("Could not parse host from URI {:?}", input));
-            };
-
-            Ok(Self::Remote {
-                repository: host.to_string(),
-                namespace: uri.path().to_string(),
-                tag: tag.map(|x| x.to_string()),
-            })
+            Err(anyhow!("Invalid schema for feature {input:?}"))
         }
     }
 

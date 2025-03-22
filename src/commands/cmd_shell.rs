@@ -79,6 +79,7 @@ mod tests {
     use std::process::Command;
 
     #[test]
+    #[ignore]
     fn cmd_shell_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 

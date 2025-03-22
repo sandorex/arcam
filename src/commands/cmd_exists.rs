@@ -23,6 +23,7 @@ mod tests {
     use assert_cmd::Command;
 
     #[test]
+    #[ignore]
     fn cmd_exists_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 

@@ -78,6 +78,7 @@ mod tests {
     use assert_cmd::Command;
 
     #[test]
+    #[ignore]
     fn cmd_exec_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 

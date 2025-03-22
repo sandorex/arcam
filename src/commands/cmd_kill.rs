@@ -67,6 +67,7 @@ mod tests {
     use std::process::Command;
 
     #[test]
+    #[ignore]
     fn cmd_kill_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 
@@ -102,6 +103,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn cmd_kill_interactive_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 

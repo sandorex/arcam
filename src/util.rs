@@ -1,5 +1,26 @@
-use std::{collections::HashSet, hash::Hash};
-use crate::command_ext::CommandExt;
+use crate::command_ext::command_extensions::*;
+
+/// Clones git repository using external git, tag is either a branch or a tag
+pub fn git_clone(path: &str, repository: &str, tag: Option<&str>) -> anyhow::Result<()> {
+    let mut command = Command::new("git");
+
+    command.args(["clone", "--depth", "1"]);
+
+    if let Some(tag) = tag {
+        command.args(["--branch", tag]);
+    }
+
+    command.args(["--", repository, path]);
+
+    // allows easy debugging by printing stdout
+    if log::log_enabled!(log::Level::Debug) {
+        command.log_status_anyhow(log::Level::Debug)?;
+    } else {
+        command.log_output_anyhow(log::Level::Debug)?;
+    }
+
+    Ok(())
+}
 
 /// Generate random number using `/dev/urandom`
 pub fn rand() -> u32 {

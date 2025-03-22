@@ -72,6 +72,7 @@ impl ConfigArg {
 }
 
 const START_HEADING_PERMISSIONS: &str = "Permissions";
+const START_HEADING_EXPERIMENTAL: &str = "EXPERIMENTAL";
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdStartArgs {
@@ -89,15 +90,19 @@ pub struct CmdStartArgs {
     #[arg(long)]
     pub shell: Option<String>,
 
+    // TODO update the docs
     /// Add devcontainer compatible feature, supported formats:
     ///
     ///   1. Absolute or relative path to feature (`/my/feature` or `./my/feature`)
+    ///
+    ///   3. Git repository with tag/sha in two formats:
+    ///     TODO
     ///
     ///   2. URL to feature in OCI repository (`ghcr.io/devcontainers/features/anaconda:1.0.0`)
     ///      with the version/tag being optional
     ///
     /// For details check out https://containers.dev/features
-    #[arg(long, value_parser = Feature::parse_cli)]
+    #[arg(long, value_parser = Feature::parse_cli, help_heading = START_HEADING_EXPERIMENTAL)]
     pub feature: Vec<Feature>,
 
     /// Path to directory which will be used as /etc/skel inside the container
@@ -183,8 +188,6 @@ fn parse_ports(input: &str) -> Result<(u32, u32), String> {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdShellArgs {
-    // NOTE: this used to be a positional argument but it prevented the command from be being used
-    // when the name of container was not provided
     /// Use a specific shell
     #[arg(long)]
     pub shell: Option<String>,
