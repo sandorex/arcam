@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::{collections::HashSet, hash::Hash};
 use crate::command_ext::CommandExt;
 
 /// Generate random number using `/dev/urandom`
@@ -54,7 +54,7 @@ pub fn is_in_container() -> bool {
         || env::var("container").is_ok()
 }
 
-pub trait Graph {
+pub trait Graph: PartialEq {
     /// Get dependencies
     fn graph_dependencies(&self) -> Vec<&Self>;
 
@@ -90,16 +90,23 @@ pub fn tsort<T: Graph>(graph: Vec<&T>) -> Vec<&T> {
 
     result.reverse();
 
-    result
+    // removing duplicates, expensive
+    let mut unique: Vec<&T> = vec![];
+    for i in &result {
+        if !unique.contains(i) {
+            unique.push(i);
+        }
+    }
+
+    unique
 }
 
-// TODO do proper test
 #[cfg(test)]
 mod tests {
     use std::fmt::Debug;
     use super::*;
 
-    #[derive(PartialEq, Eq, Hash)]
+    #[derive(PartialEq)]
     pub struct Sortable<'a>(pub &'a str, pub Vec<&'a Self>);
 
     impl Graph for Sortable<'_> {
@@ -110,11 +117,54 @@ mod tests {
 
     impl Debug for Sortable<'_> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            if self.1.is_empty() {
-                write!(f, "{:?}", self.0)
-            } else {
-                write!(f, "{:?} {:?}", self.0, self.1)
-            }
+            write!(f, "{:?}({})", self.0, self.1.len())
         }
     }
+
+    #[test]
+    fn tsort_basic() {
+        // NOTE: im using output from `cargo graph` for this test
+
+        let syn = Sortable("syn", vec![]);
+        let quote = Sortable("quote", vec![]);
+        let proc_macro2 = Sortable("proc_macro2", vec![]);
+        let serde_derive = Sortable("serde_derive", vec![&proc_macro2, &quote, &syn]);
+        let serde = Sortable("serde", vec![&serde_derive]);
+
+        let ryu = Sortable("ryu", vec![]);
+        let memchr = Sortable("memchr", vec![]);
+        let itoa = Sortable("itoa", vec![]);
+        let serde_json = Sortable("serde_json", vec![&itoa, &memchr, &ryu, &serde]);
+
+        let serde_spanned = Sortable("serde_spanned", vec![&serde]);
+        let winnow = Sortable("winnow", vec![]);
+        let hashbrown = Sortable("hashbrown", vec![]);
+        let equivalent = Sortable("equivalent", vec![]);
+        let indexmap = Sortable("indexmap", vec![&equivalent, &hashbrown]);
+        let toml_datetime = Sortable("toml_datetime", vec![&serde]);
+        let toml_edit = Sortable("toml_edit", vec![&indexmap, &serde, &serde_spanned, &toml_datetime, &winnow]);
+        let toml = Sortable("toml", vec![&serde, &serde_spanned, &toml_datetime, &toml_edit]);
+
+        let sorted: Vec<&Sortable> = tsort(vec![&serde, &serde_json, &toml]);
+
+        assert_eq!(
+            sorted,
+            vec![&syn, &quote, &proc_macro2, &serde_derive, &serde, &hashbrown, &equivalent, &winnow, &toml_datetime, &serde_spanned, &indexmap, &toml_edit, &ryu, &memchr, &itoa, &toml, &serde_json,]
+        );
+
+        // basic example
+        let d = Sortable("D", vec![]);
+        let c = Sortable("C", vec![&d]);
+        let a = Sortable("A", vec![&c, &d]);
+        let e = Sortable("E", vec![&c, &a]);
+        let b = Sortable("B", vec![&e, &d]);
+
+        let sorted: Vec<&Sortable> = tsort(vec![&d, &c, &a, &e, &b]);
+
+        assert_eq!(
+            sorted,
+            vec![&d, &c, &a, &e, &b],
+        );
+    }
+}
 
