@@ -1,7 +1,5 @@
 use crate::cli::CmdStartArgs;
 use crate::command_extensions::*;
-use crate::devcontainers::features::Feature;
-use crate::devcontainers::structure::FeatureManifest;
 use crate::prelude::*;
 use crate::util;
 use crate::APP_NAME;
@@ -283,27 +281,8 @@ pub fn mount_session_bus(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Comma
 }
 
 pub fn resolve_features(ctx: &Context, cli_args: &CmdStartArgs) -> Result<()> {
-    let features: Vec<FeatureManifest> = vec![];
-
-    // for feature in &cli_args.feature {
-    //     match feature {
-    //         Feature::Local(path) => {
-    //             if !std::fs::exists(path)? {
-    //                 return Err(anyhow!("Could not find feature, path {path:?} does not exist"));
-    //             }
-    //         },
-    //         Feature::Remote {
-    //             repository,
-    //             namespace,
-    //             tag
-    //         } => {
-    //
-    //         },
-    //     }
-    // }
-    // TODO local feature data fetching?
-    // cli_args.feature
-
+    // TODO resolve the features and move them into the container
+    // then write the init script to run them all in sequence
     Ok(())
 }
 

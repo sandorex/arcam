@@ -1,4 +1,4 @@
-use crate::{config::Config, devcontainers::features::FeaturePath, Context, FULL_VERSION};
+use crate::{config::Config, features::FeaturePath, Context, FULL_VERSION};
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -274,7 +274,7 @@ pub struct CmdCompletionArgs {
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct CmdInstallFeatureArgs {
+pub struct CmdFeatureArgs {
     /// Features to install
     #[arg(required = true, value_name = "DIR|GIT|OCI", value_parser = FeaturePath::parse_cli)]
     pub feature: Vec<FeaturePath>,
@@ -282,8 +282,8 @@ pub struct CmdInstallFeatureArgs {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum CliCommandsExperimental {
-    /// Install features into current container
-    InstallFeature(CmdInstallFeatureArgs),
+    /// Runs one or more features
+    Feature(CmdFeatureArgs),
 }
 
 #[derive(Subcommand, Debug, Clone)]

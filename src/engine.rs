@@ -171,6 +171,7 @@ impl Engine {
     }
 
     /// Gently shutdown a container, after a timeout kill it forcefully if still running
+    #[cfg(test)]
     pub fn stop_container(&self, container: &str) -> Result<()> {
         assert!(!container.is_empty());
 

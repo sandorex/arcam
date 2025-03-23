@@ -3,7 +3,7 @@ mod command_ext;
 mod commands;
 mod config;
 mod context;
-mod devcontainers;
+mod features;
 mod engine;
 mod util;
 mod vars;
@@ -56,12 +56,34 @@ fn main() -> Result<()> {
             commands::shell_completion_generation(x)?
         },
         CliCommands::Experimental { cmd } => match cmd {
-            CliCommandsExperimental::InstallFeature(x) => {
+            // TODO move this to its own file
+            CliCommandsExperimental::Feature(x) => {
+                use features::Feature;
+                use tempfile::TempDir;
+                use std::rc::Rc;
+                use crate::command_extensions::*;
+
                 if !util::is_in_container() {
-                    return Err(anyhow!("Installing features outside a container is dangerous, qutting.."));
+                    return Err(anyhow!("Running features outside a container is dangerous, qutting.."));
                 }
 
-                dbg!(&x);
+                let temp_dir = Rc::new(TempDir::new()?);
+
+                log::debug!("Caching features in {:?}", temp_dir.path());
+
+                println!("Fetching {} features", x.feature.len());
+
+                let mut features: Vec<Feature> = vec![];
+
+                for i in x.feature {
+                    features.push(Feature::cache_feature(i, temp_dir.clone())?);
+                }
+
+                for i in &features {
+                    println!("Executing feature \"{}\"", i.feature_path);
+
+                    i.command().log_status_anyhow(log::Level::Debug)?;
+                }
             },
         },
         CliCommands::Init => {
