@@ -8,7 +8,7 @@ const AFTER_HELP: &str = concat!(
 );
 
 /// Sandboxed development container manager, with focus on security by default
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(name = crate::APP_NAME, author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
 pub struct Cli {
     /// Just print engine commands that would've been ran, do not execute
@@ -273,9 +273,22 @@ pub struct CmdCompletionArgs {
     pub complete: Option<crate::commands::ShellCompletionType>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Args, Debug, Clone)]
+pub struct CmdInstallFeatureArgs {
+    /// Features to install
+    #[arg(value_name = "DIR|GIT|OCI", value_parser = FeaturePath::parse_cli)]
+    pub feature: Vec<FeaturePath>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum CliCommandsExperimental {
+    /// Install features into current container
+    InstallFeature(CmdInstallFeatureArgs),
+}
+
+#[derive(Subcommand, Debug, Clone)]
 pub enum CliCommands {
-    /// Start a container in current directory, mounting it rw
+    /// Start a container in current directory, mounting it read-write
     Start(CmdStartArgs),
 
     /// Enter the shell inside a running container
@@ -307,6 +320,11 @@ pub enum CliCommands {
     /// Shell autocompletion
     Completion(CmdCompletionArgs),
 
+    /// Highly experimental features
+    Experimental {
+        #[clap(subcommand)]
+        cmd: CliCommandsExperimental,
+    },
 
     /// Init command used to setup the container
     #[command(hide = true)]

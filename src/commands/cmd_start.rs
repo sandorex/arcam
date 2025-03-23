@@ -72,7 +72,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 buf += host_pre_init;
 
                 // write to temp file
-                let path = format!("/tmp/a{}{}", crate::rand(), crate::rand());
+                let path = format!("/tmp/a{}", rand::random::<u64>());
                 std::fs::write(&path, buf)?;
 
                 let argv0 = std::env::args().next().unwrap();
@@ -102,7 +102,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 "PWD" | "CWD" => Some(pwd.to_string()),
                 "HOME" => Some(home.to_string()),
                 "CONTAINER" | "CONTAINER_NAME" => Some(container_name.clone()),
-                "RAND" | "RANDOM" => Some(crate::rand().to_string()),
+                "RAND" | "RANDOM" => Some(rand::random::<u32>().to_string()),
 
                 // fallback to environ
                 _ => {

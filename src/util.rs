@@ -24,20 +24,6 @@ pub fn git_clone(path: &Path, repository: &str, tag: Option<&str>) -> anyhow::Re
     Ok(())
 }
 
-/// Generate random number using `/dev/urandom`
-pub fn rand() -> u32 {
-    use std::io::Read;
-
-    const ERR_MSG: &str = "Error reading /dev/urandom";
-
-    let mut rng = std::fs::File::open("/dev/urandom").expect(ERR_MSG);
-
-    let mut buffer = [0u8; 4];
-    rng.read_exact(&mut buffer).expect(ERR_MSG);
-
-    u32::from_be_bytes(buffer)
-}
-
 /// Simple yes/no prompt
 pub fn prompt(prompt: &str) -> bool {
     use std::io::Write;

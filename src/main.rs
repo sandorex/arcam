@@ -13,7 +13,7 @@ mod tests;
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use cli::CliCommands;
+use cli::{CliCommands, CliCommandsExperimental};
 
 pub use command_ext::command_extensions;
 pub use context::Context;
@@ -50,14 +50,14 @@ fn main() -> Result<()> {
         CliCommands::List(x) => commands::print_containers(get_ctx()?, x)?,
         CliCommands::Logs(x) => commands::print_logs(get_ctx()?, x)?,
         CliCommands::Kill(x) => commands::kill_container(get_ctx()?, x)?,
-        CliCommands::Completion(x) => {
-            if x.complete.is_some() {
-                commands::shell_completion_helper(get_ctx()?, x)?
-            } else {
-                // i do not want to create a context when i dont need it here
-                commands::shell_completion_generation(x)?
-            }
-        }
+        CliCommands::Completion(x) => if x.complete.is_some() {
+            commands::shell_completion_helper(get_ctx()?, x)?
+        } else {
+            commands::shell_completion_generation(x)?
+        },
+        CliCommands::Experimental { cmd } => match cmd {
+            CliCommandsExperimental::InstallFeature(_x) => todo!(),
+        },
         CliCommands::Init => {
             if !util::is_in_container() {
                 return Err(anyhow!(

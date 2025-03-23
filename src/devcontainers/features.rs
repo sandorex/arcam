@@ -1,6 +1,7 @@
 //! Everything that has to do with devcontainer features
 
 use base64::Engine;
+use tempfile::TempDir;
 
 use super::structure::FeatureManifest;
 use crate::{prelude::*, util};
@@ -67,8 +68,9 @@ pub struct Feature {
 }
 
 impl Feature {
-    /// Caches the feature into the directory
-    pub fn cache_feature(feature_path: FeaturePath, cache_dir: &Path) -> Result<Self> {
+    // TODO this cache needs to have a lockfile so it cannot be modified while its used!
+    /// Caches the features, features that cannot be cached are kept in `temp_dir`
+    pub fn cache_feature(feature_path: FeaturePath, cache_dir: &Path, temp_dir: &TempDir) -> Result<Self> {
         match feature_path {
             FeaturePath::Local(ref path) => {
                 let path = PathBuf::from(path);
@@ -95,18 +97,11 @@ impl Feature {
                         BASE64_STANDARD.encode(&tag),
                     ))
                 } else {
-                    cache_dir.join(format!(
-                        "{}",
-                        BASE64_STANDARD.encode(&url),
-                    ))
+                    temp_dir.path().join(BASE64_STANDARD.encode(&url))
                 };
 
-                // if the path does not exist then clone it
-                // TODO ensure the it is not an empty directory
-                if !path.exists() {
-                    // TODO maybe replace with git2 crate for the progress bar etc?
-                    util::git_clone(&path, &url, tag.as_deref())?;
-                }
+                // TODO maybe replace with git2 crate for the progress bar etc?
+                util::git_clone(&path, &url, tag.as_deref())?;
 
                 Ok(Self {
                     feature_path,

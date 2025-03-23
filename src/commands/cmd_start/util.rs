@@ -38,7 +38,7 @@ pub fn generate_name() -> String {
 
     let adjectives: Vec<&str> = ADJECTIVES_ENGLISH.lines().collect();
     let adjective = adjectives
-        .get(util::rand() as usize % adjectives.len())
+        .get(rand::random::<u64>() as usize % adjectives.len())
         .unwrap();
 
     // allow custom container suffix but default to bin name
