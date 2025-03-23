@@ -56,13 +56,17 @@ fn main() -> Result<()> {
             commands::shell_completion_generation(x)?
         },
         CliCommands::Experimental { cmd } => match cmd {
-            CliCommandsExperimental::InstallFeature(_x) => todo!(),
+            CliCommandsExperimental::InstallFeature(x) => {
+                if !util::is_in_container() {
+                    return Err(anyhow!("Installing features outside a container is dangerous, qutting.."));
+                }
+
+                dbg!(&x);
+            },
         },
         CliCommands::Init => {
             if !util::is_in_container() {
-                return Err(anyhow!(
-                    "Running init outside a container is dangerous, qutting.."
-                ));
+                return Err(anyhow!("Running init outside a container is dangerous, qutting.."));
             }
 
             commands::container_init()?

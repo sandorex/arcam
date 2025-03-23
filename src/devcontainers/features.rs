@@ -48,7 +48,7 @@ impl FeaturePath {
 
             Ok(Self::Git { url, tag })
         } else {
-            Err(anyhow!("Invalid schema for feature {input:?}"))
+            Err(anyhow!("Invalid URI for feature"))
         }
     }
 

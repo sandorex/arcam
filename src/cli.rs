@@ -276,7 +276,7 @@ pub struct CmdCompletionArgs {
 #[derive(Args, Debug, Clone)]
 pub struct CmdInstallFeatureArgs {
     /// Features to install
-    #[arg(value_name = "DIR|GIT|OCI", value_parser = FeaturePath::parse_cli)]
+    #[arg(required = true, value_name = "DIR|GIT|OCI", value_parser = FeaturePath::parse_cli)]
     pub feature: Vec<FeaturePath>,
 }
 
