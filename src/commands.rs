@@ -9,6 +9,7 @@ mod cmd_list;
 mod cmd_logs;
 mod cmd_shell;
 mod cmd_start;
+mod experimental;
 
 pub use cmd_completion_generator::shell_completion_generation;
 pub use cmd_completion_helper::{shell_completion_helper, ShellCompletionType};
@@ -21,3 +22,5 @@ pub use cmd_list::print_containers;
 pub use cmd_logs::print_logs;
 pub use cmd_shell::open_shell;
 pub use cmd_start::start_container;
+
+pub use experimental::*;

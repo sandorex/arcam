@@ -90,6 +90,7 @@ pub struct CmdStartArgs {
     #[arg(long)]
     pub shell: Option<String>,
 
+    /// Installs features on init, only executes `install.sh` there is no dependency resolution!
     #[arg(long, value_name = "DIR|GIT|OCI", value_parser = FeaturePath::parse_cli, help_heading = START_HEADING_EXPERIMENTAL)]
     pub feature: Vec<FeaturePath>,
 
@@ -281,9 +282,44 @@ pub struct CmdFeatureArgs {
 }
 
 #[derive(Subcommand, Debug, Clone)]
+pub enum CliCommandsDevContainer {
+    // /// Build a dev container image
+    // Build,
+
+    // /// Create and run dev container
+    // Up,
+
+    // /// Run user commands
+    // #[command(subcommand, name = "run-user-commands")]
+    // RunUserCommands,
+
+    // /// Read configuration to stdout
+    // #[command(subcommand, name = "read-configuration")]
+    // ReadConfiguration,
+
+    // /// Features commands
+    // Features,
+
+    // /// Templates commands
+    // Templates,
+
+    // /// Stops containers
+    // Stop,
+
+    // /// Stops and deletes containers
+    // Down,
+}
+
+#[derive(Subcommand, Debug, Clone)]
 pub enum CliCommandsExperimental {
-    /// Runs one or more features
+    /// Fetches a feature and executes `install.sh`
     Feature(CmdFeatureArgs),
+
+    /// DevContainer cli implementation
+    ///
+    /// Security is nonexistant here due to many reasons so beware
+    #[command(subcommand, name = "devcontainer")]
+    DevContainer(CliCommandsDevContainer),
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -321,6 +357,8 @@ pub enum CliCommands {
     Completion(CmdCompletionArgs),
 
     /// Highly experimental features
+    ///
+    /// Any of these functions may break at any point, do not rely on it
     Experimental {
         #[clap(subcommand)]
         cmd: CliCommandsExperimental,

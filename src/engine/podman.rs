@@ -109,8 +109,6 @@ impl Engine for Podman {
             .args(["container", "exists", container])
             .log_output(log::Level::Debug)?;
 
-        dbg!(&output.get_code());
-
         match output.get_code() {
             0 => Ok(true),
             1 => Ok(false),
