@@ -1,7 +1,6 @@
 use crate::cli::CmdStartArgs;
 use crate::command_extensions::*;
 use crate::prelude::*;
-use crate::util;
 use crate::APP_NAME;
 use std::collections::HashMap;
 use std::path::Path;

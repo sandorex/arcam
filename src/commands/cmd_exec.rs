@@ -1,6 +1,5 @@
 use crate::cli;
 use crate::command_extensions::*;
-use crate::engine::ContainerInfo;
 use crate::prelude::*;
 
 pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()> {
@@ -22,7 +21,7 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
     let container_info = container_info.first().unwrap();
 
     // check if container is owned
-    let Some(ws_dir) = container_info.get_label(crate::CONTAINER_LABEL_CONTAINER_DIR) else {
+    let Some(ws_dir) = container_info.labels.get(crate::CONTAINER_LABEL_CONTAINER_DIR) else {
         return Err(anyhow!(anyhow!(
             "Container {:?} is not owned by {}",
             &cli_args.name,
@@ -73,7 +72,7 @@ pub fn container_exec(ctx: Context, mut cli_args: cli::CmdExecArgs) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use crate::engine::Engine;
+    use crate::engine::Podman;
     use crate::tests_prelude::*;
     use assert_cmd::Command;
 
@@ -90,7 +89,7 @@ mod tests {
             .success();
 
         let container = Container {
-            engine: Engine::Podman,
+            engine: Box::new(Podman),
             container: String::from_utf8_lossy(&cmd.get_output().stdout)
                 .trim()
                 .to_string(),

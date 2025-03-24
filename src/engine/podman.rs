@@ -1,53 +1,66 @@
-use serde::Deserialize;
-
-use super::{Engine, ContainerInfo};
 use crate::prelude::*;
-use crate::util::command_extensions::*;
+use crate::command_extensions::*;
+use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
+use std::fmt::Display;
+use super::{ContainerInfo, Engine};
 
-// NOTE these should be expanded as needed, i do not need all the data
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct PodmanContainerInfoConfig {
-    labels: HashMap<String, String>,
+    #[serde(deserialize_with = "deserialize_null_default")]
+    pub labels: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct PodmanContainerInfo {
-    name: String,
-    config: PodmanContainerInfoConfig,
+    pub name: String,
+    pub config: PodmanContainerInfoConfig,
 }
 
-impl ContainerInfo for PodmanContainerInfo {
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    fn get_label(&self, name: &str) -> Option<&str> {
-        self.config.labels.get(name).map(|x| x.as_str())
+impl From<PodmanContainerInfo> for ContainerInfo {
+    fn from(value: PodmanContainerInfo) -> Self {
+        Self {
+            name: value.name,
+            labels: value.config.labels,
+        }
     }
 }
 
-impl Engine {
-    pub fn name(&self) -> &'static str {
+// NOTE: this is so i do not have to have all the properties at Option<T> if they are null
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
+
+/// Implementation for podman engine manager
+#[derive(Debug, Clone, Copy)]
+pub struct Podman;
+
+impl Engine for Podman {
+    fn name(&self) -> &str {
         "podman"
     }
 
-    pub fn exec<T: AsRef<std::ffi::OsStr>>(&self, container: &str, command: &[T]) -> Result<String> {
-        let output = self.command()
+    fn exec(&self, container: &str, command: &Vec<&str>) -> Result<String> {
+        assert!(!container.is_empty());
+        assert!(!command.is_empty());
+
+        let output = self
+            .command()
             .args(["exec", "--user", "root", container])
             .args(command)
-            .run_get_output()?;
+            .log_output(log::Level::Debug)?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
-    pub fn command(&self) -> Command {
-        Command::new(self.name())
-    }
-
-    pub fn get_containers(&self, labels: Vec<(&str, Option<&str>)>) -> Result<Vec<String>> {
+    fn get_containers(&self, labels: Vec<(&str, Option<&str>)>) -> Result<Vec<String>> {
         let mut cmd = self.command();
 
         // just print names of the containers
@@ -61,44 +74,88 @@ impl Engine {
             }
         }
 
-        let output = cmd.run_get_output()?;
+        let output = cmd.log_output(log::Level::Debug)?;
 
-        Ok(String::from_utf8_lossy(&output.stdout).lines().map(|x| x.to_string()).collect())
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|x| x.to_string())
+            .collect())
     }
 
-    pub fn inspect_container(&self, container: &str) -> Result<impl ContainerInfo> {
-        let output = self.command()
-            .args(["inspect", container])
-            .run_get_output()?;
+    fn inspect_containers(&self, containers: Vec<&str>) -> Result<Vec<ContainerInfo>> {
+        assert!(!containers.is_empty());
+
+        let output = self
+            .command()
+            .args(["container", "inspect"])
+            .args(containers)
+            .log_output(log::Level::Debug)?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
-        Ok(
-            serde_json::from_str::<PodmanContainerInfo>(&stdout)
-                .with_context(|| "Error parsing output from \"podman inspect\"")?
-        )
+        // deserialize into podman specific struct then convert into the generic one
+        Ok(serde_json::from_str::<Vec<PodmanContainerInfo>>(&stdout)
+            .with_context(|| "Error parsing output from \"podman inspect\"")?
+            .into_iter()
+            .map(|x| Into::<ContainerInfo>::into(x))
+            .collect())
     }
 
-    pub fn container_exists(&self, container: &str) -> Result<bool> {
-        // TODO log this with log::trace!
-        let output = self.command()
+    fn container_exists(&self, container: &str) -> Result<bool> {
+        assert!(!container.is_empty());
+
+        let output = self
+            .command()
             .args(["container", "exists", container])
-            .output()?;
+            .log_output(log::Level::Debug)?;
+
+        dbg!(&output.get_code());
 
         match output.get_code() {
             0 => Ok(true),
             1 => Ok(false),
-            _ => Err(anyhow!("Error checking if container {:?} exists", container)),
+            _ => Err(anyhow!("Error checking if container {container:?} exists")),
         }
     }
 
-    pub fn stop_container(&self, container: &str) -> Result<()> {
+    #[cfg(test)]
+    fn start_dummy_container(&self, image: &str, args: Option<Vec<&str>>) -> Result<crate::tests_prelude::Container> {
+        assert!(!image.is_empty());
+
+        let mut cmd = self.command();
+        cmd.args(["run", "--rm", "-d", "-it"]);
+
+        if let Some(args) = args {
+            cmd.args(args);
+        }
+
+        // image goes last
+        cmd.arg(image);
+
+        let output = cmd.log_output(log::Level::Debug)?;
+
+        Ok(crate::tests_prelude::Container {
+            container: String::from_utf8_lossy(&output.stdout).trim().to_string(),
+            engine: Box::new(*self),
+        })
+    }
+
+    #[cfg(test)]
+    fn stop_container(&self, container: &str) -> Result<()> {
+        assert!(!container.is_empty());
+
         // gentle shutdown, terminates by default after 10s
         self.command()
             .args(["container", "stop", container])
-            .run_interactive()?;
+            .log_status(log::Level::Debug)?;
 
         Ok(())
+    }
+}
+
+impl Display for Podman {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
     }
 }
 
@@ -110,23 +167,52 @@ mod tests {
     const INSPECT_OUTPUT: &str = include_str!("podman_inspect.json");
 
     #[test]
-    fn test_podman_inspect_parsing() {
-        let obj = serde_json::from_str::<Vec<PodmanContainerInfo>>(INSPECT_OUTPUT);
-        assert!(obj.is_ok(), "Error parsing: {:?}", obj);
+    #[ignore]
+    fn engine_inspect_podman() -> Result<()> {
+        let obj = serde_json::from_str::<Vec<PodmanContainerInfo>>(INSPECT_OUTPUT)?;
         assert_eq!(
-            obj.unwrap().first().take().unwrap(),
+            obj.first().take().unwrap(),
             &PodmanContainerInfo {
                 name: "wrathful-arcam".to_string(),
                 config: PodmanContainerInfoConfig {
                     labels: HashMap::from([
                         ("arcam".to_string(), "0.1.10".to_string()),
-                        ("com.github.containers.toolbox".to_string(), "true".to_string()),
-                        ("container_dir".to_string(), "/home/sandorex/ws/arcam".to_string()),
+                        (
+                            "com.github.containers.toolbox".to_string(),
+                            "true".to_string()
+                        ),
+                        (
+                            "container_dir".to_string(),
+                            "/home/sandorex/ws/arcam".to_string()
+                        ),
                         ("default_shell".to_string(), "/bin/fish".to_string()),
-                        ("host_dir".to_string(), "/mnt/slowmf/ws/projects/arcam".to_string()),
+                        (
+                            "host_dir".to_string(),
+                            "/mnt/slowmf/ws/projects/arcam".to_string()
+                        ),
                     ]),
                 },
             }
         );
+
+        let container = Podman.start_dummy_container("debian:trixie", None)?;
+
+        // ensure some data is extracted
+        assert!(!Podman.inspect_containers(vec![&container])?.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn engine_exists_podman() -> Result<()> {
+        let container = Podman.start_dummy_container("debian:trixie", None)?;
+
+        assert!(Podman.container_exists(&container)?);
+
+        let inspected = Podman.inspect_containers(vec![&container])?;
+        assert!(!inspected.is_empty());
+
+        Ok(())
     }
 }

@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use users::os::unix::UserExt;
 
 /// Context used throughout the application
-#[derive(Debug)]
 pub struct Context {
     pub user: String,
     pub user_home: PathBuf,
@@ -22,7 +21,7 @@ pub struct Context {
     pub app_dir: PathBuf,
 
     /// Engine to use
-    pub engine: Engine,
+    pub engine: Box<dyn Engine>,
 }
 
 /// Get app configuration directory
@@ -54,7 +53,7 @@ fn get_app_dir() -> PathBuf {
 
 impl Context {
     /// Construct new context with current user
-    pub fn new(dry_run: bool, engine: Engine) -> Result<Self> {
+    pub fn new(dry_run: bool, engine: Box<dyn Engine>) -> Result<Self> {
         use users::{get_current_uid, get_user_by_uid};
 
         let uid = get_current_uid();

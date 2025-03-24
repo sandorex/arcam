@@ -1,4 +1,4 @@
-use crate::tests_prelude::*;
+use crate::{engine::Podman, tests_prelude::*};
 use assert_cmd::Command;
 use users::{get_current_gid, get_current_uid};
 
@@ -23,7 +23,7 @@ fn test_permissions_podman() -> Result<()> {
         .success();
 
     let container = Container {
-        engine: Engine::Podman,
+        engine: Box::new(Podman),
         container: String::from_utf8_lossy(&cmd.get_output().stdout)
             .trim()
             .to_string(),

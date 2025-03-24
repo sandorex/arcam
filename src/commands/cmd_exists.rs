@@ -18,7 +18,7 @@ pub fn container_exists(ctx: Context, cli_args: cli::CmdExistsArgs) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use crate::engine::Engine;
+    use crate::engine::Podman;
     use crate::tests_prelude::*;
     use assert_cmd::Command;
 
@@ -43,7 +43,7 @@ mod tests {
             .success();
 
         let container = Container {
-            engine: Engine::Podman,
+            engine: Box::new(Podman),
             container: String::from_utf8_lossy(&cmd.get_output().stdout)
                 .trim()
                 .to_string(),

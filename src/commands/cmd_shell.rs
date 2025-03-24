@@ -1,6 +1,5 @@
 use crate::cli;
 use crate::command_extensions::*;
-use crate::engine::ContainerInfo;
 use crate::prelude::*;
 
 pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
@@ -14,14 +13,16 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
         }
 
         cli_args.name = containers.first().unwrap().clone();
-    } else if !ctx.dry_run && ctx.engine.container_exists(&cli_args.name)? {
-        return Err(anyhow!("Container {:?} does not exist", &cli_args.name));
+    } else if !ctx.dry_run {
+        if !ctx.engine.container_exists(&cli_args.name)? {
+            return Err(anyhow!("Container {:?} does not exist", &cli_args.name));
+        }
     }
 
     let container_info = ctx.engine.inspect_containers(vec![&cli_args.name])?;
     let container_info = container_info.first().unwrap();
 
-    let Some(ws_dir) = container_info.get_label(crate::CONTAINER_LABEL_CONTAINER_DIR) else {
+    let Some(ws_dir) = container_info.labels.get(crate::CONTAINER_LABEL_CONTAINER_DIR) else {
         return Err(anyhow!(
             "Container {:?} is not owned by {}",
             cli_args.name,
@@ -31,7 +32,7 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
 
     let mut cmd = ctx.engine.command();
 
-    let Some(user_shell) = container_info.get_label(crate::CONTAINER_LABEL_USER_SHELL) else {
+    let Some(user_shell) = container_info.labels.get(crate::CONTAINER_LABEL_USER_SHELL) else {
         return Err(anyhow!(
             "Container {:?} does not have label {:?}",
             cli_args.name,
@@ -73,7 +74,7 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tests_prelude::*;
+    use crate::{engine::Podman, tests_prelude::*};
     use assert_cmd::prelude::*;
     use rexpect::session::{spawn_command, PtyReplSession};
     use std::process::Command;
@@ -89,15 +90,15 @@ mod tests {
             .assert()
             .success();
 
-        let _container = Container {
-            engine: Engine::Podman,
+        let container = Container {
+            engine: Box::new(Podman),
             container: String::from_utf8_lossy(&cmd.get_output().stdout)
                 .trim()
                 .to_string(),
         };
 
         let mut c = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-        c.args(["shell"]);
+        c.args(["shell", &container]);
         c.current_dir(tempdir.path());
 
         let mut pty = spawn_command(c, Some(5_000)).and_then(|p| {

@@ -28,7 +28,7 @@ pub mod prelude {
 
 /// RAII guard to stop running containers
 pub struct Container {
-    pub engine: Engine,
+    pub engine: Box<dyn Engine>,
     pub container: String,
 }
 

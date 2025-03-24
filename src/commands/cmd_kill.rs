@@ -1,6 +1,5 @@
 use crate::cli;
 use crate::command_extensions::*;
-use crate::engine::ContainerInfo;
 use crate::prelude::*;
 
 pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()> {
@@ -23,7 +22,7 @@ pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()
         let container_info = container_info.first().unwrap();
 
         // check if container is owned
-        if !container_info.has_label(crate::CONTAINER_LABEL_APP) {
+        if !container_info.labels.contains_key(crate::CONTAINER_LABEL_APP) {
             return Err(anyhow!(
                 "Container {:?} is not owned by {}",
                 &cli_args.name,
@@ -60,7 +59,7 @@ pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use crate::engine::Engine;
+    use crate::engine::Podman;
     use crate::tests_prelude::*;
     use assert_cmd::prelude::*;
     use rexpect::session::spawn_command;
@@ -79,7 +78,7 @@ mod tests {
             .success();
 
         let container = Container {
-            engine: Engine::Podman,
+            engine: Box::new(Podman),
             container: String::from_utf8_lossy(&cmd.get_output().stdout)
                 .trim()
                 .to_string(),
@@ -114,7 +113,7 @@ mod tests {
             .success();
 
         let container = Container {
-            engine: Engine::Podman,
+            engine: Box::new(Podman),
             container: String::from_utf8_lossy(&cmd.get_output().stdout)
                 .trim()
                 .to_string(),
