@@ -1,29 +1,35 @@
-use crate::cli::{ConfigArg, CmdConfigArgs};
+use crate::cli::{CmdConfigArgs, ConfigArg};
+use crate::command_extensions::*;
 use crate::config::{Config, ConfigFile};
 use crate::prelude::*;
 use code_docs::DocumentedStruct;
 
 fn get_image_config(ctx: &Context, image: &str) -> Result<String> {
-    let cmd = ctx.engine_command()
+    let cmd = ctx
+        .engine
+        .command()
         .args(["image", "exists", image])
-        .output()
+        .log_output(log::Level::Debug)
         .expect(crate::ENGINE_ERR_MSG);
 
     if !cmd.status.success() {
         return Err(anyhow!("Image {:?} does not exist", image));
     }
 
-    let mut cmd = ctx.engine_command();
+    let mut cmd = ctx.engine.command();
     cmd.args([
-        "run", "--rm", "-it",
+        "run",
+        "--rm",
+        "-it",
         // basically just cat the file, should be pretty portable
-        "--entrypoint", "cat",
+        "--entrypoint",
+        "cat",
         image,
-        crate::ARCAM_CONFIG
+        crate::ARCAM_CONFIG,
     ]);
 
     let output = cmd
-        .output()
+        .log_output(log::Level::Debug)
         .expect(crate::ENGINE_ERR_MSG);
 
     if !output.status.success() {
@@ -52,11 +58,8 @@ fn show_example(ctx: &Context) -> Result<()> {
             config: Config {
                 image: "docker.io/library/debian:latest".into(),
                 network: true,
-                engine_args: vec![ "--privileged".into() ],
-                ports: vec![
-                    (8080, 8080),
-                    (6666, 6666),
-                ],
+                engine_args: vec!["--privileged".into()],
+                ports: vec![(8080, 8080), (6666, 6666)],
                 env: vec![("LS_COLORS".into(), "rs=0:di=01;34:ln=01;...".into())],
                 ..Default::default()
             },
@@ -65,15 +68,16 @@ fn show_example(ctx: &Context) -> Result<()> {
         toml::to_string(&example)?
     };
 
-    println!(r#"APP DIRECTORY (ENV {appdir_env}): {appdir:?}
+    println!(
+        r#"APP DIRECTORY (ENV {appdir_env}): {appdir:?}
 CONFIG DIRECTORY: {cfgdir:?}
 
 -- EXAMPLE --
 {example}
 -- EXAMPLE --"#,
-        appdir_env=crate::ENV_APP_DIR,
-        appdir=ctx.app_dir,
-        cfgdir=ctx.config_dir(),
+        appdir_env = crate::ENV_APP_DIR,
+        appdir = ctx.app_dir,
+        cfgdir = ctx.config_dir(),
     );
 
     Ok(())

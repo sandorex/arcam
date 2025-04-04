@@ -1,18 +1,23 @@
-use std::path::PathBuf;
-use clap::{Args, Parser, Subcommand};
 use crate::{config::Config, Context, FULL_VERSION};
+use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
 
 const AFTER_HELP: &str = concat!(
-    "For help visit the git repository\n", env!("CARGO_PKG_REPOSITORY")
+    "For help visit the git repository\n   ",
+    env!("CARGO_PKG_REPOSITORY")
 );
 
 /// Sandboxed development container manager, with focus on security by default
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(name = crate::APP_NAME, author, version = FULL_VERSION, about, after_help = AFTER_HELP)]
 pub struct Cli {
     /// Just print engine commands that would've been ran, do not execute
     #[arg(long)]
     pub dry_run: bool,
+
+    /// Increase verbosity
+    #[arg(short, long, value_name = "Error|Warn|Info|Debug|Trace", default_value_t = log::Level::Warn, env = crate::ENV_LOG_LEVEL)]
+    pub log_level: log::Level,
 
     #[command(subcommand)]
     pub cmd: CliCommands,
@@ -51,7 +56,9 @@ impl ConfigArg {
             || input.starts_with(".")       // ex. .arcam.toml
             || input.starts_with("/")       // ex. /etc/arcam/configs/something.toml
             || input.starts_with("~/")      // ex. ~/.config/arcam/configs/something.toml
-            || input.ends_with(".toml") {   // well no image is gonna end with .toml? right?
+            || input.ends_with(".toml")
+        {
+            // well no image is gonna end with .toml? right?
             // it must be a path
             Ok(Self::File(PathBuf::from(input)))
         } else if let Some(config_name) = input.strip_prefix("@") {
@@ -65,6 +72,9 @@ impl ConfigArg {
 }
 
 const START_HEADING_PERMISSIONS: &str = "Permissions";
+
+#[allow(dead_code)]
+const START_HEADING_EXPERIMENTAL: &str = "EXPERIMENTAL";
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdStartArgs {
@@ -165,8 +175,6 @@ fn parse_ports(input: &str) -> Result<(u32, u32), String> {
 
 #[derive(Args, Debug, Clone)]
 pub struct CmdShellArgs {
-    // NOTE: this used to be a positional argument but it prevented the command from be being used
-    // when the name of container was not provided
     /// Use a specific shell
     #[arg(long)]
     pub shell: Option<String>,
@@ -264,16 +272,16 @@ pub struct CmdCompletionArgs {
     pub complete: Option<crate::commands::ShellCompletionType>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub enum CliCommands {
-    /// Start a container in current directory, mounting read-write
+    /// Start a container in current directory, mounting it read-write
     Start(CmdStartArgs),
 
     /// Enter the shell inside a running container
     #[clap(visible_alias = "enter")]
     Shell(CmdShellArgs),
 
-    /// Execute a command inside a running container
+    /// Execute a command inside a running container as the user
     Exec(CmdExecArgs),
 
     /// Check if container exists
@@ -285,6 +293,7 @@ pub enum CliCommands {
     Config(CmdConfigArgs),
 
     /// List running containers
+    #[clap(visible_alias = "ls")]
     List(CmdListArgs),
 
     /// Show container logs in journalctl

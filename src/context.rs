@@ -1,22 +1,10 @@
-use std::path::PathBuf;
 use crate::config::Config;
+use crate::engine::Engine;
 use crate::prelude::*;
+use std::path::PathBuf;
 use users::os::unix::UserExt;
-use crate::util::Engine;
-use crate::util::command_extensions::*;
-
-/// Possible status of a container
-#[derive(Debug)]
-pub enum ContainerStatus {
-    Created,
-    Exited,
-    Paused,
-    Running,
-    Unknown,
-}
 
 /// Context used throughout the application
-#[derive(Debug)]
 pub struct Context {
     pub user: String,
     pub user_home: PathBuf,
@@ -32,8 +20,8 @@ pub struct Context {
     /// Directory where app related configuration files reside
     pub app_dir: PathBuf,
 
-    /// Which container engine to use
-    pub engine: Engine,
+    /// Engine to use
+    pub engine: Box<dyn Engine>,
 }
 
 /// Get app configuration directory
@@ -49,23 +37,28 @@ fn get_app_dir() -> PathBuf {
                 Err(_) => {
                     let home = std::env::var("HOME").expect("Failed to get HOME dir from env var");
 
-                    PathBuf::from(home).join(".config").to_str().unwrap().to_string()
-                },
+                    PathBuf::from(home)
+                        .join(".config")
+                        .to_str()
+                        .unwrap()
+                        .to_string()
+                }
             };
 
             // use bin name for dir name
             PathBuf::from(xdg_config_home).join(crate::APP_NAME)
-        },
+        }
     }
 }
 
 impl Context {
     /// Construct new context with current user
-    pub fn new(dry_run: bool, engine: Engine) -> Result<Self> {
+    pub fn new(dry_run: bool, engine: Box<dyn Engine>) -> Result<Self> {
         use users::{get_current_uid, get_user_by_uid};
+
         let uid = get_current_uid();
-        let user = get_user_by_uid(uid)
-            .ok_or(anyhow::anyhow!("Unable to find user by id {}", uid))?;
+        let user =
+            get_user_by_uid(uid).ok_or(anyhow::anyhow!("Unable to find user by id {}", uid))?;
 
         Ok(Self {
             user: user.name().to_string_lossy().to_string(),
@@ -73,8 +66,7 @@ impl Context {
             user_id: uid,
             user_gid: user.primary_group_id(),
 
-            cwd: std::env::current_dir()
-                .with_context(|| "Failed to get current directory")?,
+            cwd: std::env::current_dir().with_context(|| "Failed to get current directory")?,
             dry_run,
             app_dir: get_app_dir(),
             engine,
@@ -92,7 +84,8 @@ impl Context {
                 .join(&self.user)
                 .join(".local")
                 .join("state"),
-        }.join(crate::APP_NAME)
+        }
+        .join(crate::APP_NAME)
     }
 
     /// Get container configuration directory
@@ -102,124 +95,15 @@ impl Context {
 
     /// Get path to this executable
     pub fn get_executable_path(&self) -> Result<PathBuf> {
-        std::env::current_exe()
-            .with_context(|| "Failed to get executable path")
+        std::env::current_exe().with_context(|| "Failed to get executable path")
     }
 
-    /// Get containers running in cwd
-    pub fn get_cwd_container(&self) -> Option<Vec<String>> {
-        let cmd = self.engine_command()
-            .args(["container", "ls", "--format", "{{.Names}}", "--sort", "created"])
-            .args(["--filter".into(), format!("label={}={}", crate::CONTAINER_LABEL_HOST_DIR, self.cwd.to_string_lossy())])
-            .output()
-            .expect(crate::ENGINE_ERR_MSG);
-
-        if cmd.status.success() {
-            let stdout = String::from_utf8_lossy(&cmd.stdout);
-            let trimmed = stdout.trim();
-
-            // check if stdout is empty
-            if trimmed.is_empty() {
-                // return empty vec to signify none were found
-                Some(vec![])
-            } else {
-                // collect the lines
-                // NOTE reversing to get youngest container first
-                Some(trimmed.lines().rev().map(|x| x.to_string()).collect())
-            }
-        } else {
-            // could not get the containers for some reason
-            None
-        }
-    }
-
-    /// Creates `std::process::Command` with engine
-    pub fn engine_command(&self) -> std::process::Command {
-        std::process::Command::new(&self.engine.path)
-    }
-
-    /// Execute engine command and get output back, the user is root!
-    pub fn engine_exec_root(&self, container: &str, command: Vec<&str>) -> Result<String> {
-        let mut cmd = self.engine_command();
-        cmd.args(["exec", "--user", "root", "-it", container]);
-        cmd.args(&command);
-
-        let cmd_result = cmd
-            .output()
-            .expect(crate::ENGINE_ERR_MSG);
-
-        // TODO print stdout and stderr if debugging mode
-        let stdout = String::from_utf8_lossy(&cmd_result.stdout);
-        if !cmd_result.status.success() {
-            return Err(anyhow!(
-                "Engine command \"{} {}\" exited with code {}",
-                self.engine.to_string(),
-                cmd.get_args().collect::<Vec<_>>().join(std::ffi::OsStr::new(" ")).to_string_lossy(),
-                cmd_result.get_code(),
-            ));
-        }
-
-        Ok(stdout.to_string())
-    }
-
-    pub fn engine_container_exists(&self, container: &str) -> bool {
-        self.engine_command()
-            .args(["container", "exists", container])
-            .output()
-            .expect(crate::ENGINE_ERR_MSG)
-            .status.success()
-    }
-
-    /// Gets value of label on a container if it is defined
-    pub fn get_container_label(&self, container: &str, label: &str) -> Option<String> {
-        let key = format!(".Config.Labels.{}", label);
-
-        // this looks like a mess as i need to escape curly braces
-        //
-        // basically return key if it exists
-        // {{if .. }} is added so that the stdout is empty if ws is none
-        let format = format!("{{{{ if {0} }}}}{{{{ {0} }}}}{{{{ end }}}}", key);
-
-        let cmd = self.engine_command()
-            .args(["inspect", container, "--format", format.as_str()])
-            .output()
-            .expect(crate::ENGINE_ERR_MSG);
-
-        if cmd.status.success() {
-            let stdout = String::from_utf8_lossy(&cmd.stdout);
-            let trimmed = stdout.trim();
-
-            // check if stdout is empty (will have some whitespace though!)
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_string())
-            }
-        } else {
-            None
-        }
-    }
-
-    /// Get container status if it exists
-    pub fn get_container_status(&self, container: &str) -> Option<ContainerStatus> {
-        let cmd = self.engine_command()
-            .args(["container", "inspect", container, "--format", "{{.State.Status}}"])
-            .output()
-            .expect(crate::ENGINE_ERR_MSG);
-
-        // the container does not exist
-        if !cmd.status.success() {
-            return None;
-        }
-
-        let stdout = String::from_utf8_lossy(&cmd.stdout);
-        Some(match stdout.trim() {
-            "created" => ContainerStatus::Created,
-            "exited" => ContainerStatus::Exited,
-            "paused" => ContainerStatus::Paused,
-            "running" => ContainerStatus::Running,
-            _ => ContainerStatus::Unknown,
-        })
+    /// Get all owned containers in this directory
+    pub fn get_cwd_containers(&self) -> Result<Vec<String>> {
+        self.engine.get_containers(vec![(
+            crate::CONTAINER_LABEL_HOST_DIR,
+            Some(&self.cwd.to_string_lossy()),
+        )])
     }
 
     /// Tries to find config by the name

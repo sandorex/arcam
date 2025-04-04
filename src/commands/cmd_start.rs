@@ -1,260 +1,11 @@
-use crate::{APP_NAME, ENV_VAR_PREFIX, VERSION};
-use crate::util::{self, rand, EngineKind};
-use crate::prelude::*;
-use crate::util::command_extensions::*;
+mod util;
+
 use crate::cli::{CmdStartArgs, ConfigArg};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-
-/// Get hostname from system using `hostname` command
-fn get_hostname() -> Result<String> {
-    // try to get hostname from env var
-    if let Ok(env_hostname) = std::env::var("HOSTNAME") {
-        return Ok(env_hostname);
-    }
-
-    // then as a fallback use hostname executable
-    let cmd = Command::new("hostname")
-        .output()
-        .with_context(|| "Could not call hostname")?;
-
-    let hostname = String::from_utf8_lossy(&cmd.stdout);
-
-    if !cmd.status.success() || hostname.is_empty() {
-        panic!("Unable to get hostname from host");
-    }
-
-    Ok(hostname.trim().into())
-}
-
-/// Generates random name using adjectives list
-fn generate_name() -> String {
-    const ADJECTIVES_ENGLISH: &str = include_str!("adjectives.txt");
-
-    let adjectives: Vec<&str> = ADJECTIVES_ENGLISH.lines().collect();
-    let adjective = adjectives.get(util::rand() as usize % adjectives.len()).unwrap();
-
-    // allow custom container suffix but default to bin name
-    let suffix = std::env::var(crate::ENV_CONTAINER_SUFFIX)
-        .unwrap_or_else(|_| APP_NAME.to_string());
-
-    format!("{}-{}", adjective, suffix)
-}
-
-/// Finds all terminfo directories on host so they can be mounted in the container so no terminfo
-/// installing is required
-///
-/// This function is required as afaik only debian has non-standard paths for terminfo
-fn find_terminfo() -> Vec<String> {
-    let mut args: Vec<String> = vec![];
-
-    let mut existing: Vec<String> = vec![];
-    for x in ["/usr/share/terminfo", "/usr/lib/terminfo", "/etc/terminfo"] {
-        if std::path::Path::new(x).exists() {
-            args.push(format!("--volume={0}:/host{0}:ro", x));
-            existing.push(x.into());
-        }
-    }
-
-    let mut terminfo_env = "".to_string();
-
-    // add first the host ones as they are preferred
-    for x in &existing {
-        terminfo_env.push_str(format!("/host{}:", x).as_str());
-    }
-
-    // add container ones as fallback
-    for x in &existing {
-        terminfo_env.push_str(format!("{}:", x).as_str());
-    }
-
-    // remove leading ':'
-    if terminfo_env.chars().last().unwrap_or(' ') == ':' {
-        terminfo_env.pop();
-    }
-
-    // generate the env variable to find them all
-    args.push(format!("--env=TERMINFO_DIRS={}", terminfo_env));
-
-    args
-}
-
-fn resolve_capabilities(cli_args: &CmdStartArgs, cmd: &mut Command) {
-    // NOTE podman does not support drop and add at the same time, once dropped its dropped so i
-    // want to extend that so config can overwrite it and then cli can overwrite the overwritten
-    {
-        // list of all capabilities mentioned, true => add, false => drop
-        let mut caps = HashMap::<&str, bool>::new();
-
-        for i in &cli_args.capabilities {
-            match i.strip_prefix("!") {
-                Some(x) => caps.insert(x, false),
-                None => caps.insert(i, true),
-            };
-        }
-
-        for (cap, val) in caps {
-            if val {
-                cmd.arg(format!("--cap-add={}", cap));
-            } else {
-                cmd.arg(format!("--cap-drop={}", cap));
-            }
-        }
-    }
-}
-
-fn mount_wayland(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) -> Result<()> {
-    // try to pass through wayland socket
-    if cli_args.wayland.unwrap_or(false) {
-        // prefer ARCAM_WAYLAND_DISPLAY
-        if let Ok(wayland_display) = std::env::var(crate::ENV_WAYLAND_DISPLAY).or(std::env::var("WAYLAND_DISPLAY")) {
-            let socket_path = format!("/run/user/{}/{}", ctx.user_id, wayland_display);
-            if Path::new(&socket_path).exists() {
-                // TODO pass XDG_CURRENT_DESKTOP XDG_SESSION_TYPE
-                cmd.args([
-                    format!("--volume={0}:{0}", socket_path),
-                    format!("--env=WAYLAND_DISPLAY={}", wayland_display),
-                ]);
-            } else {
-                return Err(anyhow!("Could not find the wayland socket {:?}", socket_path));
-            }
-
-            // add fonts just in case
-            cmd.arg("--volume=/usr/share/fonts:/usr/share/fonts/host:ro");
-
-            // legacy ~/.fonts
-            let home_dot_fonts = ctx.user_home.join(".fonts");
-            if home_dot_fonts.exists() {
-                cmd.arg(format!("--volume={}:/usr/share/fonts/host_dot:ro", home_dot_fonts.to_string_lossy()));
-            }
-
-            // font dir ~/.local/share/fonts
-            let home_dot_local_fonts = ctx.user_home.join(".local")
-                .join("share")
-                .join("fonts");
-
-            if home_dot_local_fonts.exists() {
-                cmd.arg(format!("--volume={}:/usr/share/fonts/host_local:ro", home_dot_local_fonts.to_string_lossy()));
-            }
-        } else {
-            return Err(anyhow!("Could not pass through wayland socket as WAYLAND_DISPLAY is not defined"));
-        }
-    }
-
-    Ok(())
-}
-
-fn mount_additional_mounts(ws_dir: &Path, cli_args: &CmdStartArgs, cmd: &mut Command) -> Result<()> {
-    for m in &cli_args.mount {
-        let mount = Path::new(m);
-        if mount.exists() {
-            if ! mount.is_dir() {
-                return Err(anyhow!("Mountpoint {:?} is not a directory", mount));
-            }
-
-            // get the absolute path
-            let mount = mount.canonicalize().unwrap();
-
-            cmd.arg(format!("--volume={}:{}/{}", mount.to_string_lossy(), ws_dir.to_string_lossy(), mount.file_name().unwrap().to_string_lossy()));
-        } else {
-            return Err(anyhow!("Mountpoint {:?} does not exist", mount));
-        }
-    }
-
-    Ok(())
-}
-
-fn mount_audio(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) -> Result<()> {
-    // try to pass audio
-    if cli_args.audio.unwrap_or(false) {
-        // TODO see if passing pipewire or alsa is possible too
-        let socket_path = format!("/run/user/{}/pulse/native", ctx.user_id);
-        if Path::new(&socket_path).exists() {
-            cmd.args([
-                format!("--volume={0}:{0}", socket_path),
-                format!("--env=PULSE_SERVER=unix:{}", socket_path),
-            ]);
-        } else {
-            return Err(anyhow!("Could not find pulseaudio socket to pass to the container"));
-        }
-    }
-
-    Ok(())
-}
-
-fn mount_ssh_agent(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) -> Result<()> {
-    if cli_args.ssh_agent.unwrap_or(false) {
-        if let Ok(ssh_sock) = std::env::var("SSH_AUTH_SOCK") {
-            if Path::new(&ssh_sock).exists() {
-                cmd.args([
-                    format!("--volume={}:/run/user/{}/ssh-auth", ssh_sock, ctx.user_id),
-                    format!("--env=SSH_AUTH_SOCK=/run/user/{}/ssh-auth", ctx.user_id),
-                ]);
-            } else {
-                return Err(anyhow!("Socket does not exist at {:?} (ssh-agent)", ssh_sock));
-            }
-        } else {
-            return Err(anyhow!("Could not pass through ssh-agent as SSH_AUTH_SOCK is not defined"));
-        }
-    }
-
-    Ok(())
-}
-
-fn mount_session_bus(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) -> Result<()> {
-    if cli_args.session_bus.unwrap_or(false) {
-        if let Ok(dbus_addr) = std::env::var("DBUS_SESSION_BUS_ADDRESS") {
-            if let Some(dbus_sock) = dbus_addr.strip_prefix("unix:path=") {
-                if Path::new(&dbus_sock).exists() {
-                    cmd.args([
-                        format!("--volume={}:/run/user/{}/bus", dbus_sock, ctx.user_id),
-                        format!("--env=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{}/bus", ctx.user_id),
-                    ]);
-                } else {
-                    return Err(anyhow!("Socket does not exist at {:?} (session bus)", dbus_sock));
-                }
-            } else {
-                return Err(anyhow!("Invalid format for DBUS_SESSION_BUS_ADDRESS={:?}", dbus_addr));
-            }
-        } else {
-            return Err(anyhow!("Could not pass through session bus as DBUS_SESSION_BUS_ADDRESS is not defined"));
-        }
-    }
-
-    Ok(())
-}
-
-/// Writes text to file inside the container
-pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str) -> Result<()> {
-    use std::io::Write;
-    use std::process::Stdio;
-
-    // write to file using tee
-    #[allow(clippy::zombie_processes)]
-    let mut child = ctx.engine_command()
-        .args(["exec", "-i", "--user", "root", container, "tee", &file.to_string_lossy()])
-        .stdin(Stdio::piped()) // pipe into stdin but ignore stdout/stderr
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect(crate::ENGINE_ERR_MSG);
-
-    let mut stdin = child.stdin.take()
-        .with_context(|| anyhow!("Failed to open child stdin"))?;
-
-    stdin.write_all(content.as_bytes())?;
-
-    // NOTE drop is important here otherwise stdin wont close
-    drop(stdin);
-
-    let result = child.wait()?;
-
-    if result.success() {
-        Ok(())
-    } else {
-        Err(anyhow!("Error writing to file {:?} in container ({})", file, result.get_code()))
-    }
-}
+use crate::command_extensions::*;
+use crate::prelude::*;
+use crate::{APP_NAME, ENV_VAR_PREFIX, VERSION};
+use std::path::PathBuf;
+use util::*;
 
 pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     let executable_path = ctx.get_executable_path()?;
@@ -266,14 +17,19 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     let ws_dir = ctx.user_home.join("ws");
 
     // this is the main project where app was started
-    let main_project_dir: String = format!("{}/{}", ws_dir.to_string_lossy(), ctx.cwd.file_name().unwrap().to_string_lossy());
+    let main_project_dir: String = format!(
+        "{}/{}",
+        ws_dir.to_string_lossy(),
+        ctx.cwd.file_name().unwrap().to_string_lossy()
+    );
 
     // get containers in this cwd, i do not care if it fails
-    if let Some(x) = ctx.get_cwd_container() {
-        // check if any are running
-        if !x.is_empty() {
-            return Err(anyhow!(r#"There are containers running in current directory: {}"#, x.join(" ")));
-        }
+    let cwd_containers = ctx.get_cwd_containers()?;
+    if !cwd_containers.is_empty() {
+        return Err(anyhow!(
+            "There are containers running in current directory: {:?}",
+            cwd_containers.join(" ")
+        ));
     }
 
     // prefer cli name over random one
@@ -284,9 +40,12 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     let mut persist: Vec<(String, String)> = vec![];
     let mut persist_user: Vec<(String, String)> = vec![];
 
+    log::debug!("Container name set to {container_name:?}");
+
     // TODO shellexpand env expansion should error out!
     if let ConfigArg::Image(image) = &cli_args.config {
         // no config used
+
         container_image = image.to_string();
         on_init_pre = "".into();
         on_init_post = "".into();
@@ -294,8 +53,14 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         // get config from file or by name
         let config = match &cli_args.config {
             ConfigArg::Image(_) => unreachable!(),
-            ConfigArg::File(file) => crate::config::ConfigFile::config_from_file(file)?,
-            ConfigArg::Config(config_name) => ctx.find_config(config_name)?,
+            ConfigArg::File(file) => {
+                log::debug!("Loading config file {:?}", file);
+                crate::config::ConfigFile::config_from_file(file)?
+            }
+            ConfigArg::Config(config_name) => {
+                log::debug!("Loading config @{:?}", config_name);
+                ctx.find_config(config_name)?
+            }
         };
 
         if let Some(host_pre_init) = &config.host_pre_init {
@@ -307,22 +72,20 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 buf += host_pre_init;
 
                 // write to temp file
-                let path = format!("/tmp/a{}{}", rand(), rand());
+                let path = format!("/tmp/a{}", rand::random::<u64>());
                 std::fs::write(&path, buf)?;
 
                 let argv0 = std::env::args().next().unwrap();
 
                 // execute it using the shell and replace this process with it
-                return Err(
-                    Command::new("/bin/sh")
-                        .arg(path)
-                        // skipping argv0 and command 'start'
-                        .args(std::env::args().skip(2))
-                        // pass the path to arcam in the env var
-                        .env(crate::ENV_EXE_PATH, argv0)
-                        .exec()
-                        .into()
-                );
+                return Err(Command::new("/bin/sh")
+                    .arg(path)
+                    // skipping argv0 and command 'start'
+                    .args(std::env::args().skip(2))
+                    // pass the path to arcam in the env var
+                    .env(crate::ENV_EXE_PATH, argv0)
+                    .exec()
+                    .into());
             }
         }
 
@@ -339,31 +102,42 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 "PWD" | "CWD" => Some(pwd.to_string()),
                 "HOME" => Some(home.to_string()),
                 "CONTAINER" | "CONTAINER_NAME" => Some(container_name.clone()),
-                "RAND" | "RANDOM" => Some(rand().to_string()),
+                "RAND" | "RANDOM" => Some(rand::random::<u32>().to_string()),
 
                 // fallback to environ
-                _ => std::env::var(input).ok(),
+                _ => {
+                    if let Ok(var) = std::env::var(input) {
+                        Some(var)
+                    } else {
+                        log::warn!("Could not expand {input:?} in config");
+                        None
+                    }
+                }
             }
         };
 
         // expand vars in engine args and append to cli args
-        for i in config.engine_args.iter().chain(config.get_engine_args(&ctx.engine).iter()) {
-            cli_args.engine_args.push(
-                shellexpand::env_with_context_no_errors(&i, context_getter).to_string()
-            );
+        for i in config.engine_args.iter() {
+            cli_args
+                .engine_args
+                .push(shellexpand::env_with_context_no_errors(&i, context_getter).to_string());
         }
 
         // cli skel takes priority
         if cli_args.skel.is_none() {
             if let Some(skel) = config.skel {
-                cli_args.skel = Some(shellexpand::env_with_context_no_errors(&skel, context_getter).to_string());
+                cli_args.skel = Some(
+                    shellexpand::env_with_context_no_errors(&skel, context_getter).to_string(),
+                );
             }
         }
 
         // expand env as well for some fun dynamic shennanigans
         for (k, v) in &config.env {
             let mapped = format!("{k}={v}");
-            cli_args.env.push(shellexpand::env_with_context_no_errors(&mapped, context_getter).to_string());
+            cli_args
+                .env
+                .push(shellexpand::env_with_context_no_errors(&mapped, context_getter).to_string());
         }
 
         // prefer options from cli
@@ -374,7 +148,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
         cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
         cli_args.ports.extend_from_slice(&config.ports);
-        cli_args.capabilities.extend_from_slice(&config.capabilities);
+        cli_args
+            .capabilities
+            .extend_from_slice(&config.capabilities);
 
         // get the persist paths
         persist = config.persist;
@@ -385,12 +161,14 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         on_init_post = cli_args.on_init_post.join("\n") + &config.on_init_post.unwrap_or_default();
     }
 
+    log::debug!("Using image {container_image:?}");
+
     // allow dry-run regardless if the container exists
-    if !ctx.dry_run {
-        // quit pre-emptively if container already exists
-        if ctx.get_container_status(&container_name).is_some() {
-            return Err(anyhow!("Container {:?} already exists", container_name));
-        }
+    if !ctx.dry_run && ctx.engine.container_exists(&container_name)? {
+        return Err(anyhow!(
+            "Container with name {:?} already exists",
+            container_name
+        ));
     }
 
     // set default shell to bash if not set already
@@ -398,27 +176,40 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         cli_args.shell = Some("/bin/bash".into());
     }
 
-    let mut cmd = Command::new(&ctx.engine.path);
+    log::info!("Using {:?} as the shell", cli_args.shell);
+
+    let mut cmd = ctx.engine.command();
     cmd.args([
-        "run", "-d", "--rm",
+        "run",
+        "-d",
+        "--rm",
         "--security-opt=label=disable",
         "--user=root",
-
         // arcam does not act as the init system anymore
         "--init",
-
         // detaching breaks things
         "--detach-keys=",
-
     ]);
 
     cmd.args([
         format!("--name={}", container_name),
         format!("--label=manager={}", ctx.engine),
         format!("--label={}={}", APP_NAME, VERSION),
-        format!("--label={}={}", crate::CONTAINER_LABEL_HOST_DIR, ctx.cwd.to_string_lossy()),
-        format!("--label={}={}", crate::CONTAINER_LABEL_CONTAINER_DIR, main_project_dir),
-        format!("--label={}={}", crate::CONTAINER_LABEL_USER_SHELL, cli_args.shell.as_ref().unwrap()),
+        format!(
+            "--label={}={}",
+            crate::CONTAINER_LABEL_HOST_DIR,
+            ctx.cwd.to_string_lossy()
+        ),
+        format!(
+            "--label={}={}",
+            crate::CONTAINER_LABEL_CONTAINER_DIR,
+            main_project_dir
+        ),
+        format!(
+            "--label={}={}",
+            crate::CONTAINER_LABEL_USER_SHELL,
+            cli_args.shell.as_ref().unwrap()
+        ),
         format!("--env={0}={0}", APP_NAME),
         format!("--env={}={}", ENV_VAR_PREFIX!("VERSION"), VERSION),
         format!("--env=manager={}", ctx.engine),
@@ -429,27 +220,28 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!("--env=HOST_USER_GID={}", ctx.user_gid),
         // TODO explore all the xdg dirs and set them properly
         format!("--env=XDG_RUNTIME_DIR=/run/user/{}", ctx.user_id),
-        format!("--volume={}:{}", ctx.cwd.to_string_lossy(), main_project_dir),
-        format!("--volume={}:{}:ro,nocopy", executable_path.display(), crate::ARCAM_EXE),
+        format!(
+            "--volume={}:{}",
+            ctx.cwd.to_string_lossy(),
+            main_project_dir
+        ),
+        format!(
+            "--volume={}:{}:ro,nocopy",
+            executable_path.display(),
+            crate::ARCAM_EXE
+        ),
         format!("--entrypoint={}", crate::ARCAM_EXE),
         format!("--hostname={}", get_hostname()?),
     ]);
 
-    // engine specific args
-    match ctx.engine.kind {
-        EngineKind::Podman => {
-            cmd.args([
-                "--userns=keep-id",
-                "--group-add=keep-groups",
-
-                // the default ulimit is low
-                "--ulimit=host",
-
-                // use same timezone as host
-                "--tz=local",
-            ]);
-        },
-    }
+    cmd.args([
+        "--userns=keep-id",
+        "--group-add=keep-groups",
+        // the default ulimit is low
+        "--ulimit=host",
+        // use same timezone as host
+        "--tz=local",
+    ]);
 
     // add the env vars
     for e in &cli_args.env {
@@ -470,11 +262,14 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     for (vol, path) in persist.iter().chain(persist_user.iter()) {
         // using mount here to prevent mounting paths from persist, either by accident or
         // intentionally
-        cmd.arg(format!("--mount=type=volume,source={},destination={}", vol, path));
+        cmd.arg(format!(
+            "--mount=type=volume,source={},destination={}",
+            vol, path
+        ));
     }
 
     // set network if requested
-    if ! cli_args.network.unwrap_or(false) {
+    if !cli_args.network.unwrap_or(false) {
         cmd.arg("--network=none");
     }
 
@@ -504,32 +299,40 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     cmd.args([
         // the container image
         &container_image,
-
         "init",
     ]);
 
+    // TODO check if image exists and pull it interactively
+
     if ctx.dry_run {
-        cmd.print_escaped_cmd();
+        cmd.log(log::Level::Error);
 
         Ok(())
     } else {
         // do i need stdout if it fails?
         let output = cmd
-            .output()
+            .log_output(log::Level::Debug)
             .expect(crate::ENGINE_ERR_MSG);
 
         if !output.status.success() {
-            return Err(anyhow!("Stderr from container init: {}", String::from_utf8_lossy(&output.stderr)));
+            return Err(anyhow!(
+                "Stderr from container init: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
 
         let id = String::from_utf8_lossy(&output.stdout);
         let id = id.trim();
 
         // check if file exists in the container, used for flag files
-        let file_exists = |file: &str| -> Result<bool> {
-            let cmd = ctx.engine_command()
+        let container_file_exists = |file: &str| -> Result<bool> {
+            log::trace!("Testing for existance of {file:?}");
+
+            let cmd = ctx
+                .engine
+                .command()
                 .args(["exec", id, "test", "-f", file])
-                .output()
+                .log_output(log::Level::Debug)
                 .expect(crate::ENGINE_ERR_MSG);
 
             match cmd.get_code() {
@@ -539,14 +342,11 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 127 => panic!("Unknown command used during container initialization check"),
 
                 // this really should not happen unless something breaks
-                x => Err(anyhow!("Unknown error during container initialization ({})", x)),
+                x => Err(anyhow!(
+                    "Unknown error during container initialization ({x})"
+                )),
             }
         };
-
-        // wait until container finishes pre-initialization
-        while !file_exists(crate::FLAG_FILE_PRE_INIT)? {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
 
         // write pre init script into the container
         if !on_init_pre.is_empty() {
@@ -570,11 +370,14 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            let buffer: String = format!(r#"#!/bin/sh
+            let buffer: String = format!(
+                r#"#!/bin/sh
 set -e
 
 asroot chown "$USER:$USER" {0}
-"#, persist_user_paths);
+"#,
+                persist_user_paths
+            );
 
             write_to_file(&ctx, id, &path, &buffer)?;
         }
@@ -589,25 +392,79 @@ asroot chown "$USER:$USER" {0}
             write_to_file(&ctx, id, &path, &buffer)?;
         }
 
+        log::trace!("Waiting for container preinitalization");
+
+        // wait until container finishes pre-initialization
+        while !container_file_exists(crate::FLAG_FILE_PRE_INIT)? {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
         // remove pre-init flag to start initalization
-        ctx.engine_exec_root(id, vec!["rm", crate::FLAG_FILE_PRE_INIT])?;
+        ctx.engine
+            .exec(id, &vec!["rm", crate::FLAG_FILE_PRE_INIT])?;
+
+        log::trace!("Waiting for container initialization");
 
         // wait until container finishes initialization
-        while !file_exists(crate::FLAG_FILE_INIT)? {
+        while !container_file_exists(crate::FLAG_FILE_INIT)? {
             std::thread::sleep(std::time::Duration::from_millis(300));
         }
 
         if cli_args.enter {
+            log::debug!("Launching shell");
+
             // launch shell right away
-            crate::commands::open_shell(ctx, crate::cli::CmdShellArgs {
-                name: container_name,
-                shell: None,
-            })
+            crate::commands::open_shell(
+                ctx,
+                crate::cli::CmdShellArgs {
+                    name: container_name,
+                    shell: None,
+                },
+            )
         } else {
             // print container name
             println!("{}", container_name);
 
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::engine::Podman;
+    use crate::tests_prelude::*;
+    use assert_cmd::Command;
+
+    #[test]
+    #[ignore]
+    fn cmd_start_podman() -> Result<()> {
+        let tempdir = tempfile::tempdir()?;
+
+        let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["start", "debian:trixie"])
+            .current_dir(tempdir.path())
+            .assert()
+            .success();
+
+        let container = Container {
+            engine: Box::new(Podman),
+            container: String::from_utf8_lossy(&cmd.get_output().stdout)
+                .trim()
+                .to_string(),
+        };
+
+        // try to start another container in same directory
+        Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["start", "--name", &container, "debian:trixie"])
+            .current_dir(tempdir.path())
+            .assert()
+            .failure()
+            .stderr(format!(
+                "Error: There are containers running in current directory: {:?}\n",
+                container
+            ));
+
+        Ok(())
     }
 }

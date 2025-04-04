@@ -1,28 +1,69 @@
 use crate::cli;
 use crate::prelude::*;
+use std::process::exit;
 
-pub fn container_exists(ctx: Context, mut cli_args: cli::CmdExistsArgs) -> Result<()> {
-    // try to find container in current directory
+pub fn container_exists(ctx: Context, cli_args: cli::CmdExistsArgs) -> Result<()> {
     if cli_args.name.is_empty() {
-        // TODO this whole thing could be a function its used at least 3 times!
-        if let Some(containers) = ctx.get_cwd_container() {
-            if containers.is_empty() {
-                return Err(anyhow!("Could not find a running container in current directory"));
-            }
-
-            cli_args.name = containers.first().unwrap().clone();
+        // cwd containers are always owned
+        match ctx.get_cwd_containers() {
+            Ok(containers) if !containers.is_empty() => exit(0),
+            _ => exit(1),
         }
+    } else if ctx.engine.container_exists(&cli_args.name)? {
+        exit(0);
+    } else {
+        exit(1);
     }
+}
 
-    use std::process::exit;
+#[cfg(test)]
+mod tests {
+    use crate::engine::Podman;
+    use crate::tests_prelude::*;
+    use assert_cmd::Command;
 
-    // TODO i am not sure if there is any problems with using exit here
-    match ctx.engine_container_exists(&cli_args.name) {
-        // give different exit code if the container exists but is not owned
-        true => match ctx.get_container_label(&cli_args.name, crate::CONTAINER_LABEL_CONTAINER_DIR) {
-            Some(_) => Ok(()),
-            None => exit(2),
-        },
-        false => exit(1),
+    #[test]
+    #[ignore]
+    fn cmd_exists_podman() -> Result<()> {
+        let tempdir = tempfile::tempdir()?;
+
+        // no cwd containers yet
+        Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["exists"])
+            .current_dir(tempdir.path())
+            .assert()
+            .failure()
+            .code(1);
+
+        // create the container
+        let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["start", "debian:trixie"])
+            .current_dir(tempdir.path())
+            .assert()
+            .success();
+
+        let container = Container {
+            engine: Box::new(Podman),
+            container: String::from_utf8_lossy(&cmd.get_output().stdout)
+                .trim()
+                .to_string(),
+        };
+
+        assert!(!container.is_empty(), "Container name is empty");
+
+        // test with explicitly set container_name
+        Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["exists", &container])
+            .assert()
+            .success();
+
+        // detect container from cwd
+        Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+            .args(["exists"])
+            .current_dir(tempdir.path())
+            .assert()
+            .success();
+
+        Ok(())
     }
 }

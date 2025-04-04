@@ -1,5 +1,5 @@
 use crate::cli::CmdCompletionArgs;
-use crate::util::command_extensions::*;
+use crate::command_extensions::*;
 use crate::prelude::*;
 
 /// Used to run autocompletion functions
@@ -25,25 +25,29 @@ pub fn shell_completion_helper(ctx: Context, cli_args: CmdCompletionArgs) -> Res
                     println!("@{}", name);
                 }
             }
-        },
+        }
 
         ShellCompletionType::Container => {
-            let output = ctx.engine_command()
+            let output = ctx
+                .engine
+                .command()
                 .args([
-                    "container", "ls",
-                    "--filter", format!("label={}", crate::APP_NAME).as_str(),
-                    "--format", "{{.Names}}",
+                    "container",
+                    "ls",
+                    "--filter",
+                    format!("label={}", crate::APP_NAME).as_str(),
+                    "--format",
+                    "{{.Names}}",
                 ])
-                .run_get_output()?;
+                .log_output(log::Level::Debug)?;
 
             // print the output
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 print!("{}", stdout);
             }
-        },
+        }
     }
 
     Ok(())
 }
-

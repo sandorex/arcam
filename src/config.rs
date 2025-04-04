@@ -1,10 +1,9 @@
 //! Contains everything related to container configuration
 
-use code_docs::{code_docs_struct, DocumentedStruct};
 use anyhow::{Context, Result};
+use code_docs::{code_docs_struct, DocumentedStruct};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use crate::util::Engine;
 
 /// Whole config file
 #[derive(Debug, Clone, PartialEq, Default, Deserialize, Serialize)]
@@ -39,7 +38,6 @@ code_docs_struct! {
     #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
     #[serde(deny_unknown_fields)]
     pub struct Config {
-        // TODO redo these comments so they are easy to understand even for non-rust programmers
         /// Image used for the container
         pub image: String,
 
@@ -117,21 +115,6 @@ code_docs_struct! {
         /// Environ vars are expanded
         #[serde(default)]
         pub engine_args: Vec<String>,
-
-        /// Args passed to the engine, if its podman
-        ///
-        /// Environ vars are expanded
-        #[serde(default)]
-        pub engine_args_podman: Vec<String>,
-    }
-}
-
-impl Config {
-    /// Get engine args for specific engine
-    pub fn get_engine_args(&self, engine: &Engine) -> &Vec<String> {
-        match engine.kind {
-            crate::util::EngineKind::Podman => &self.engine_args_podman,
-        }
     }
 }
 
@@ -145,19 +128,20 @@ mod tests {
 version = 1
 image = "fedora"
 engine_args = [ "default" ]
-engine_args_podman = [ "podman" ]
 "#;
 
         let result = ConfigFile::config_from_str(cfg_text);
         assert!(result.is_ok(), "result is err: {}", result.unwrap_err());
         let result_ok = result.unwrap();
 
-        assert_eq!(result_ok, Config {
-            image: "fedora".into(),
-            engine_args: vec!["default".into()],
-            engine_args_podman: vec!["podman".into()],
+        assert_eq!(
+            result_ok,
+            Config {
+                image: "fedora".into(),
+                engine_args: vec!["default".into()],
 
-            ..Default::default()
-        });
+                ..Default::default()
+            }
+        );
     }
 }
