@@ -86,19 +86,17 @@ impl CommandExt for Command {
         )
     }
 
-    fn log_output(&mut self, level: log::Level) -> std::io::Result<Output> {
+    fn log_output(&mut self, _level: log::Level) -> std::io::Result<Output> {
         let output = self.output();
         match output.as_ref() {
-            Ok(output) => log::log!(
-                level,
+            Ok(output) => log::debug!(
                 "Command {:?} (output)\n  STDOUT: {:?}\n  STDERR: {:?}\n  STATUS: {:?}",
                 self.get_full_command(),
                 String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stdout),
                 output.status,
             ),
-            Err(err) => log::log!(
-                level,
+            Err(err) => log::debug!(
                 "Command {:?} (output)\n  ERROR: {:?}",
                 self.get_full_command(),
                 err,
@@ -122,17 +120,16 @@ impl CommandExt for Command {
         }
     }
 
-    fn log_status(&mut self, level: log::Level) -> std::io::Result<ExitStatus> {
+    fn log_status(&mut self, _level: log::Level) -> std::io::Result<ExitStatus> {
         let status = self.status();
+
         match status.as_ref() {
-            Ok(status) => log::log!(
-                level,
+            Ok(status) => log::debug!(
                 "Command {:?} (status)\n  STATUS: {:?}",
                 self.get_full_command(),
                 status,
             ),
-            Err(err) => log::log!(
-                level,
+            Err(err) => log::debug!(
                 "Command {:?} (status)\n  ERROR {:?}",
                 self.get_full_command(),
                 err,
@@ -176,8 +173,8 @@ impl CommandExt for Command {
             .with_context(|| anyhow!("Command {:?} failed", self.get_full_command()))
     }
 
-    fn log(&mut self, level: log::Level) -> &mut Self {
-        log::log!(level, "Command {:?}", self.get_full_command());
+    fn log(&mut self, _level: log::Level) -> &mut Self {
+        log::debug!("Command {:?}", self.get_full_command());
 
         self
     }

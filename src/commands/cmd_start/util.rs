@@ -9,7 +9,7 @@ use std::path::Path;
 pub fn get_hostname() -> Result<String> {
     // try to get hostname from env var
     if let Ok(env_hostname) = std::env::var("HOSTNAME") {
-        log::debug!("Getting hostname from environ");
+        log::debug!("Getting hostname from environment");
         return Ok(env_hostname);
     }
 
@@ -57,7 +57,7 @@ pub fn find_terminfo() -> Vec<String> {
     let mut existing: Vec<String> = vec![];
     for x in ["/usr/share/terminfo", "/usr/lib/terminfo", "/etc/terminfo"] {
         if std::path::Path::new(x).exists() {
-            log::debug!("Found {x:?}");
+            log::debug!("Found terminfo dir at {x:?}");
             args.push(format!("--volume={0}:/host{0}:ro", x));
             existing.push(x.into());
         }
