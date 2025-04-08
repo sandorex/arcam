@@ -11,7 +11,7 @@ use std::{
 #[test]
 fn test_sanity() -> Result<()> {
     assert_cmd::Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["--version"])
+        .args(["-V"])
         .assert()
         .success()
         .stdout(format!("arcam {}\n", crate::FULL_VERSION));

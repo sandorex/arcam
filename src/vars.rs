@@ -11,13 +11,15 @@ macro_rules! ENV_VAR_PREFIX {
 pub const ENGINE_ERR_MSG: &str = "Failed to execute engine";
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const FULL_VERSION: &str = concat!(
-    env!("CARGO_PKG_VERSION"),
-    "-",
-    env!("VERGEN_GIT_DESCRIBE"),
-    " (",
-    env!("VERGEN_GIT_BRANCH"),
-    ")"
+pub const FULL_VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"));
+
+#[rustfmt::skip]
+pub const LONG_VERSION: &str = concat!(
+    env!("CARGO_PKG_VERSION"), "-", env!("VERGEN_GIT_SHA"), "\n\n",
+
+    "Debug: ", env!("VERGEN_CARGO_DEBUG"), "\n",
+    "Rust: ", env!("VERGEN_RUSTC_SEMVER"), " (", env!("VERGEN_CARGO_TARGET_TRIPLE"), ")", "\n",
+    "Features: ", env!("VERGEN_CARGO_FEATURES"),
 );
 
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
