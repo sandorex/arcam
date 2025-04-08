@@ -25,7 +25,7 @@ simple_logger = { version = "5.0.0", default-features = false, features = ["colo
 
 [build-dependencies]
 anyhow = "1.0.86"
-vergen-git2 = { version = "1.0.0", features = [] }
+vergen-git2 = { version = "1.0.0", features = ["build", "cargo", "rustc"] }
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
