@@ -1,6 +1,12 @@
 name: Rust Tests
 
-on: push
+on:
+  push:
+    # ignore any tags but test on all branches
+    tags-ignore:
+      - '**'
+    branches:
+      - '**'
 
 env:
   CARGO_TERM_COLOR: always

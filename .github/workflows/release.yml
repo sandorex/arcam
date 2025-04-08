@@ -16,14 +16,27 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Rust Musl Toolchain
+      run: rustup target add x86_64-unknown-linux-musl
+
     - name: Build Release
-      run: cargo build --verbose --release
+      run: |
+        git config --global --add safe.directory '*'
+
+        cargo build --verbose --release
+        cargo build --verbose --release --target x86_64-unknown-linux-musl
+
+        mv target/x86_64-unknown-linux-musl/release/arcam target/x86_64-unknown-linux-musl/release/arcam-musl
+
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
           target/release/arcam
+          target/x86_64-unknown-linux-musl/release/arcam-musl
+
     - name: Publish to Crates.io
-      run: |
-        cargo login "${{ secrets.CRATES_IO_TOKEN }}"
-        cargo publish
+      run: cargo publish
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
