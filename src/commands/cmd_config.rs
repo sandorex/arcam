@@ -9,7 +9,7 @@ fn get_image_config(ctx: &Context, image: &str) -> Result<String> {
         .engine
         .command()
         .args(["image", "exists", image])
-        .log_output(log::Level::Debug)
+        .log_output()
         .expect(crate::ENGINE_ERR_MSG);
 
     if !cmd.status.success() {
@@ -29,7 +29,7 @@ fn get_image_config(ctx: &Context, image: &str) -> Result<String> {
     ]);
 
     let output = cmd
-        .log_output(log::Level::Debug)
+        .log_output()
         .expect(crate::ENGINE_ERR_MSG);
 
     if !output.status.success() {

@@ -65,9 +65,9 @@ pub fn open_shell(ctx: Context, mut cli_args: cli::CmdShellArgs) -> Result<()> {
     ]);
 
     if ctx.dry_run {
-        cmd.log(log::Level::Error);
+        cmd.log();
     } else {
-        cmd.log_status_anyhow(log::Level::Debug)?;
+        cmd.log_status_anyhow()?;
     }
 
     Ok(())

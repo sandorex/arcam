@@ -30,51 +30,32 @@ impl CommandOutputExt for Output {
 }
 
 pub trait CommandExt {
-    /// Prints the command in readable and copy-able format
-    #[deprecated]
-    fn print_escaped_cmd(&self);
-
+    /// Returns the command with all the arguments as a `String`
     fn get_full_command(&self) -> String;
 
-    /// Logs command and output after running `output`
-    fn log_output(&mut self, level: log::Level) -> std::io::Result<Output>;
+    /// Logs command and output after running `Command::output`
+    fn log_output(&mut self) -> std::io::Result<Output>;
 
     /// Same as `log_output` but anyhow error
-    fn log_output_anyhow(&mut self, level: log::Level) -> Result<Output>;
+    fn log_output_anyhow(&mut self) -> Result<Output>;
 
-    /// Logs command and output after running `status`
-    fn log_status(&mut self, level: log::Level) -> std::io::Result<ExitStatus>;
+    /// Logs command and output after running `Command::status`
+    fn log_status(&mut self) -> std::io::Result<ExitStatus>;
 
     /// Same as `log_status` but anyhow error
-    fn log_status_anyhow(&mut self, level: log::Level) -> Result<ExitStatus>;
+    fn log_status_anyhow(&mut self) -> Result<ExitStatus>;
 
-    /// Logs command and output after running `spawn`
-    fn log_spawn(&mut self, level: log::Level) -> std::io::Result<Child>;
+    /// Logs command and output after running `Command::spawn`
+    fn log_spawn(&mut self) -> std::io::Result<Child>;
 
     /// Same as `log_spawn` but anyhow error
-    fn log_spawn_anyhow(&mut self, level: log::Level) -> Result<Child>;
+    fn log_spawn_anyhow(&mut self) -> Result<Child>;
 
     /// Logs full command if at required level
-    fn log(&mut self, level: log::Level) -> &mut Self;
+    fn log(&mut self) -> &mut Self;
 }
 
 impl CommandExt for Command {
-    /// Print the whole command with quotes around each argument
-    fn print_escaped_cmd(&self) {
-        println!("(CMD) {:?} \\", self.get_program().to_string_lossy());
-        let mut iter = self.get_args();
-        while let Some(arg) = iter.next() {
-            print!("      {:?}", arg.to_string_lossy());
-
-            // do not add backslash on the last argument
-            if iter.len() != 0 {
-                print!(" \\");
-            }
-
-            println!();
-        }
-    }
-
     fn get_full_command(&self) -> String {
         format!(
             "{} {}",
@@ -86,7 +67,7 @@ impl CommandExt for Command {
         )
     }
 
-    fn log_output(&mut self, _level: log::Level) -> std::io::Result<Output> {
+    fn log_output(&mut self) -> std::io::Result<Output> {
         let output = self.output();
         match output.as_ref() {
             Ok(output) => log::debug!(
@@ -106,8 +87,8 @@ impl CommandExt for Command {
         output
     }
 
-    fn log_output_anyhow(&mut self, level: log::Level) -> Result<Output> {
-        match self.log_output(level) {
+    fn log_output_anyhow(&mut self) -> Result<Output> {
+        match self.log_output() {
             Ok(output) if output.status.success() => Ok(output),
             Ok(output) => Err(anyhow!(
                 "Command {:?} failed with code {:?}",
@@ -120,7 +101,7 @@ impl CommandExt for Command {
         }
     }
 
-    fn log_status(&mut self, _level: log::Level) -> std::io::Result<ExitStatus> {
+    fn log_status(&mut self) -> std::io::Result<ExitStatus> {
         let status = self.status();
 
         match status.as_ref() {
@@ -139,8 +120,8 @@ impl CommandExt for Command {
         status
     }
 
-    fn log_status_anyhow(&mut self, level: log::Level) -> Result<ExitStatus> {
-        match self.log_status(level) {
+    fn log_status_anyhow(&mut self) -> Result<ExitStatus> {
+        match self.log_status() {
             Ok(status) if status.success() => Ok(status),
             Ok(status) => Err(anyhow!(
                 "Command {:?} failed with code {:?}",
@@ -153,12 +134,11 @@ impl CommandExt for Command {
         }
     }
 
-    fn log_spawn(&mut self, level: log::Level) -> std::io::Result<Child> {
+    fn log_spawn(&mut self) -> std::io::Result<Child> {
         let child = self.spawn();
         match child.as_ref() {
-            Ok(_) => log::log!(level, "Command {:?} (spawn)", self.get_full_command(),),
-            Err(err) => log::log!(
-                level,
+            Ok(_) => log::debug!("Command {:?} (spawn)", self.get_full_command(),),
+            Err(err) => log::debug!(
                 "Command {:?} (spawn)\n  ERROR {:?}",
                 self.get_full_command(),
                 err,
@@ -168,12 +148,12 @@ impl CommandExt for Command {
         child
     }
 
-    fn log_spawn_anyhow(&mut self, level: log::Level) -> Result<Child> {
-        self.log_spawn(level)
+    fn log_spawn_anyhow(&mut self) -> Result<Child> {
+        self.log_spawn()
             .with_context(|| anyhow!("Command {:?} failed", self.get_full_command()))
     }
 
-    fn log(&mut self, _level: log::Level) -> &mut Self {
+    fn log(&mut self) -> &mut Self {
         log::debug!("Command {:?}", self.get_full_command());
 
         self

@@ -52,9 +52,9 @@ pub fn kill_container(ctx: Context, mut cli_args: cli::CmdKillArgs) -> Result<()
     cmd.args(["container", "stop", "--time", &timeout, &cli_args.name]);
 
     if ctx.dry_run {
-        cmd.log(log::Level::Error);
+        cmd.log();
     } else {
-        cmd.log_output_anyhow(log::Level::Debug)?;
+        cmd.log_output_anyhow()?;
     }
 
     Ok(())

@@ -106,13 +106,13 @@ fn initialization() -> Result<()> {
                 "--no-create-home",
                 &user,
             ])
-            .log_status_anyhow(log::Level::Debug)?
+            .log_status_anyhow()?
     } else {
         println!("Modifying user {:?}", user);
 
         Command::new("usermod")
             .args(["--home", &home, "--shell", shell, &user])
-            .log_status_anyhow(log::Level::Debug)?
+            .log_status_anyhow()?
     };
 
     if !cmd.success() {
@@ -133,7 +133,7 @@ fn initialization() -> Result<()> {
     {
         println!("Recreating font cache");
 
-        let cmd = Command::new("fc-cache").log_status(log::Level::Debug);
+        let cmd = Command::new("fc-cache").log_status();
 
         match cmd {
             Ok(x) => {
@@ -264,12 +264,12 @@ fn initialization() -> Result<()> {
                 Command::new("sudo")
                     .args(["-u", &user])
                     .arg(&file)
-                    .log_status_anyhow(log::Level::Debug)
+                    .log_status_anyhow()
             } else {
                 Command::new("su")
                     .args([&user, "-c"])
                     .arg(&file)
-                    .log_status_anyhow(log::Level::Debug)
+                    .log_status_anyhow()
             }
             .with_context(|| anyhow!("Script {:?} has failed", file))?;
         }

@@ -25,7 +25,7 @@ pub fn print_logs(ctx: Context, mut cli_args: cli::CmdLogsArgs) -> Result<()> {
         cmd.arg("--follow");
     }
 
-    cmd.log_status(log::Level::Debug)?;
+    cmd.log_status()?;
 
     Ok(())
 }

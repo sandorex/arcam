@@ -23,7 +23,7 @@ pub fn executable_in_path(cmd: &str) -> bool {
     let output = std::process::Command::new("sh")
         .arg("-c")
         .arg(format!("which {}", cmd))
-        .log_output(log::Level::Debug)
+        .log_output()
         .expect("Failed to execute 'which'");
 
     output.status.success()

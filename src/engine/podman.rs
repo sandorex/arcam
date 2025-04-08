@@ -55,7 +55,7 @@ impl Engine for Podman {
             .command()
             .args(["exec", "--user", "root", container])
             .args(command)
-            .log_output(log::Level::Debug)?;
+            .log_output()?;
 
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
@@ -74,7 +74,7 @@ impl Engine for Podman {
             }
         }
 
-        let output = cmd.log_output(log::Level::Debug)?;
+        let output = cmd.log_output()?;
 
         Ok(String::from_utf8_lossy(&output.stdout)
             .lines()
@@ -89,7 +89,7 @@ impl Engine for Podman {
             .command()
             .args(["container", "inspect"])
             .args(containers)
-            .log_output(log::Level::Debug)?;
+            .log_output()?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -107,7 +107,7 @@ impl Engine for Podman {
         let output = self
             .command()
             .args(["container", "exists", container])
-            .log_output(log::Level::Debug)?;
+            .log_output()?;
 
         match output.get_code() {
             0 => Ok(true),
@@ -134,7 +134,7 @@ impl Engine for Podman {
         // image goes last
         cmd.arg(image);
 
-        let output = cmd.log_output(log::Level::Debug)?;
+        let output = cmd.log_output()?;
 
         Ok(crate::tests_prelude::Container {
             container: String::from_utf8_lossy(&output.stdout).trim().to_string(),
@@ -149,7 +149,7 @@ impl Engine for Podman {
         // gentle shutdown, terminates by default after 10s
         self.command()
             .args(["container", "stop", container])
-            .log_status(log::Level::Debug)?;
+            .log_status()?;
 
         Ok(())
     }

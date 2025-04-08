@@ -303,7 +303,7 @@ pub fn write_to_file(ctx: &Context, container: &str, file: &Path, content: &str)
         .stdin(Stdio::piped()) // pipe into stdin but ignore stdout/stderr
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .log_spawn(log::Level::Debug)
+        .log_spawn()
         .expect(crate::ENGINE_ERR_MSG);
 
     let mut stdin = child

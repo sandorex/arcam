@@ -39,7 +39,7 @@ pub fn shell_completion_helper(ctx: Context, cli_args: CmdCompletionArgs) -> Res
                     "--format",
                     "{{.Names}}",
                 ])
-                .log_output(log::Level::Debug)?;
+                .log_output()?;
 
             // print the output
             if output.status.success() {

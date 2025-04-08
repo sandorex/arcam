@@ -305,13 +305,13 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     // TODO check if image exists and pull it interactively
 
     if ctx.dry_run {
-        cmd.log(log::Level::Error);
+        cmd.log();
 
         Ok(())
     } else {
         // do i need stdout if it fails?
         let output = cmd
-            .log_output(log::Level::Debug)
+            .log_output()
             .expect(crate::ENGINE_ERR_MSG);
 
         if !output.status.success() {
@@ -332,7 +332,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 .engine
                 .command()
                 .args(["exec", id, "test", "-f", file])
-                .log_output(log::Level::Debug)
+                .log_output()
                 .expect(crate::ENGINE_ERR_MSG);
 
             match cmd.get_code() {

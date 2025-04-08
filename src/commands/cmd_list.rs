@@ -29,12 +29,12 @@ pub fn print_containers(ctx: Context, args: CmdListArgs) -> Result<()> {
     }
 
     if ctx.dry_run {
-        cmd.log(log::Level::Error);
+        cmd.log();
     } else if args.raw {
         // just run it raw
-        cmd.log_status_anyhow(log::Level::Debug)?;
+        cmd.log_status_anyhow()?;
     } else {
-        let output = cmd.log_output(log::Level::Debug)?;
+        let output = cmd.log_output()?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         for (index, line) in stdout.lines().enumerate() {
