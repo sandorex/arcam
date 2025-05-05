@@ -35,6 +35,12 @@ pub trait Engine: Display {
     /// Check if container exists, should be faster than `inspect_container`
     fn container_exists(&self, container: &str) -> Result<bool>;
 
+    /// Check if image exists locally and doesn't have to be pulled
+    fn image_exists(&self, image: &str) -> Result<bool>;
+
+    /// Pull an image
+    fn image_pull(&self, image: &str, interactive: bool) -> Result<()>;
+
     #[cfg(test)]
     fn start_dummy_container(
         &self,

@@ -116,6 +116,32 @@ impl Engine for Podman {
         }
     }
 
+    fn image_exists(&self, image: &str) -> Result<bool> {
+        let cmd = self
+            .command()
+            .args(["image", "exists", image])
+            .log_output()?;
+
+        match cmd.get_code() {
+            0 => Ok(true),
+            1 => Ok(false),
+            _ => Err(anyhow!("Error checking does image {image:?} exist")),
+        }
+    }
+
+    fn image_pull(&self, image: &str, interactive: bool) -> Result<()> {
+        let mut cmd = self.command();
+        cmd.args(["image", "pull", image]);
+
+        if interactive {
+            cmd.log_status_anyhow()?;
+        } else {
+            cmd.log_output_anyhow()?;
+        }
+
+        Ok(())
+    }
+
     #[cfg(test)]
     fn start_dummy_container(
         &self,
