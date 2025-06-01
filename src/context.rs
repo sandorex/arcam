@@ -1,7 +1,7 @@
-use crate::config::Config;
 use crate::engine::Engine;
 use crate::prelude::*;
-use std::path::PathBuf;
+use crate::{config::Config, APP_NAME};
+use std::path::{Path, PathBuf};
 use users::os::unix::UserExt;
 
 /// Context used throughout the application
@@ -93,6 +93,11 @@ impl Context {
         self.app_dir.join("configs")
     }
 
+    /// Get container configuration directory in /etc
+    pub fn config_dir_etc(&self) -> PathBuf {
+        Path::new("/etc/").join(APP_NAME).join("configs")
+    }
+
     /// Get path to this executable
     pub fn get_executable_path(&self) -> Result<PathBuf> {
         std::env::current_exe().with_context(|| "Failed to get executable path")
@@ -108,7 +113,21 @@ impl Context {
 
     /// Tries to find config by the name
     pub fn find_config(&self, name: &str) -> Result<Config> {
-        let path = self.config_dir().as_path().join(format!("{}.toml", name));
+        let mut path = self.config_dir().as_path().join(format!("{}.toml", name));
+
+        // if it does not exist check /etc directory, allows overriding system
+        // configs by users
+        if !path.exists() {
+            path = self
+                .config_dir_etc()
+                .as_path()
+                .join(format!("{}.toml", name));
+        }
+
+        if !path.exists() {
+            return Err(anyhow!("Could not find config by name {:?}", name));
+        }
+
         crate::config::ConfigFile::config_from_file(&path)
     }
 }
