@@ -118,9 +118,13 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
     pub network: Option<bool>,
 
-    /// Try to pass audio into the the container, security impact is unknown
+    /// Try to pass pipewire into the the container, no sandboxing is done
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
-    pub audio: Option<bool>,
+    pub pipewire: Option<bool>,
+
+    /// Try to pass pulseaudio into the the container, no sandboxing is done
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
+    pub pulseaudio: Option<bool>,
 
     /// Passes wayland compositor through, pokes holes in sandbox, allows r/w access to clipboard
     ///

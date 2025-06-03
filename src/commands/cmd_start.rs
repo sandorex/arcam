@@ -143,7 +143,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         // prefer options from cli
         cli_args.shell = cli_args.shell.or(config.shell);
         cli_args.network = cli_args.network.or(Some(config.network));
-        cli_args.audio = cli_args.audio.or(Some(config.audio));
+        cli_args.pipewire = cli_args.pipewire.or(Some(config.pipewire));
+        cli_args.pulseaudio = cli_args.pulseaudio.or(Some(config.pulseaudio));
         cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
         cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
         cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));

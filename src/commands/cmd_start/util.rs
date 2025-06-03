@@ -196,21 +196,55 @@ pub fn mount_additional_mounts(
 }
 
 pub fn mount_audio(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) -> Result<()> {
-    // try to pass audio
-    if cli_args.audio.unwrap_or(false) {
-        // TODO see if passing pipewire or alsa is possible too
-        let socket_path = format!("/run/user/{}/pulse/native", ctx.user_id);
-        if Path::new(&socket_path).exists() {
+    // try to pass pipewire
+    if cli_args.pipewire.unwrap_or(false) {
+        let container_path = format!("/run/user/{}/pipewire-0", ctx.user_id);
+
+        // respect PIPEWIRE_REMOTE if defined
+        let host_path = match std::env::var("PIPEWIRE_REMOTE") {
+            Ok(x) => x,
+            Err(_) => container_path.clone(),
+        };
+
+        if Path::new(&host_path).exists() {
             cmd.args([
-                format!("--volume={0}:{0}", socket_path),
-                format!("--env=PULSE_SERVER=unix:{}", socket_path),
+                format!("--volume={}:{}", host_path, container_path),
+                format!("--env=PIPEWIRE_REMOTE={}", container_path),
             ]);
 
-            log::debug!("Pulseaudio socket found at {socket_path:?}");
+            log::debug!("pipewire socket found at {host_path:?}");
         } else {
-            return Err(anyhow!(
-                "Could not find pulseaudio socket to pass to the container"
-            ));
+            return Err(anyhow!("Could not find pipewire socket at {host_path:?}"));
+        }
+    }
+
+    // try to pass pulseaudio
+    if cli_args.pulseaudio.unwrap_or(false) {
+        let container_path = format!("/run/user/{}/pulse/native", ctx.user_id);
+
+        // respect PULSE_SERVER if defined
+        let host_path = match std::env::var("PULSE_SERVER") {
+            Ok(pulse_server) => {
+                // only accept sockets i do not know if there are other protocols
+                if let Some(path) = pulse_server.strip_prefix("unix:") {
+                    path.to_string()
+                } else {
+                    return Err(anyhow!("Invalid PULSE_SERVER value {pulse_server:?}"));
+                }
+            }
+            // fallback to the default
+            Err(_) => container_path.clone(),
+        };
+
+        if Path::new(&host_path).exists() {
+            cmd.args([
+                format!("--volume={}:{}", host_path, container_path),
+                format!("--env=PULSE_SERVER=unix:{}", container_path),
+            ]);
+
+            log::debug!("pulseaudio socket found at {host_path:?}");
+        } else {
+            return Err(anyhow!("Could not find pulseaudio socket at {host_path:?}"));
         }
     }
 

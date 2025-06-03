@@ -54,9 +54,13 @@ code_docs_struct! {
         #[serde(default)]
         pub network: bool,
 
-        /// Passthrough pulseaudio, security impact is unknown
+        /// Passthrough pipewire
         #[serde(default)]
-        pub audio: bool,
+        pub pipewire: bool,
+
+        /// Passthrough pulseaudio
+        #[serde(default)]
+        pub pulseaudio: bool,
 
         /// Passthrough wayland compositor socket, high security impact, allows clipboard access
         #[serde(default)]
