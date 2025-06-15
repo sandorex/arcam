@@ -276,6 +276,41 @@ pub struct CmdCompletionArgs {
     pub complete: Option<crate::commands::ShellCompletionType>,
 }
 
+#[derive(Args, Debug, Clone)]
+pub struct CmdWrapArgs {
+    /// Poll interval in seconds
+    #[arg(long, default_value_t = 120)]
+    pub interval: u32,
+
+    // /// Delay before first poll
+    // pub delay: u32,
+    /// Pipe command stdout into this file
+    #[arg(long)]
+    pub stdout_file: Option<String>,
+
+    /// Pipe command stderr into this file
+    #[arg(long)]
+    pub stderr_file: Option<String>,
+
+    /// Which signal to send to process to tell it to quit
+    ///
+    /// Use signal names from linux `kill` command
+    #[arg(long, default_value = "TERM")]
+    pub signal: String,
+
+    /// Timeout after which KILL signal is sent to the process
+    #[arg(long, default_value_t = 5000)]
+    pub timeout: u32,
+
+    /// Container to wait on
+    #[arg(value_name = "CONTAINER", env = crate::ENV_CONTAINER)]
+    pub container: String,
+
+    /// Command to run
+    #[arg(last = true, required = true)]
+    pub command: Vec<String>,
+}
+
 #[derive(Subcommand, Debug, Clone)]
 pub enum CliCommands {
     /// Start a container in current directory, mounting it read-write
@@ -309,6 +344,12 @@ pub enum CliCommands {
 
     /// Shell autocompletion
     Completion(CmdCompletionArgs),
+
+    // TODO wrap needs testing!
+    // NOTE this could be useful for hacking but i cannot separate it in the help
+    /// Wrap a command which will be killed after the container dies
+    #[command(hide = true)]
+    Wrap(CmdWrapArgs),
 
     /// Init command used to setup the container
     #[command(hide = true)]
