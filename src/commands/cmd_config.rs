@@ -28,9 +28,7 @@ fn get_image_config(ctx: &Context, image: &str) -> Result<String> {
         crate::ARCAM_CONFIG,
     ]);
 
-    let output = cmd
-        .log_output()
-        .expect(crate::ENGINE_ERR_MSG);
+    let output = cmd.log_output().expect(crate::ENGINE_ERR_MSG);
 
     if !output.status.success() {
         return Err(anyhow!("Failed to extract config from image {:?}", image));
@@ -53,17 +51,14 @@ fn show_options() -> Result<()> {
 fn show_example(ctx: &Context) -> Result<()> {
     // NOTE instead of writing examples by hand im serializing it here
     let example: String = {
-        let example = ConfigFile {
-            version: 1,
-            config: Config {
-                image: "docker.io/library/debian:latest".into(),
-                network: true,
-                engine_args: vec!["--privileged".into()],
-                ports: vec![(8080, 8080), (6666, 6666)],
-                env: vec![("LS_COLORS".into(), "rs=0:di=01;34:ln=01;...".into())],
-                ..Default::default()
-            },
-        };
+        let example = ConfigFile::V25_06(Config {
+            image: "docker.io/library/debian:latest".into(),
+            network: true,
+            engine_args: vec!["--privileged".into()],
+            ports: vec![(8080, 8080), (6666, 6666)],
+            env: vec![("LS_COLORS".into(), "rs=0:di=01;34:ln=01;...".into())],
+            ..Default::default()
+        });
 
         toml::to_string(&example)?
     };

@@ -2,14 +2,9 @@ use crate::{config::Config, Context, FULL_VERSION, LONG_VERSION};
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
-const AFTER_HELP: &str = concat!(
-    "For help visit the git repository\n   ",
-    env!("CARGO_PKG_REPOSITORY")
-);
-
 /// Sandboxed development container manager, with focus on security by default
 #[derive(Parser, Debug, Clone)]
-#[command(name = crate::APP_NAME, author, version = FULL_VERSION, long_version = LONG_VERSION, about, after_help = AFTER_HELP)]
+#[command(name = crate::APP_NAME, author, version = FULL_VERSION, long_version = LONG_VERSION, about)]
 pub struct Cli {
     /// Just print engine commands that would've been ran, do not execute
     #[arg(long)]

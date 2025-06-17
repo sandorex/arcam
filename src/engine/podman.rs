@@ -28,7 +28,7 @@ impl From<PodmanContainerInfo> for ContainerInfo {
     }
 }
 
-// NOTE: this is so i do not have to have all the properties at Option<T> if they are null
+// NOTE: this is so i do not have to have all the properties as Option<T> if they are null
 fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     T: Default + Deserialize<'de>,
