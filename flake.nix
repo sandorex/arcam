@@ -40,10 +40,12 @@
         shellHook = ''
           echo "Development shell for arcam"
 
-          alias build='cargo build --debug --target=${cargoTarget}'
-          alias build-release='cargo build --release --target=${cargoTarget}'
+          alias build='cargo build'
+          alias build-release='cargo build --release'
           alias test='cargo test'
         '';
+
+        CARGO_BUILD_TARGET = "${cargoTarget}";
       };
     };
 }
