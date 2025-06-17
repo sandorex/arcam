@@ -35,7 +35,7 @@
 
       devShells.${system}.default = pkgs.mkShell {
         # buildInputs = [ nano cargo rustc rustfmt rust-analyzer pre-commit rustPackages.clippy ];
-        nativeBuildInputs = with pkgs; [ git ];
+        nativeBuildInputs = with pkgs; [ git toolchain ];
 
         shellHook = ''
           echo "Development shell for arcam"
