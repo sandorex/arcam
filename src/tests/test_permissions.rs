@@ -12,6 +12,7 @@ fn run(container_name: &str, command: &[&str]) -> Result<Command> {
 
 #[test]
 #[ignore]
+#[serial]
 fn test_permissions_podman() -> Result<()> {
     let tempdir = tempfile::tempdir()?;
 

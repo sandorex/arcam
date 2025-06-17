@@ -190,12 +190,14 @@ impl Display for Podman {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests_prelude::*;
 
     // NOTE: this is truncated output from `podman inspect`, removed few labels cause of laziness
     const INSPECT_OUTPUT: &str = include_str!("podman_inspect.json");
 
     #[test]
     #[ignore]
+    #[serial]
     fn engine_inspect_podman() -> Result<()> {
         let obj = serde_json::from_str::<Vec<PodmanContainerInfo>>(INSPECT_OUTPUT)?;
         assert_eq!(
@@ -233,6 +235,7 @@ mod tests {
 
     #[test]
     #[ignore]
+    #[serial]
     fn engine_exists_podman() -> Result<()> {
         let container = Podman.start_dummy_container("debian:trixie", None)?;
 

@@ -24,6 +24,7 @@ mod tests {
 
     #[test]
     #[ignore]
+    #[serial]
     fn cmd_exists_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 

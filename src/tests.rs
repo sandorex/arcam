@@ -24,6 +24,7 @@ pub mod prelude {
     pub use super::Container;
     pub use crate::engine::Engine;
     pub use anyhow::Result;
+    pub use serial_test::serial;
 }
 
 /// RAII guard to stop running containers

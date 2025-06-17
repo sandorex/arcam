@@ -440,6 +440,7 @@ mod tests {
 
     #[test]
     #[ignore]
+    #[serial]
     fn cmd_start_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 
