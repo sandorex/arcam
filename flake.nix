@@ -1,36 +1,49 @@
 {
   inputs = {
     naersk.url = "github:nix-community/naersk/master";
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
   };
 
-  outputs = { self, nixpkgs, naersk }:
-     let
-       inherit nixpkgs self;
-       package = system: (nixpkgs.legacyPackages.${system}.callPackage naersk {}).buildPackage {
-         src = ./.;
+  outputs = { self, nixpkgs, naersk, rust-overlay }:
+    let
+      inherit self;
+      system = "x86_64-linux";
 
-         # make vergen_git2 happy
-         VERGEN_IDEMPOTENT = "1";
-         VERGEN_GIT_SHA = if (self ? "rev") then (builtins.substring 0 7 self.rev) else "nix-dirty";
-       };
-       shell = system: with import nixpkgs { inherit system; }; mkShell {
-            buildInputs = [ nano cargo rustc rustfmt rust-analyzer pre-commit rustPackages.clippy ];
-            RUST_SRC_PATH = rustPlatform.rustLibSrc;
-       };
-     in
-     {
-       packages.x86_64-linux.default = package "x86_64-linux";
-       packages.aarch64-linux.default = package "aarch64-linux";
+      overlays = [ (import rust-overlay) ];
+      pkgs = import nixpkgs { inherit system overlays; };
 
-       devShells.x86_64-linux.default = shell "x86_64-linux";
-       devShells.aarch64-linux.default = shell "aarch64-linux";
+      toolchain = pkgs.rust-bin.fromRustupToolchainFile ./toolchain.toml;
+      cargoTarget = "x86_64-unknown-linux-musl";
 
-       # apple stuff (not officially supported)
-       packages.x86_64-darwin.default = package "x86_64-darwin";
-       packages.aarch64-darwin.default = package "aarch64-darwin";
+      naersk' = pkgs.callPackage naersk {
+        cargo = toolchain;
+        rustc = toolchain;
+      };
+    in
+    {
+      packages.${system}.default = naersk'.buildPackage {
+        src = ./.;
 
-       devShells.x86_64-darwin.default = shell "x86_64-linux";
-       devShells.aarch64-darwin.default = shell "x86_64-linux";
-     };
+        # build using default target
+        CARGO_BUILD_TARGET = cargoTarget;
+
+        # make vergen_git2 happy
+        VERGEN_IDEMPOTENT = "1";
+        VERGEN_GIT_SHA = if (self ? "rev") then (builtins.substring 0 7 self.rev) else "nix-dirty";
+      };
+
+      devShells.${system}.default = pkgs.mkShell {
+        # buildInputs = [ nano cargo rustc rustfmt rust-analyzer pre-commit rustPackages.clippy ];
+        nativeBuildInputs = with pkgs; [ git ];
+
+        shellHook = ''
+          echo "Development shell for arcam"
+
+          alias build='cargo build --debug --target=${cargoTarget}'
+          alias build-release='cargo build --release --target=${cargoTarget}'
+          alias test='cargo test'
+        '';
+      };
+    };
 }
