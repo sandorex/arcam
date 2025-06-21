@@ -1,20 +1,28 @@
 //! Contains everything related to container configuration
 
-mod v25_06;
-use v25_06::Config2506;
-
-/// Latest config struct
-pub type Config = Config2506;
+mod v1;
+use v1::ConfigV1;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+// Alias the latest config version
+pub type Config = ConfigV1;
+
+/// Config file with version string, use `Config` directly elsewhere
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, tag = "version")]
 pub enum ConfigFile {
-    #[serde(rename = "25.06")]
-    V25_06(Config2506),
+    #[serde(rename = "1")]
+    V01(ConfigV1),
+}
+
+impl ConfigFile {
+    /// Construct latest version config
+    pub fn latest(config: Config) -> Self {
+        Self::V01(config)
+    }
 }
 
 impl TryInto<Config> for ConfigFile {
@@ -22,7 +30,7 @@ impl TryInto<Config> for ConfigFile {
 
     fn try_into(self) -> std::result::Result<Config, Self::Error> {
         match self {
-            Self::V25_06(x) => Ok(x.try_into()?),
+            Self::V01(x) => Ok(x.try_into()?),
         }
     }
 }
@@ -46,14 +54,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn from_str() {
-        let cfg_text = r#"
-version = "25.06"
+    fn config_from_str() {
+        // always test latest version
+        let cfg_text = format!(
+            r#"
+version = "{}"
 image = "fedora"
 engine_args = [ "default" ]
-"#;
+"#,
+            Config::VERSION
+        );
 
-        let result = ConfigFile::config_from_str(cfg_text);
+        let result = ConfigFile::config_from_str(&cfg_text);
         assert!(result.is_ok(), "result is err: {}", result.unwrap_err());
         let result_ok = result.unwrap();
 

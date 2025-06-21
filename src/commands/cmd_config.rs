@@ -51,7 +51,7 @@ fn show_options() -> Result<()> {
 fn show_example(ctx: &Context) -> Result<()> {
     // NOTE instead of writing examples by hand im serializing it here
     let example: String = {
-        let example = ConfigFile::V25_06(Config {
+        let example = ConfigFile::latest(Config {
             image: "docker.io/library/debian:latest".into(),
             network: true,
             engine_args: vec!["--privileged".into()],

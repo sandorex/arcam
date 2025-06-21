@@ -1,4 +1,4 @@
-//! Configuration version 25.06
+//! Configuration version 1
 
 use code_docs::{code_docs_struct, DocumentedStruct};
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ code_docs_struct! {
     /// engine that get applied over the default settings
     #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
     #[serde(deny_unknown_fields)]
-    pub struct Config2506 {
+    pub struct ConfigV1 {
         /// Image used for the container
         pub image: String,
 
@@ -92,4 +92,8 @@ code_docs_struct! {
         #[serde(default)]
         pub engine_args: Vec<String>,
     }
+}
+
+impl ConfigV1 {
+    pub const VERSION: u32 = 1;
 }
