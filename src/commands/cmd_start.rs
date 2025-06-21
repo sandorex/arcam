@@ -307,9 +307,10 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     // pull image interactively if it does not exist
     if !ctx.engine.image_exists(&container_image)? && !ctx.dry_run {
+        // printerr!("Downloading image {:?}")
         // pull interactively only if running in terminal
-        ctx.engine
-            .image_pull(&container_image, std::io::stdout().is_terminal())?;
+        ctx.engine.image_pull(&container_image, true)?;
+        // .image_pull(&container_image, std::io::stdin().is_terminal())?;
     }
 
     if ctx.dry_run {

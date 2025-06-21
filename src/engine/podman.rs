@@ -134,6 +134,8 @@ impl Engine for Podman {
         cmd.args(["image", "pull", image]);
 
         if interactive {
+            // print to stderr to prevent issues with reading container name
+            cmd.stdout(std::io::stderr());
             cmd.log_status_anyhow()?;
         } else {
             cmd.log_output_anyhow()?;
