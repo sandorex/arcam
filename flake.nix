@@ -14,27 +14,27 @@
       pkgs = import nixpkgs { inherit system overlays; };
 
       toolchain = pkgs.rust-bin.fromRustupToolchainFile ./toolchain.toml;
-      cargoTarget = "x86_64-unknown-linux-musl";
 
       naersk' = pkgs.callPackage naersk {
         cargo = toolchain;
         rustc = toolchain;
       };
+
+      # build for musl by default
+      CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
+
+      # make vergen_git2 happy
+      VERGEN_IDEMPOTENT = "1";
+      VERGEN_GIT_SHA = if (self ? "rev") then (builtins.substring 0 7 self.rev) else "nix-dirty";
     in
     {
       packages.${system}.default = naersk'.buildPackage {
         src = ./.;
 
-        # build using default target
-        CARGO_BUILD_TARGET = cargoTarget;
-
-        # make vergen_git2 happy
-        VERGEN_IDEMPOTENT = "1";
-        VERGEN_GIT_SHA = if (self ? "rev") then (builtins.substring 0 7 self.rev) else "nix-dirty";
+        inherit CARGO_BUILD_TARGET VERGEN_IDEMPOTENT VERGEN_GIT_SHA;
       };
 
       devShells.${system}.default = pkgs.mkShell {
-        # buildInputs = [ nano cargo rustc rustfmt rust-analyzer pre-commit rustPackages.clippy ];
         nativeBuildInputs = with pkgs; [ git toolchain ];
 
         shellHook = ''
@@ -45,7 +45,7 @@
           alias test='cargo test'
         '';
 
-        CARGO_BUILD_TARGET = "${cargoTarget}";
+        inherit CARGO_BUILD_TARGET VERGEN_IDEMPOTENT VERGEN_GIT_SHA;
       };
     };
 }
