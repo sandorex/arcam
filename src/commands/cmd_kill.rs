@@ -107,6 +107,7 @@ mod tests {
 
     #[test]
     #[ignore]
+    #[serial]
     fn cmd_kill_interactive_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 
