@@ -25,6 +25,6 @@ jobs:
       run: cargo test --target=x86_64-unknown-linux-musl --verbose -- --show-output
     # container tests cannot run in parallel
     - name: Run container tests 
-      run: cargo test --target=x86_64-unknown-linux-musl --verbose -- --ignored --show-output --test-threads 1
+      run: cargo test --target=x86_64-unknown-linux-musl --verbose -- --ignored --show-output
     - name: Run clippy
       run: cargo clippy --verbose

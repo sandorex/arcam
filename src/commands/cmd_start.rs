@@ -4,6 +4,7 @@ use crate::cli::{CmdStartArgs, ConfigArg};
 use crate::command_extensions::*;
 use crate::prelude::*;
 use crate::{APP_NAME, ENV_VAR_PREFIX, VERSION};
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use util::*;
 
@@ -306,7 +307,9 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     // pull image interactively if it does not exist
     if !ctx.engine.image_exists(&container_image)? && !ctx.dry_run {
-        ctx.engine.image_pull(&container_image, true)?;
+        // pull interactively only if running in terminal
+        ctx.engine
+            .image_pull(&container_image, std::io::stdout().is_terminal())?;
     }
 
     if ctx.dry_run {
