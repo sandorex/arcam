@@ -52,6 +52,8 @@ mod tests {
 
         assert!(!container.is_empty(), "Container name is empty");
 
+        println!("got {container:?}");
+
         // test with explicitly set container_name
         Command::cargo_bin(env!("CARGO_BIN_NAME"))?
             .args(["exists", &container])
