@@ -46,32 +46,82 @@ pub fn generate_name() -> String {
 }
 
 /// Finds all terminfo directories on host so they can be mounted in the container so no terminfo
-/// installing is required
-///
-/// This function is required as afaik only debian has non-standard paths for terminfo
+/// installation is required
+//
+// Special cases:
+// - Debian has non-standard paths for terminfo
+//
+// - NixOS uses TERMINFO_DIRS to set proper paths but.. the directories inside are all symlinks..
+//   so i resorted to using `infocmp -D` instead
 pub fn find_terminfo() -> Vec<String> {
+    const STANDARD_PATHS: &[&str] = &["/usr/share/terminfo", "/usr/lib/terminfo", "/etc/terminfo"];
+
     let mut args: Vec<String> = vec![];
+    let mut terminfo_env = "".to_string();
+    let mut dirs: Vec<String> = vec![];
 
-    log::debug!("Looking for terminfo directories on host system");
+    // get terminfo directories using infocmp (experimental)
+    match Command::new("infocmp").arg("-D").log_output_anyhow() {
+        Ok(x) => {
+            let stdout = String::from_utf8_lossy(&x.stdout);
 
-    let mut existing: Vec<String> = vec![];
-    for x in ["/usr/share/terminfo", "/usr/lib/terminfo", "/etc/terminfo"] {
-        if std::path::Path::new(x).exists() {
-            log::debug!("Found terminfo dir at {x:?}");
-            args.push(format!("--volume={0}:/host{0}:ro", x));
-            existing.push(x.into());
+            for dir in stdout.lines() {
+                if std::fs::exists(dir).ok().unwrap_or(false) {
+                    dirs.push(dir.to_string());
+                }
+            }
+        }
+        Err(err) => log::error!("Error getting terminfo directories using infocmp: {err}"),
+    }
+
+    // use TERMINFO_DIRS if defined
+    if let Some(env_dirs) = std::env::var("TERMINFO_DIRS").ok() {
+        log::debug!("Looking for terminfo directories from environment variable");
+
+        // filter existing directories
+        for dir in env_dirs.split(':') {
+            if std::fs::exists(dir).ok().unwrap_or(false) {
+                // do not add duplicates
+                let dir = dir.to_string();
+                if !dirs.contains(&dir) {
+                    dirs.push(dir);
+                }
+            }
         }
     }
 
-    let mut terminfo_env = "".to_string();
+    log::debug!("Looking for standard terminfo directories");
 
-    // add first the host ones as they are preferred
-    for x in &existing {
-        terminfo_env.push_str(format!("/host{}:", x).as_str());
+    // find the standard paths
+    for dir in STANDARD_PATHS {
+        if std::fs::exists(dir).ok().unwrap_or(false) {
+            let dir = dir.to_string();
+            if dirs.contains(&dir) {
+                dirs.push(dir.to_string());
+            }
+        }
     }
 
-    // add container ones as fallback
-    for x in &existing {
+    // this certainly should not happen but just in case
+    assert!(!dirs.is_empty(), "Could not find any TERMINFO directories!");
+
+    log::debug!("Terminfo directories found:");
+    for dir in &dirs {
+        use rand::distr::{Alphanumeric, SampleString};
+
+        let mountpoint = format!(
+            "/host/terminfo/{}",
+            // generate random name to prevent huge paths
+            Alphanumeric.sample_string(&mut rand::rng(), 4)
+        );
+        log::debug!("{dir:?} -> {mountpoint:?}");
+
+        args.push(format!("--volume={dir}:{mountpoint}:ro"));
+        terminfo_env.push_str(format!("{mountpoint}:").as_str());
+    }
+
+    // add container paths to TERMINFO_DIRS
+    for x in STANDARD_PATHS {
         terminfo_env.push_str(format!("{}:", x).as_str());
     }
 
