@@ -63,6 +63,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             }
         };
 
+        // TODO add env var that points to the directory where the config was located!
         if let Some(host_pre_init) = &config.host_pre_init {
             // avoid infinite loop using env var
             if std::env::var(crate::ENV_EXE_PATH).is_err() {

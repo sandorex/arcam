@@ -43,6 +43,12 @@ fn show_options() -> Result<()> {
         // replacing vec with array for people that dont know rust
         .replace("Vec<", "Array<");
 
+    // print config version in same style
+    println!(
+        "/// Schema version, must be one of {:?}\nversion: u32\n",
+        (1..=Config::VERSION).collect::<Vec<_>>()
+    );
+
     println!(r#"{docstring}"#);
 
     Ok(())

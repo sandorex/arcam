@@ -62,8 +62,13 @@ code_docs_struct! {
         #[serde(default)]
         pub on_init_post: Option<String>,
 
-        /// Script to run on start, all original arguments are passed verbatim, you have to run
-        /// `arcam start` yourself or nothing will happen
+        // TODO make this into a command so any kind of script/executable could
+        // be used like python for example
+        /// Runs following shell script and pass all arguments verbatim to it,
+        /// script itself is responsible for running arcam start with all the arguments
+        ///
+        /// This allows you total control of the container startup which also
+        /// makes it dangerous if you do not check the config file beforhand
         ///
         /// NOTE: the script is ran using "/bin/sh"
         pub host_pre_init: Option<String>,
