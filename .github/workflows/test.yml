@@ -17,9 +17,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Rust Musl Toolchain
+      run: rustup target add x86_64-unknown-linux-musl
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --target=x86_64-unknown-linux-musl --verbose
     - name: Run tests
-      run: cargo test --verbose -- --include-ignored --show-output
+      # for some reason tests fail when running in parallel
+      run: cargo test --target=x86_64-unknown-linux-musl --verbose -- --include-ignored --show-output
+      #--test-threads 1
     - name: Run clippy
       run: cargo clippy --verbose
