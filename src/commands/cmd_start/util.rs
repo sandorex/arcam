@@ -42,7 +42,12 @@ pub fn generate_name() -> String {
     let suffix =
         std::env::var(crate::ENV_CONTAINER_SUFFIX).unwrap_or_else(|_| APP_NAME.to_string());
 
-    format!("{}-{}", adjective, suffix)
+    // allow removing suffix by setting it to empty string
+    if suffix.is_empty() {
+        adjective.to_string()
+    } else {
+        format!("{}-{}", adjective, suffix)
+    }
 }
 
 /// Finds all terminfo directories on host so they can be mounted in the container so no terminfo
