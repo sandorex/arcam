@@ -7,34 +7,30 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: rust:bullseye # build using old glibc for compatability
-
     steps:
     - uses: actions/checkout@v4
 
-    - name: Rust Musl Toolchain
+    - name: Fetch Toolchain
       run: rustup target add x86_64-unknown-linux-musl
 
     - name: Build Release
       run: |
         git config --global --add safe.directory '*'
-
         cargo build --verbose --release
-        cargo build --verbose --release --target x86_64-unknown-linux-musl
 
-        mv target/x86_64-unknown-linux-musl/release/arcam target/x86_64-unknown-linux-musl/release/arcam-musl
+    - name: Test Release
+      run: cargo test --release --verbose -- --include-ignored --show-output
 
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          target/release/arcam
-          target/x86_64-unknown-linux-musl/release/arcam-musl
+          target/x86_64-unknown-linux-musl/release/arcam
 
     - name: Publish to Crates.io
       run: cargo publish
