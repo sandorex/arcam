@@ -31,4 +31,3 @@ vergen-git2 = { version = "1.0.0", features = ["build", "cargo", "rustc"] }
 assert_cmd = "2.0.16"
 rexpect = "0.6.0"
 tempfile = "3.16.0"
-serial_test = "*"

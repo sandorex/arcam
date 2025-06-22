@@ -24,7 +24,9 @@ pub mod prelude {
     pub use super::Container;
     pub use crate::engine::Engine;
     pub use anyhow::Result;
-    pub use serial_test::serial;
+
+    /// Debian image used across multiple tests
+    pub const DEBIAN_IMAGE: &str = "debian:trixie";
 }
 
 /// RAII guard to stop running containers

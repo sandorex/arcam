@@ -134,6 +134,8 @@ impl Engine for Podman {
         cmd.args(["image", "pull", image]);
 
         if interactive {
+            // print to stderr to prevent issues with reading container name
+            cmd.stdout(std::io::stderr());
             cmd.log_status_anyhow()?;
         } else {
             cmd.log_output_anyhow()?;
@@ -197,7 +199,6 @@ mod tests {
 
     #[test]
     #[ignore]
-    #[serial]
     fn engine_inspect_podman() -> Result<()> {
         let obj = serde_json::from_str::<Vec<PodmanContainerInfo>>(INSPECT_OUTPUT)?;
         assert_eq!(
@@ -225,7 +226,7 @@ mod tests {
             }
         );
 
-        let container = Podman.start_dummy_container("debian:trixie", None)?;
+        let container = Podman.start_dummy_container(DEBIAN_IMAGE, None)?;
 
         // ensure some data is extracted
         assert!(!Podman.inspect_containers(vec![&container])?.is_empty());
@@ -235,9 +236,8 @@ mod tests {
 
     #[test]
     #[ignore]
-    #[serial]
     fn engine_exists_podman() -> Result<()> {
-        let container = Podman.start_dummy_container("debian:trixie", None)?;
+        let container = Podman.start_dummy_container(DEBIAN_IMAGE, None)?;
 
         assert!(Podman.container_exists(&container)?);
 

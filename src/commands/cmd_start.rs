@@ -403,8 +403,7 @@ asroot chown "$USER:$USER" {0}
         }
 
         // remove pre-init flag to start initalization
-        ctx.engine
-            .exec(id, &vec!["rm", crate::FLAG_FILE_PRE_INIT])?;
+        ctx.engine.exec(id, &["rm", crate::FLAG_FILE_PRE_INIT])?;
 
         log::trace!("Waiting for container initialization");
 
@@ -441,12 +440,11 @@ mod tests {
 
     #[test]
     #[ignore]
-    #[serial]
     fn cmd_start_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 
         let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-            .args(["start", "debian:trixie"])
+            .args(["start", DEBIAN_IMAGE])
             .current_dir(tempdir.path())
             .assert()
             .success();
@@ -460,7 +458,7 @@ mod tests {
 
         // try to start another container in same directory
         Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-            .args(["start", "--name", &container, "debian:trixie"])
+            .args(["start", "--name", &container, DEBIAN_IMAGE])
             .current_dir(tempdir.path())
             .assert()
             .failure()

@@ -80,7 +80,7 @@ pub fn find_terminfo() -> Vec<String> {
     }
 
     // use TERMINFO_DIRS if defined
-    if let Some(env_dirs) = std::env::var("TERMINFO_DIRS").ok() {
+    if let Ok(env_dirs) = std::env::var("TERMINFO_DIRS") {
         log::debug!("Looking for terminfo directories from environment variable");
 
         // filter existing directories

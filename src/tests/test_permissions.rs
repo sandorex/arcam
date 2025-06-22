@@ -12,13 +12,12 @@ fn run(container_name: &str, command: &[&str]) -> Result<Command> {
 
 #[test]
 #[ignore]
-#[serial]
 fn test_permissions_podman() -> Result<()> {
     let tempdir = tempfile::tempdir()?;
 
     // create the container
     let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-        .args(["start", "debian:trixie"])
+        .args(["start", DEBIAN_IMAGE])
         .current_dir(tempdir.path())
         .assert()
         .success();

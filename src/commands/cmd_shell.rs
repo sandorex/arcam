@@ -82,12 +82,11 @@ mod tests {
 
     #[test]
     #[ignore]
-    #[serial]
     fn cmd_shell_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 
         let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-            .args(["start", "debian:trixie"])
+            .args(["start", DEBIAN_IMAGE])
             .current_dir(tempdir.path())
             .assert()
             .success();

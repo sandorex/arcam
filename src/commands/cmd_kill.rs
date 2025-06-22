@@ -70,13 +70,12 @@ mod tests {
 
     #[test]
     #[ignore]
-    #[serial]
     fn cmd_kill_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 
         // create the container
         let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-            .args(["start", "debian:trixie"])
+            .args(["start", DEBIAN_IMAGE])
             .current_dir(tempdir.path())
             .assert()
             .success();
@@ -107,12 +106,11 @@ mod tests {
 
     #[test]
     #[ignore]
-    #[serial]
     fn cmd_kill_interactive_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 
         let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-            .args(["start", "debian:trixie"])
+            .args(["start", DEBIAN_IMAGE])
             .current_dir(tempdir.path())
             .assert()
             .success();

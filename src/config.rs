@@ -30,14 +30,14 @@ impl TryInto<Config> for ConfigFile {
 
     fn try_into(self) -> std::result::Result<Config, Self::Error> {
         match self {
-            Self::V01(x) => Ok(x.try_into()?),
+            Self::V01(x) => Ok(x),
         }
     }
 }
 
 impl ConfigFile {
     pub fn config_from_str(input: &str) -> Result<Config> {
-        Ok(toml::from_str::<ConfigFile>(input)?.try_into()?)
+        toml::from_str::<ConfigFile>(input)?.try_into()
     }
 
     pub fn config_from_file(file: &Path) -> Result<Config> {

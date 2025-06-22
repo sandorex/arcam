@@ -24,7 +24,6 @@ mod tests {
 
     #[test]
     #[ignore]
-    #[serial]
     fn cmd_exists_podman() -> Result<()> {
         let tempdir = tempfile::tempdir()?;
 
@@ -38,7 +37,7 @@ mod tests {
 
         // create the container
         let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
-            .args(["start", "debian:trixie"])
+            .args(["start", DEBIAN_IMAGE])
             .current_dir(tempdir.path())
             .assert()
             .success();
