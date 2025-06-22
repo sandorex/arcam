@@ -2,6 +2,7 @@
 
 use code_docs::{code_docs_struct, DocumentedStruct};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 // save all the fields and docs so they can be printed as always up-to-date documentation
 code_docs_struct! {
@@ -10,6 +11,18 @@ code_docs_struct! {
     #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
     #[serde(deny_unknown_fields)]
     pub struct ConfigV1 {
+        /// Path to the config
+        /// @skip
+        #[serde(skip)]
+        pub path: Option<PathBuf>,
+
+        /// Name of the config
+        /// @skip
+        #[serde(skip)]
+        pub name: Option<String>,
+
+        // --- real config options --- //
+
         /// Image used for the container
         pub image: String,
 

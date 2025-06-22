@@ -63,7 +63,14 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             }
         };
 
-        // TODO add env var that points to the directory where the config was located!
+        let config_dir = match config.path.as_ref() {
+            // NOTE it should never be a directory so it should always work right?
+            Some(x) => x.parent().unwrap(),
+            None => panic!("Config path is None after loading!"),
+        };
+
+        let config_name = config.name.expect("Config name is not set after loading!");
+
         if let Some(host_pre_init) = &config.host_pre_init {
             // avoid infinite loop using env var
             if std::env::var(crate::ENV_EXE_PATH).is_err() {
@@ -85,6 +92,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                     .args(std::env::args().skip(2))
                     // pass the path to arcam in the env var
                     .env(crate::ENV_EXE_PATH, argv0)
+                    .env(crate::ENV_CFG_DIR, config_dir)
+                    .env(crate::ENV_CFG_NAME, config_name)
                     .exec()
                     .into());
             }
@@ -104,6 +113,8 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
                 "HOME" => Some(home.to_string()),
                 "CONTAINER" | "CONTAINER_NAME" => Some(container_name.clone()),
                 "RAND" | "RANDOM" => Some(rand::random::<u32>().to_string()),
+                "CONFIG_DIR" => Some(config_dir.to_string_lossy().to_string()),
+                "CONFIG_NAME" => Some(config_name.clone()),
 
                 // fallback to environ
                 _ => {

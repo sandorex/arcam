@@ -61,6 +61,12 @@ pub const ENV_ENTER_ON_START: &str = ENV_VAR_PREFIX!("ENTER_ON_START");
 /// Stores path to arcam executable and prevents infinite loop with host_pre_init
 pub const ENV_EXE_PATH: &str = ENV_VAR_PREFIX!("EXE_PATH");
 
+/// Path to the directory where the config was loaded from
+pub const ENV_CFG_DIR: &str = ENV_VAR_PREFIX!("CFG_DIR");
+
+/// Name of the config loaded
+pub const ENV_CFG_NAME: &str = ENV_VAR_PREFIX!("CFG_NAME");
+
 /// Where scripts are executed from
 pub const INIT_D_DIR: &str = "/init.d";
 

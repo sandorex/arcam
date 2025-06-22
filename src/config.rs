@@ -44,8 +44,16 @@ impl ConfigFile {
         let file_contents = std::fs::read_to_string(file)
             .with_context(|| format!("while reading config file {:?}", file))?;
 
-        Self::config_from_str(&file_contents)
-            .with_context(|| format!("while parsing config file {:?}", file))
+        let mut config = Self::config_from_str(&file_contents)
+            .with_context(|| format!("while parsing config file {:?}", file))?;
+
+        // set the original path of file
+        config.path = Some(file.to_path_buf());
+
+        // set name of the config to be file name (no extension)
+        config.name = file.file_stem().map(|x| x.to_string_lossy().to_string());
+
+        Ok(config)
     }
 }
 

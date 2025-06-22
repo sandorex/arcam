@@ -38,18 +38,37 @@ fn get_image_config(ctx: &Context, image: &str) -> Result<String> {
 }
 
 fn show_options() -> Result<()> {
-    let docstring = Config::commented_fields()
-        .unwrap()
-        // replacing vec with array for people that dont know rust
-        .replace("Vec<", "Array<");
-
-    // print config version in same style
+    // print config version in same style as the rest of options
     println!(
-        "/// Schema version, must be one of {:?}\nversion: u32\n",
-        (1..=Config::VERSION).collect::<Vec<_>>()
+        "/// Config schema version (valid versions: {})\nversion: u32\n",
+        (1..=Config::VERSION)
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
     );
 
-    println!(r#"{docstring}"#);
+    let iter = Config::field_names()
+        .into_iter()
+        .zip(Config::field_types().into_iter())
+        .zip(Config::field_docs().into_iter())
+        .map(|((name, r#type), docs)| (name, r#type, docs));
+
+    // convert some types to be easier to understand for non-rust users
+    let convert_type = |x: &str| -> String { x.replace("Vec<", "Array<") };
+
+    for (name, t, docs) in iter {
+        // skip any that contains '@skip' in its docs
+        if docs.join("\n").contains("@skip") {
+            continue;
+        }
+
+        // format like rust docs
+        for i in docs {
+            println!("///{i}");
+        }
+
+        println!("{name}: {}\n", convert_type(t));
+    }
 
     Ok(())
 }
