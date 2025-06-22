@@ -456,6 +456,14 @@ mod tests {
                 .to_string(),
         };
 
+        // make sure the returned container name is proper, to prevent issues
+        // like with interactive downloading of images
+        let re = regex::Regex::new(r"[A-Za-z0-9-]").unwrap();
+        assert!(
+            re.is_match(&container),
+            "Container name from start command is invalid"
+        );
+
         // try to start another container in same directory
         Command::cargo_bin(env!("CARGO_BIN_NAME"))?
             .args(["start", "--name", &container, DEBIAN_IMAGE])
