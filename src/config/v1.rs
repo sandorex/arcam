@@ -51,6 +51,10 @@ code_docs_struct! {
         #[serde(default)]
         pub wayland: bool,
 
+        /// Passthrough GPUs by their index, use 0 for all
+        #[serde(default)]
+        pub gpus: Vec<u8>,
+
         /// Passthrough ssh-agent socket, security impact is unknown
         #[serde(default)]
         pub ssh_agent: bool,

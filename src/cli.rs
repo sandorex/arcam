@@ -130,6 +130,12 @@ pub struct CmdStartArgs {
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
     pub wayland: Option<bool>,
 
+    /// Passes through GPUs by their index, use 0 for all
+    ///
+    /// If passed without argument then use no gpu
+    #[arg(long = "gpus", require_equals = true, num_args = 0.., value_delimiter = ',', help_heading = START_HEADING_PERMISSIONS)]
+    pub gpus: Option<Vec<u8>>,
+
     /// Pass through ssh-agent socket
     #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_PERMISSIONS)]
     pub ssh_agent: Option<bool>,

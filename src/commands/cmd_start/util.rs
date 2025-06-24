@@ -224,6 +224,58 @@ pub fn mount_wayland(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
     Ok(())
 }
 
+pub fn gpu_passthrough(_ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) -> Result<()> {
+    use std::fs;
+
+    let gpus = cli_args.gpus.clone().unwrap_or_else(|| vec![]);
+
+    // no gpus selected do nothing
+    if gpus.is_empty() {
+        return Ok(());
+    }
+
+    let mut files: Vec<String> = vec![];
+
+    // 0 means copy all
+    if gpus.contains(&0) {
+        log::debug!("Adding all GPU devices");
+
+        for entry in std::fs::read_dir("/dev/dri").expect("Error reading /dev/dri") {
+            let entry = entry?;
+
+            // just filter paths by name
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if filename.starts_with("card") || filename.starts_with("renderD") {
+                log::debug!("Found {:?}", entry.path());
+                files.push(entry.path().to_string_lossy().to_string());
+            }
+        }
+    } else {
+        log::debug!("Adding GPU devices");
+
+        for gpu_index in gpus {
+            // NOTE: for some reason first card is /dev/dri/card1 and /dev/renderD128
+            let card = format!("/dev/dri/card{gpu_index}");
+            let render = format!("/dev/dri/renderD{}", 127 + gpu_index);
+
+            if fs::exists(&card).is_ok_and(|x| x) && fs::exists(&render).is_ok_and(|x| x) {
+                log::debug!("Found GPU {gpu_index} at {card:?} and {render:?}");
+
+                files.push(card);
+                files.push(render);
+            } else {
+                return Err(anyhow!("Could not find card with index {gpu_index}"));
+            }
+        }
+    }
+
+    for path in files {
+        cmd.args([format!("--device={path}")]);
+    }
+
+    Ok(())
+}
+
 pub fn mount_additional_mounts(
     ws_dir: &Path,
     cli_args: &CmdStartArgs,
