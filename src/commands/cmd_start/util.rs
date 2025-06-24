@@ -17,7 +17,7 @@ pub fn get_hostname() -> Result<String> {
 
     // then as a fallback use hostname executable
     let cmd = Command::new("hostname")
-        .output()
+        .log_output()
         .with_context(|| "Could not call hostname")?;
 
     let hostname = String::from_utf8_lossy(&cmd.stdout);
@@ -188,8 +188,14 @@ pub fn mount_wayland(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
                 ));
             }
 
-            // add fonts just in case
-            cmd.arg("--volume=/usr/share/fonts:/usr/share/fonts/host:ro");
+            // add fonts if they exist
+            let system_fonts = Path::new("/usr/share/fonts");
+            if system_fonts.exists() {
+                cmd.arg(format!(
+                    "--volume={}:/usr/share/fonts/host:ro",
+                    system_fonts.to_string_lossy()
+                ));
+            }
 
             // legacy ~/.fonts
             let home_dot_fonts = ctx.user_home.join(".fonts");
@@ -202,7 +208,6 @@ pub fn mount_wayland(ctx: &Context, cli_args: &CmdStartArgs, cmd: &mut Command) 
 
             // font dir ~/.local/share/fonts
             let home_dot_local_fonts = ctx.user_home.join(".local").join("share").join("fonts");
-
             if home_dot_local_fonts.exists() {
                 cmd.arg(format!(
                     "--volume={}:/usr/share/fonts/host_local:ro",

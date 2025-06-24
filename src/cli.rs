@@ -10,6 +10,11 @@ pub struct Cli {
     #[arg(long)]
     pub dry_run: bool,
 
+    /// Debug only option to print the parsed options
+    #[cfg(debug_assertions)]
+    #[arg(long)]
+    pub print_cmd: bool,
+
     /// Increase verbosity
     #[arg(short, long, value_name = "Error|Warn|Info|Debug|Trace", default_value_t = log::Level::Warn, env = crate::ENV_LOG_LEVEL)]
     pub log_level: log::Level,
@@ -74,8 +79,6 @@ const START_HEADING_EXPERIMENTAL: &str = "EXPERIMENTAL";
 #[derive(Args, Debug, Clone)]
 pub struct CmdStartArgs {
     /// Enter shell after container initialization finishes
-    ///
-    /// Ignored if stdout is not a terminal (ex. a pipe)
     #[arg(short = 'E', long, env = crate::ENV_ENTER_ON_START)]
     pub enter: bool,
 
@@ -144,7 +147,7 @@ pub struct CmdStartArgs {
     /// Add capabilities, or drop them with by prefixing `!cap`
     ///
     /// For more details about capabilities read `man 7 capabilities`
-    #[arg(long = "cap", value_name = "[!]CAPABILITY", help_heading = START_HEADING_PERMISSIONS)]
+    #[arg(long = "cap", value_name = "[!]CAPABILITY", value_delimiter = ',', help_heading = START_HEADING_PERMISSIONS)]
     pub capabilities: Vec<String>,
 
     /// File, image or config to use to start a container

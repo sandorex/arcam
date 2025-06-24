@@ -40,6 +40,14 @@ fn main() -> Result<()> {
         Context::new(args.dry_run, Box::new(engine::Podman))
     };
 
+    // print parsed options
+    if cfg!(debug_assertions) {
+        if args.print_cmd {
+            dbg!(args);
+            return Ok(());
+        }
+    }
+
     match args.cmd {
         CliCommands::Start(x) => commands::start_container(get_ctx()?, x)?,
         CliCommands::Shell(x) => commands::open_shell(get_ctx()?, x)?,
