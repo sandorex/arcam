@@ -1,4 +1,4 @@
-use vergen_git2::{CargoBuilder, Emitter, Git2Builder, RustcBuilder};
+use vergen_gitcl::{CargoBuilder, Emitter, GitclBuilder, RustcBuilder};
 
 fn main() -> anyhow::Result<()> {
     // cause i cannot figure out how to uppercase a str literal at compile time
@@ -7,7 +7,7 @@ fn main() -> anyhow::Result<()> {
         env!("CARGO_PKG_NAME").to_ascii_uppercase()
     );
 
-    let git2 = Git2Builder::default().sha(true).build()?;
+    let git2 = GitclBuilder::default().sha(true).build()?;
 
     let cargo = CargoBuilder::default()
         .debug(true)

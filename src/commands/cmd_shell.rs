@@ -103,12 +103,9 @@ mod tests {
         c.current_dir(tempdir.path());
 
         let mut pty = spawn_command(c, Some(5_000)).and_then(|p| {
-            let mut session = PtyReplSession {
-                prompt: "$".to_owned(),
-                pty_session: p,
-                quit_command: Some("exit".to_owned()),
-                echo_on: true,
-            };
+            let mut session = PtyReplSession::new(p, "$".to_owned())
+                .echo_on(true)
+                .quit_command(Some("exit".to_owned()));
 
             // wait until the prompt appears
             session.wait_for_prompt()?;
