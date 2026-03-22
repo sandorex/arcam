@@ -35,6 +35,10 @@ code_docs_struct! {
         #[serde(default)]
         pub shell: Option<String>,
 
+        /// Use gvisor runtime for better sandboxing
+        #[serde(default)]
+        pub gvisor: bool,
+
         /// Set network access
         #[serde(default)]
         pub network: bool,
@@ -85,7 +89,7 @@ code_docs_struct! {
         /// script itself is responsible for running arcam start with all the arguments
         ///
         /// This allows you total control of the container startup which also
-        /// makes it dangerous if you do not check the config file beforhand
+        /// makes it dangerous if you do not check the config file beforehand
         ///
         /// NOTE: the script is ran using "/bin/sh"
         pub host_pre_init: Option<String>,

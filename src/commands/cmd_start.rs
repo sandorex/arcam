@@ -154,6 +154,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
         // prefer options from cli
         cli_args.shell = cli_args.shell.or(config.shell);
+        cli_args.gvisor = cli_args.gvisor.or(Some(config.gvisor));
         cli_args.network = cli_args.network.or(Some(config.network));
         cli_args.pipewire = cli_args.pipewire.or(Some(config.pipewire));
         cli_args.pulseaudio = cli_args.pulseaudio.or(Some(config.pulseaudio));
@@ -204,6 +205,19 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         // detaching breaks things
         "--detach-keys=",
     ]);
+
+    if cli_args.gvisor.unwrap_or(false) {
+        if !crate::executable_in_path("runsc") {
+            return Err(anyhow!("Could not find gvisor (runsc) in path"));
+        }
+
+        // TODO do i want the --rootless flag for runsc?
+        cmd.args([
+            // it seems it can look for it in path
+            "--runtime=runsc",
+            "--runtime-flag", "ignore-cgroups",
+        ]);
+    }
 
     cmd.args([
         format!("--name={}", container_name),

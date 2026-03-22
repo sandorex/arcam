@@ -3,14 +3,20 @@ use anyhow::Result;
 use assert_cmd::Command;
 use arcam::engine::Podman;
 
-#[test]
-#[ignore = "requires podman"]
-fn cmd_start_podman() -> Result<()> {
+fn start_podman(gvisor: bool) -> Result<()> {
     let tempdir = tempfile::tempdir()?;
 
-    let cmd = Command::cargo_bin("arcam")?
-        .args(["start", DEBIAN_IMAGE])
-        .current_dir(tempdir.path())
+    let mut cmd = Command::cargo_bin("arcam")?;
+    cmd.current_dir(tempdir.path());
+    cmd.args(["start"]);
+
+    if gvisor {
+        cmd.arg("--gvisor");
+    }
+
+    cmd.arg(DEBIAN_IMAGE);
+
+    let cmd = cmd
         .assert()
         .success();
 
@@ -41,4 +47,16 @@ fn cmd_start_podman() -> Result<()> {
         ));
 
     Ok(())
+}
+
+#[test]
+#[ignore = "requires podman"]
+fn cmd_start_podman() -> Result<()> {
+    start_podman(false)
+}
+
+#[test]
+#[ignore = "requires podman and gvisor"]
+fn cmd_start_podman_gvisor() -> Result<()> {
+    start_podman(true)
 }

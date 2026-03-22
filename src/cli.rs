@@ -1,4 +1,4 @@
-use crate::{config::Config, Context, FULL_VERSION, LONG_VERSION};
+use crate::{FULL_VERSION, LONG_VERSION, config::Config, context::Context};
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -83,6 +83,12 @@ pub struct CmdStartArgs {
     /// Name of the new container (if not set a randomly generated name will be used)
     #[arg(long, env = crate::ENV_CONTAINER)]
     pub name: Option<String>,
+
+    /// Use gvisor runtime for better sandboxing (EXPERIMENTAL)
+    ///
+    /// Requires runsc to be in PATH
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
+    pub gvisor: Option<bool>,
 
     /// Set container default shell
     #[arg(long)]
