@@ -42,7 +42,6 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
 
     log::debug!("Container name set to {container_name:?}");
 
-    // TODO shellexpand env expansion should error out!
     if let ConfigArg::Image(image) = &cli_args.config {
         // no config used
 
@@ -132,15 +131,13 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         for i in config.engine_args.iter() {
             cli_args
                 .engine_args
-                .push(shellexpand::env_with_context_no_errors(&i, context_getter).to_string());
+                .push(util::expand_vars(i, context_getter)?);
         }
 
         // cli skel takes priority
         if cli_args.skel.is_none() {
             if let Some(skel) = config.skel {
-                cli_args.skel = Some(
-                    shellexpand::env_with_context_no_errors(&skel, context_getter).to_string(),
-                );
+                cli_args.skel = Some(util::expand_vars(&skel, context_getter)?);
             }
         }
 
@@ -149,7 +146,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             let mapped = format!("{k}={v}");
             cli_args
                 .env
-                .push(shellexpand::env_with_context_no_errors(&mapped, context_getter).to_string());
+                .push(util::expand_vars(&mapped, context_getter)?)
         }
 
         // prefer options from cli
