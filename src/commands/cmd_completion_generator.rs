@@ -1,13 +1,11 @@
-use crate::cli::CmdCompletionArgs;
-use crate::prelude::*;
+use crate::{APP_NAME, cli::CmdCompletionArgs, prelude::*};
 use clap::CommandFactory;
 use clap_complete::{generate, Shell};
-use std::io::IsTerminal;
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 
 fn gen(shell: Shell, buf: &mut dyn Write) {
     let mut cmd = crate::cli::Cli::command();
-    generate(shell, &mut cmd, env!("CARGO_BIN_NAME"), buf);
+    generate(shell, &mut cmd, APP_NAME, buf);
 }
 
 fn detect_shell() -> Result<Shell> {

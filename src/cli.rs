@@ -56,10 +56,8 @@ impl ConfigArg {
             || input.starts_with(".")       // ex. .arcam.toml
             || input.starts_with("/")       // ex. /etc/arcam/configs/something.toml
             || input.starts_with("~/")      // ex. ~/.config/arcam/configs/something.toml
-            || input.ends_with(".toml")
+            || input.ends_with(".toml")     // well no image is gonna end with .toml? right?
         {
-            // well no image is gonna end with .toml? right?
-            // it must be a path
             Ok(Self::File(PathBuf::from(input)))
         } else if let Some(config_name) = input.strip_prefix("@") {
             // @ is prefix for a config

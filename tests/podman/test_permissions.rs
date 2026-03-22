@@ -1,9 +1,9 @@
-use crate::{engine::Podman, tests_prelude::*};
-use assert_cmd::Command;
+use crate::common::prelude::*;
+use arcam::engine::Podman;
 use users::{get_current_gid, get_current_uid};
 
 fn run(container_name: &str, command: &[&str]) -> Result<Command> {
-    let mut cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?;
+    let mut cmd = Command::cargo_bin(arcam::APP_NAME)?;
     cmd.args(["exec", container_name, "--"]);
     cmd.args(command);
 
@@ -11,12 +11,12 @@ fn run(container_name: &str, command: &[&str]) -> Result<Command> {
 }
 
 #[test]
-#[ignore]
+#[ignore = "requires podman"]
 fn test_permissions_podman() -> Result<()> {
     let tempdir = tempfile::tempdir()?;
 
     // create the container
-    let cmd = Command::cargo_bin(env!("CARGO_BIN_NAME"))?
+    let cmd = Command::cargo_bin(arcam::APP_NAME)?
         .args(["start", DEBIAN_IMAGE])
         .current_dir(tempdir.path())
         .assert()

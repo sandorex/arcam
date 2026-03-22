@@ -143,44 +143,6 @@ impl Engine for Podman {
 
         Ok(())
     }
-
-    #[cfg(test)]
-    fn start_dummy_container(
-        &self,
-        image: &str,
-        args: Option<Vec<&str>>,
-    ) -> Result<crate::tests_prelude::Container> {
-        assert!(!image.is_empty());
-
-        let mut cmd = self.command();
-        cmd.args(["run", "--rm", "-d", "-it"]);
-
-        if let Some(args) = args {
-            cmd.args(args);
-        }
-
-        // image goes last
-        cmd.arg(image);
-
-        let output = cmd.log_output()?;
-
-        Ok(crate::tests_prelude::Container {
-            container: String::from_utf8_lossy(&output.stdout).trim().to_string(),
-            engine: Box::new(*self),
-        })
-    }
-
-    #[cfg(test)]
-    fn stop_container(&self, container: &str) -> Result<()> {
-        assert!(!container.is_empty());
-
-        // gentle shutdown, terminates by default after 10s
-        self.command()
-            .args(["container", "stop", container])
-            .log_status()?;
-
-        Ok(())
-    }
 }
 
 impl Display for Podman {
@@ -189,61 +151,3 @@ impl Display for Podman {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tests_prelude::*;
-
-    // NOTE: this is truncated output from `podman inspect`, removed few labels cause of laziness
-    const INSPECT_OUTPUT: &str = include_str!("podman_inspect.json");
-
-    #[test]
-    #[ignore]
-    fn engine_inspect_podman() -> Result<()> {
-        let obj = serde_json::from_str::<Vec<PodmanContainerInfo>>(INSPECT_OUTPUT)?;
-        assert_eq!(
-            obj.first().take().unwrap(),
-            &PodmanContainerInfo {
-                name: "wrathful-arcam".to_string(),
-                config: PodmanContainerInfoConfig {
-                    labels: HashMap::from([
-                        ("arcam".to_string(), "0.1.10".to_string()),
-                        (
-                            "com.github.containers.toolbox".to_string(),
-                            "true".to_string()
-                        ),
-                        (
-                            "container_dir".to_string(),
-                            "/home/sandorex/ws/arcam".to_string()
-                        ),
-                        ("default_shell".to_string(), "/bin/fish".to_string()),
-                        (
-                            "host_dir".to_string(),
-                            "/mnt/slowmf/ws/projects/arcam".to_string()
-                        ),
-                    ]),
-                },
-            }
-        );
-
-        let container = Podman.start_dummy_container(DEBIAN_IMAGE, None)?;
-
-        // ensure some data is extracted
-        assert!(!Podman.inspect_containers(vec![&container])?.is_empty());
-
-        Ok(())
-    }
-
-    #[test]
-    #[ignore]
-    fn engine_exists_podman() -> Result<()> {
-        let container = Podman.start_dummy_container(DEBIAN_IMAGE, None)?;
-
-        assert!(Podman.container_exists(&container)?);
-
-        let inspected = Podman.inspect_containers(vec![&container])?;
-        assert!(!inspected.is_empty());
-
-        Ok(())
-    }
-}

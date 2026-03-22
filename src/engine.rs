@@ -40,15 +40,4 @@ pub trait Engine: Display {
 
     /// Pull an image
     fn image_pull(&self, image: &str, interactive: bool) -> Result<()>;
-
-    #[cfg(test)]
-    fn start_dummy_container(
-        &self,
-        image: &str,
-        args: Option<Vec<&str>>,
-    ) -> Result<crate::tests_prelude::Container>;
-
-    /// Gently shutdown a container, after a timeout kill it forcefully if still running
-    #[cfg(test)]
-    fn stop_container(&self, container: &str) -> Result<()>;
 }

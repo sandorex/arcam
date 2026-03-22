@@ -9,6 +9,12 @@ categories = ["command-line-utilities", "virtualization"]
 repository = "https://github.com/sandorex/arcam"
 readme = "README.md"
 
+[lib]
+name = "arcam"
+
+[[bin]]
+name = "arcam"
+
 [dependencies]
 clap_complete = "4.5.42"
 clap = { version = "4.5.11", features = ["derive", "env"] }

@@ -1,35 +1,11 @@
-mod cli;
-mod command_ext;
-mod commands;
-mod config;
-mod context;
-mod engine;
-mod util;
-mod vars;
+// all logic is in arcam library for access in integration tests
 
-#[cfg(test)]
-mod tests;
-
+use arcam::{cli::{Cli, CliCommands}, util, commands, context::Context, engine};
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use cli::CliCommands;
-
-pub use command_ext::command_extensions;
-pub use context::Context;
-pub use util::*;
-pub use vars::*;
-
-#[cfg(test)]
-pub use tests::prelude as tests_prelude;
-
-pub mod prelude {
-    // NOTE: anyhow context is renamed cause it clashes with Context
-    pub use crate::context::Context;
-    pub use anyhow::{anyhow, Context as AnyhowContext, Result};
-}
 
 fn main() -> Result<()> {
-    let args = cli::Cli::parse();
+    let args = Cli::parse();
     simple_logger::init_with_level(args.log_level)?;
 
     let get_ctx = || {

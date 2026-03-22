@@ -1,8 +1,6 @@
 //! Contains all code that should run inside the container as the init
 
-use crate::command_extensions::*;
-use crate::prelude::*;
-use crate::FULL_VERSION;
+use crate::{APP_NAME, FULL_VERSION, command_extensions::*, prelude::*};
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::os::unix::fs::{chown, lchown, symlink, PermissionsExt};
@@ -62,7 +60,7 @@ fn make_executable(path: &Path) -> Result<(), std::io::Error> {
 }
 
 fn initialization() -> Result<()> {
-    println!("{} {}", env!("CARGO_BIN_NAME"), FULL_VERSION);
+    println!("{} {}", APP_NAME, FULL_VERSION);
 
     let user = std::env::var("HOST_USER").context("HOST_USER is undefined")?;
     let uid = std::env::var("HOST_USER_UID").context("HOST_USER_UID is undefined")?;
