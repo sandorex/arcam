@@ -484,7 +484,7 @@ pub fn expand_vars<F>(input: &str, mut getter: F) -> Result<String>
 {
     // compile regex only once
     static RE: LazyLock<regex::Regex> = LazyLock::new(||
-        regex::Regex::new(r"\$\{([^}]*)\}|\$([A-Za-z_][A-Za-z0-9_]*\b)"
+        regex::Regex::new(r"\$\{([^}]*)\}|\$([A-Za-z_][A-Za-z0-9_]*\b|\$)"
     ).unwrap());
 
     let mut output = String::with_capacity(input.len() + 256);
@@ -508,13 +508,20 @@ pub fn expand_vars<F>(input: &str, mut getter: F) -> Result<String>
                 // by default subtitute with empty string
                 (name, Some(""))
             }
+        } else if name == "$" {
+            // escape the sign by just doing '$$'
+            ("", Some("$"))
         } else {
             (name, Some(""))
         };
 
-        // use default as fallback
-        let value = getter(name)
-            .or_else(|| default.map(|x| x.to_owned()));
+        // if name is empty then just use default
+        let value = if name.is_empty() {
+            default.map(|x| x.to_owned())
+        } else {
+            getter(name)
+                .or_else(|| default.map(|x| x.to_owned()))
+        };
 
         // if still None then just error out
         let Some(value) = value else {
@@ -607,6 +614,14 @@ mod tests {
                 ])
             ).unwrap(),
             "cd /home/user/.config/arcam/config.toml".to_owned()
+        );
+
+        assert_eq!(
+            expand_vars_map(
+                "/$${x}/$$xx",
+                &HashMap::from([])
+            ).unwrap(),
+            "/${x}/$xx".to_owned()
         );
     }
 }
