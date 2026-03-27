@@ -1,27 +1,22 @@
-[package]
-name = "arcam"
-version = "1.0.0"
-description = "Sandboxed development containers at your fingertips"
-edition = "2021"
-license = "GPL-2.0-or-later"
-keywords = ["container", "podman", "docker"]
-categories = ["command-line-utilities", "virtualization"]
+[workspace]
+resolver = "3"
+
+members = [
+    "arcam",
+    "garcam",
+]
+
+[workspace.package]
+authors = [ "Sandorex" ]
+description = "Sandboxed development containers or VMs at your fingertips"
 repository = "https://github.com/sandorex/arcam"
+categories = ["command-line-utilities", "virtualization"]
+license = "GPL-2.0-or-later"
+edition = "2021"
+keywords = ["container", "podman", "docker", "vm"]
 readme = "README.md"
-default-run = "arcam"
 
-[lib]
-name = "arcam"
-
-[[bin]]
-name = "arcam"
-path = "src/main.rs"
-
-[[bin]]
-name = "garcam"
-path = "src/main_garcam.rs"
-
-[dependencies]
+[workspace.dependencies]
 clap_complete = "4.5.42"
 clap = { version = "4.5.11", features = ["derive", "env"] }
 serde = { version = "1.0.204", features = ["derive"] }
@@ -29,17 +24,12 @@ serde_json = "1.0.138"
 toml = "1.0.7"
 code-docs-rs = "0.2.0"
 regex = "1.11.1"
-anyhow = "1.0.86"
 users = "0.11.0"
 log = "0.4.25"
 rand = "0.10.0"
 simple_logger = { version = "5.2.0", default-features = false, features = ["colors"] }
-
-[build-dependencies]
 anyhow = "1.0.102"
 vergen-gitcl = { version = "9.1.0", features = ["build", "cargo", "rustc"] }
-
-[dev-dependencies]
 assert_cmd = "2.2.0"
 rexpect = "0.7.0"
 tempfile = "3.16.0"

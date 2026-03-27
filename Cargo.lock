@@ -69,7 +69,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "arcam"
-version = "1.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -376,6 +376,28 @@ name = "foldhash"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
+
+[[package]]
+name = "garcam"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "assert_cmd",
+ "clap",
+ "clap_complete",
+ "code-docs-rs",
+ "log",
+ "rand",
+ "regex",
+ "rexpect",
+ "serde",
+ "serde_json",
+ "simple_logger",
+ "tempfile",
+ "toml",
+ "users",
+ "vergen-gitcl",
+]
 
 [[package]]
 name = "getrandom"

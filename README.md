@@ -21,12 +21,12 @@ You can download binary for latest release [here](https://github.com/sandorex/ar
 
 Alternatively you can install it from crates.io
 ```sh
-cargo install arcam
+cargo install --locked arcam
 ```
 
 You can also install straight from git
 ```
-cargo install --git https://github.com/sandorex/arcam
+cargo install --locked --git https://github.com/sandorex/arcam
 ```
 
 <details>
@@ -57,8 +57,6 @@ Making a custom container image is same as for any other container, to take full
 - Any file in `/init.d` will be executed on start of the container as the user, use `asroot` (wraps `su` or `sudo` if it exists) to run commands as root
 - Put dotfiles in `/etc/skel` which will be copied to user home on start, note that it may be overriden at runtime using `--skel`
 - All data inside the container (not counting volumes) will be deleted when container stops, to add caching or presistant data use a named volume
-
-For examples you can take a look at [my everchanging containers](https://github.com/sandorex/config/tree/master/boxes)
 
 </details>
 

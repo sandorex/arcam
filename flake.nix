@@ -1,11 +1,17 @@
 {
   inputs = {
-    naersk.url = "github:nix-community/naersk/master";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    # naersk = {
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    #   url = "github:nix-community/naersk/master";
+    # };
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, naersk, rust-overlay }:
+  outputs = { self, nixpkgs, rust-overlay }:
     let
       inherit self;
       system = "x86_64-linux";
@@ -15,10 +21,10 @@
 
       toolchain = pkgs.rust-bin.fromRustupToolchainFile ./toolchain.toml;
 
-      naersk' = pkgs.callPackage naersk {
-        cargo = toolchain;
-        rustc = toolchain;
-      };
+      # naersk' = pkgs.callPackage naersk {
+      #   cargo = toolchain;
+      #   rustc = toolchain;
+      # };
 
       # build for musl by default
       CARGO_BUILD_TARGET = "x86_64-unknown-linux-musl";
@@ -28,11 +34,12 @@
       VERGEN_GIT_SHA = if (self ? "rev") then (builtins.substring 0 7 self.rev) else "nix-dirty";
     in
     {
-      packages.${system}.default = naersk'.buildPackage {
-        src = ./.;
-
-        inherit CARGO_BUILD_TARGET VERGEN_IDEMPOTENT VERGEN_GIT_SHA;
-      };
+      # TODO remove and use pkgsStatic to build musl rust package
+      # packages.${system}.default = naersk'.buildPackage {
+      #   src = ./.;
+      #
+      #   inherit CARGO_BUILD_TARGET VERGEN_IDEMPOTENT VERGEN_GIT_SHA;
+      # };
 
       devShells.${system}.default = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [ git toolchain ];
@@ -45,7 +52,7 @@
           alias test='cargo test'
         '';
 
-        inherit CARGO_BUILD_TARGET VERGEN_IDEMPOTENT VERGEN_GIT_SHA;
+        inherit CARGO_BUILD_TARGET;
       };
     };
 }

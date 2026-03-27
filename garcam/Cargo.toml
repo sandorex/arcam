@@ -1,0 +1,42 @@
+[package]
+version = "0.1.0"
+name = "garcam"
+
+version.workspace = true
+description.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[lib]
+name = "garcam"
+doctest = false
+
+[[bin]]
+name = "garcam"
+
+[dependencies]
+clap_complete.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+code-docs-rs.workspace = true
+regex.workspace = true
+anyhow.workspace = true
+users.workspace = true
+log.workspace = true
+rand.workspace = true
+simple_logger.workspace = true
+
+[build-dependencies]
+anyhow.workspace = true
+vergen-gitcl.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+rexpect.workspace = true
+tempfile.workspace = true
