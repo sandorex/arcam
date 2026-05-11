@@ -1,179 +1,124 @@
 mod util;
+mod nix;
 
 use crate::cli::{CmdStartArgs, ConfigArg};
 use crate::command_extensions::*;
+use crate::config::{Config, Source};
 use crate::prelude::*;
 use crate::{APP_NAME, ENV_VAR_PREFIX, VERSION};
 use std::path::PathBuf;
 use util::*;
 
-pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
-    let executable_path = ctx.get_executable_path()?;
-
-    // NOTE /ws/ prefix is used so it does not clash with home dirs like ~/.config
-    //
-    // this is the general workspace dir where the main project and additional mountpoints are
-    // mounted to
-    let ws_dir = ctx.user_home.join("ws");
-
-    // this is the main project where app was started
-    let main_project_dir: String = format!(
-        "{}/{}",
-        ws_dir.to_string_lossy(),
-        ctx.cwd.file_name().unwrap().to_string_lossy()
-    );
-
-    // get containers in this cwd, i do not care if it fails
+pub fn start_container(ctx: Context, cli_args: CmdStartArgs) -> Result<()> {
+    // get any running containers in this directory
     let cwd_containers = ctx.get_cwd_containers()?;
     if !cwd_containers.is_empty() {
         return Err(anyhow!(
-            "There are containers running in current directory: {:?}",
+            "There are containers running in current directory: {}",
             cwd_containers.join(" ")
         ));
     }
 
-    // prefer cli name over random one
-    let container_name = cli_args.name.clone().unwrap_or_else(generate_name);
-    let container_image: String;
-    let on_init_pre: String;
-    let on_init_post: String;
-    let mut persist: Vec<(String, String)> = vec![];
-    let mut persist_user: Vec<(String, String)> = vec![];
+    let mut config = match &cli_args.config {
+        ConfigArg::File(file) => {
+            log::debug!("Loading config file {:?}", file);
+            crate::config::ConfigFile::config_from_file(&file)?
+        }
 
-    log::debug!("Container name set to {container_name:?}");
+        ConfigArg::Config(config_name) => {
+            log::debug!("Loading config @{:?}", config_name);
+            ctx.find_config(&config_name)?
+        }
 
-    if let ConfigArg::Image(image) = &cli_args.config {
-        // no config used
-
-        container_image = image.to_string();
-        on_init_pre = "".into();
-        on_init_post = "".into();
-    } else {
-        // get config from file or by name
-        let config = match &cli_args.config {
-            ConfigArg::Image(_) => unreachable!(),
-            ConfigArg::File(file) => {
-                log::debug!("Loading config file {:?}", file);
-                crate::config::ConfigFile::config_from_file(file)?
-            }
-            ConfigArg::Config(config_name) => {
-                log::debug!("Loading config @{:?}", config_name);
-                ctx.find_config(config_name)?
-            }
-        };
-
-        let config_dir = match config.path.as_ref() {
-            // NOTE it should never be a directory so it should always work right?
-            Some(x) => x.parent().unwrap(),
-            None => panic!("Config path is None after loading!"),
-        };
-
-        let config_name = config.name.expect("Config name is not set after loading!");
-
-        if let Some(host_pre_init) = &config.host_pre_init {
-            // avoid infinite loop using env var
-            if std::env::var(crate::ENV_EXE_PATH).is_err() {
-                use std::os::unix::process::CommandExt;
-
-                let mut buf: String = "#!/bin/sh\n".into();
-                buf += host_pre_init;
-
-                // write to temp file
-                let path = format!("/tmp/a{}", rand::random::<u64>());
-                std::fs::write(&path, buf)?;
-
-                let argv0 = std::env::args().next().unwrap();
-
-                // execute it using the shell and replace this process with it
-                return Err(Command::new("/bin/sh")
-                    .arg(path)
-                    // skipping argv0 and command 'start'
-                    .args(std::env::args().skip(2))
-                    // pass the path to arcam in the env var
-                    .env(crate::ENV_EXE_PATH, argv0)
-                    .env(crate::ENV_CFG_DIR, config_dir)
-                    .env(crate::ENV_CFG_NAME, config_name)
-                    .exec()
-                    .into());
+        ConfigArg::Image(image) => {
+            Config {
+                source: Source::Image(image.clone()),
+                ..Default::default()
             }
         }
 
-        // use config image
-        container_image = config.image.clone();
-
-        // expand vars
-        let pwd = ctx.cwd.to_string_lossy();
-        let home = ctx.user_home.to_string_lossy();
-
-        let context_getter = |input: &str| -> Option<String> {
-            match input {
-                "USER" => Some(ctx.user.clone()),
-                "PWD" | "CWD" => Some(pwd.to_string()),
-                "HOME" => Some(home.to_string()),
-                "CONTAINER" | "CONTAINER_NAME" => Some(container_name.clone()),
-                "RAND" | "RANDOM" => Some(rand::random::<u32>().to_string()),
-                "CONFIG_DIR" => Some(config_dir.to_string_lossy().to_string()),
-                "CONFIG_NAME" => Some(config_name.clone()),
-
-                // fallback to environ
-                _ => {
-                    if let Ok(var) = std::env::var(input) {
-                        Some(var)
-                    } else {
-                        log::warn!("Could not expand {input:?} in config");
-                        None
-                    }
-                }
-            }
-        };
-
-        // expand vars in engine args and append to cli args
-        for i in config.engine_args.iter() {
-            cli_args
-                .engine_args
-                .push(util::expand_vars(i, context_getter)?);
-        }
-
-        // cli skel takes priority
-        if cli_args.skel.is_none() {
-            if let Some(skel) = config.skel {
-                cli_args.skel = Some(util::expand_vars(&skel, context_getter)?);
+        ConfigArg::Nix(file, spec) => {
+            Config {
+                source: Source::Nix(file.clone(), spec.clone()),
+                ..Default::default()
             }
         }
+    };
 
-        // expand env as well for some fun dynamic shennanigans
-        for (k, v) in &config.env {
-            let mapped = format!("{k}={v}");
-            cli_args
-                .env
-                .push(util::expand_vars(&mapped, context_getter)?)
+    let config_name = config
+        .name
+        .clone()
+        .expect("config.name is not set after loading!");
+
+    let config_path = config.path.clone();
+    let config_dir = match &config_path {
+        Some(x) => Some(x.parent().unwrap()),
+        None => None
+    };
+
+    // TODO probably deprecate this and add option to run a single command with same env vars
+    // call the host pre init script
+    if let Some(host_pre_init) = &config.host_pre_init {
+        // avoid infinite loop using env var
+        if std::env::var(crate::ENV_EXE_PATH).is_err() {
+            use std::os::unix::process::CommandExt;
+
+            let mut buf: String = "#!/bin/sh\n".into();
+            buf += host_pre_init;
+
+            // write to temp file
+            let path = format!("/tmp/a{}", rand::random::<u64>());
+            std::fs::write(&path, buf)?;
+
+            // execute it using the shell and replace this process with it
+            return Err(Command::new("/bin/sh")
+                .arg(path)
+                // skipping argv0 and command 'start'
+                .args(std::env::args().skip(2))
+                // pass the path to arcam in the env var
+                .env(crate::ENV_EXE_PATH, std::env::args().next().unwrap())
+                .env(crate::ENV_CFG_DIR, config_dir.expect("config.path is not set but host_pre_init is"))
+                .env(crate::ENV_CFG_NAME, config_name)
+                .exec()
+                .into());
         }
-
-        // prefer options from cli
-        cli_args.shell = cli_args.shell.or(config.shell);
-        cli_args.gvisor = cli_args.gvisor.or(Some(config.gvisor));
-        cli_args.network = cli_args.network.or(Some(config.network));
-        cli_args.pipewire = cli_args.pipewire.or(Some(config.pipewire));
-        cli_args.pulseaudio = cli_args.pulseaudio.or(Some(config.pulseaudio));
-        cli_args.wayland = cli_args.wayland.or(Some(config.wayland));
-        cli_args.gpus = cli_args.gpus.or(Some(config.gpus));
-        cli_args.ssh_agent = cli_args.ssh_agent.or(Some(config.ssh_agent));
-        cli_args.session_bus = cli_args.session_bus.or(Some(config.session_bus));
-        cli_args.ports.extend_from_slice(&config.ports);
-        cli_args
-            .capabilities
-            .extend_from_slice(&config.capabilities);
-
-        // get the persist paths
-        persist = config.persist;
-        persist_user = config.persist_user;
-
-        // concatinate pre / post init
-        on_init_pre = cli_args.on_init_pre.join("\n") + &config.on_init_pre.unwrap_or_default();
-        on_init_post = cli_args.on_init_post.join("\n") + &config.on_init_post.unwrap_or_default();
     }
 
-    log::debug!("Using image {container_image:?}");
+    // use generated name if it is not set
+    if config.name.is_none() {
+        config.name = Some(generate_name());
+    }
+
+    let container_name = config.name.as_ref().unwrap().clone();
+
+    let context_getter = |input: &str| -> Option<String> {
+        match input {
+            "USER" => Some(ctx.user.clone()),
+            "PWD" | "CWD" => Some(ctx.cwd.to_string_lossy().to_string()),
+            "HOME" => Some(ctx.user_home.to_string_lossy().to_string()),
+            "CONTAINER" | "CONTAINER_NAME" => Some(container_name.clone()),
+            "RAND" | "RANDOM" => Some(rand::random::<u32>().to_string()),
+            "CONFIG_DIR" => config_dir.clone().map(|x| x.to_string_lossy().to_string()),
+            "CONFIG_NAME" => Some(config_name.clone()),
+
+            // fallback to environ
+            _ => {
+                if let Ok(var) = std::env::var(input) {
+                    Some(var)
+                } else {
+                    log::warn!("Could not expand {input:?} in config ({:?})", config_path);
+                    None
+                }
+            }
+        }
+    };
+
+    // NOTE: expand vars BEFORE merging!
+    config.expand_vars(context_getter)?;
+    config.merge_cli(&cli_args);
+
+    log::debug!("Container name set to {container_name:?}");
+    log::debug!("Using source: {}", config.source);
 
     // allow dry-run regardless if the container exists
     if !ctx.dry_run && ctx.engine.container_exists(&container_name)? {
@@ -184,11 +129,11 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     }
 
     // set default shell to bash if not set already
-    if cli_args.shell.is_none() {
-        cli_args.shell = Some("/bin/bash".into());
+    if config.shell.is_none() {
+        config.shell = Some("/bin/bash".into());
     }
 
-    log::info!("Using {:?} as the shell", cli_args.shell);
+    log::info!("Using {:?} as the shell", config.shell);
 
     let mut cmd = ctx.engine.command();
     cmd.args([
@@ -203,7 +148,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         "--detach-keys=",
     ]);
 
-    if cli_args.gvisor.unwrap_or(false) {
+    if config.gvisor {
         if !crate::executable_in_path("runsc") {
             return Err(anyhow!("Could not find gvisor (runsc) in path"));
         }
@@ -215,6 +160,10 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
             "--runtime-flag", "ignore-cgroups",
         ]);
     }
+
+    let executable_path = ctx.get_executable_path()?;
+    let projects_dir = ctx.user_home.join(crate::WS_DIR);
+    let main_project_dir = projects_dir.join(ctx.cwd.file_name().unwrap());
 
     cmd.args([
         format!("--name={}", container_name),
@@ -228,12 +177,12 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!(
             "--label={}={}",
             crate::CONTAINER_LABEL_CONTAINER_DIR,
-            main_project_dir
+            main_project_dir.to_string_lossy()
         ),
         format!(
             "--label={}={}",
             crate::CONTAINER_LABEL_USER_SHELL,
-            cli_args.shell.as_ref().unwrap()
+            config.shell.as_ref().unwrap()
         ),
         format!("--env={0}={0}", APP_NAME),
         format!("--env={}={}", ENV_VAR_PREFIX!("VERSION"), VERSION),
@@ -248,43 +197,42 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         format!(
             "--volume={}:{}",
             ctx.cwd.to_string_lossy(),
-            main_project_dir
+            main_project_dir.to_string_lossy()
         ),
+        // mount the executable inside container but do not copy it as it is slow
         format!(
             "--volume={}:{}:ro,nocopy",
-            executable_path.display(),
+            executable_path.to_string_lossy(),
             crate::ARCAM_EXE
         ),
-        format!("--entrypoint={}", crate::ARCAM_EXE),
+        format!("--entrypoint={}", crate::ARCAM_EXE), // TODO this will clash with systemd probably
+                                                      // and nix
         format!("--hostname={}", get_hostname()?),
     ]);
 
     cmd.args([
         "--userns=keep-id",
-        "--group-add=keep-groups",
-        // the default ulimit is low
-        "--ulimit=host",
-        // use same timezone as host
-        "--tz=local",
+        "--ulimit=host", // the default ulimit is low
+        "--tz=local", // use same timezone as host
     ]);
 
     // add the env vars
-    for e in &cli_args.env {
-        cmd.arg(format!("--env={}", e));
+    for (k, v) in &config.env {
+        cmd.arg(format!("--env={k}={v}"));
     }
 
     resolve_capabilities(&cli_args, &mut cmd);
 
-    mount_additional_mounts(ws_dir.as_path(), &cli_args, &mut cmd)?;
+    mount_additional_mounts(projects_dir.as_path(), &cli_args, &mut cmd)?;
 
     {
-        // find all terminfo dirs, they differ mostly on debian...
+        // find all terminfo dirs
         let args = find_terminfo();
         cmd.args(args);
     }
 
     // add all volumes
-    for (vol, path) in persist.iter().chain(persist_user.iter()) {
+    for (vol, path) in config.persist.iter().chain(config.persist_user.iter()) {
         // using mount here to prevent mounting paths from persist, either by accident or
         // intentionally
         cmd.arg(format!(
@@ -294,7 +242,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     }
 
     // set network if requested
-    if !cli_args.network.unwrap_or(false) {
+    if !config.network {
         cmd.arg("--network=none");
     }
 
@@ -309,30 +257,54 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
     mount_session_bus(&ctx, &cli_args, &mut cmd)?;
 
     // pass through ports
-    for (container, host) in &cli_args.ports {
+    for (container, host) in &config.ports {
         // for simplicity i am passing through both udp and tcp
         cmd.arg(format!("--publish={}:{}/tcp", host, container));
         cmd.arg(format!("--publish={}:{}/udp", host, container));
     }
 
     // mount skel if provided
-    if let Some(skel) = &cli_args.skel {
+    if let Some(skel) = &config.skel {
         cmd.arg(format!("--volume={}:/etc/skel:ro", skel));
     }
 
     // add the extra args verbatim
-    cmd.args(cli_args.engine_args.clone());
+    cmd.args(config.engine_args.clone());
 
-    cmd.args([
-        // the container image
-        &container_image,
-        "init",
-    ]);
+    match &config.source {
+        // just pass the image
+        Source::Image(image) => {
+            cmd.arg(image);
 
-    // pull image interactively if it does not exist
-    if !ctx.engine.image_exists(&container_image)? && !ctx.dry_run {
-        ctx.engine.image_pull(&container_image, true)?;
-    }
+            // pull image interactively if it does not exist
+            if !ctx.dry_run && !ctx.engine.image_exists(&image)? {
+                ctx.engine.image_pull(&image, true)?;
+            }
+        },
+
+        // TODO pretty sure 
+        Source::Nix(path, spec) => {
+            cmd.args(&[
+                "--volume=/nix/store:/nix/store:ro", // everything is in the nix store
+                "--systemd=always",                  // systemd is a requirement
+                "--rootfs",                          // argument is the rootfs not an image
+            ]);
+
+            let output_path = if let Some(spec) = spec {
+                nix::evaluate_flake(&path, &spec)?
+            } else {
+                nix::evaluate_file(&path)?
+            };
+
+            // set the init
+            cmd.arg(output_path.join("init"));
+
+            todo!()
+        }
+    };
+
+    // run init command
+    cmd.arg("init");
 
     if ctx.dry_run {
         cmd.log();
@@ -356,6 +328,7 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         let container_file_exists = |file: &str| -> Result<bool> {
             log::trace!("Testing for existance of {file:?}");
 
+            // TODO this is also engine specific, abstract it
             let cmd = ctx
                 .engine
                 .command()
@@ -377,22 +350,24 @@ pub fn start_container(ctx: Context, mut cli_args: CmdStartArgs) -> Result<()> {
         };
 
         // write pre init script into the container
-        if !on_init_pre.is_empty() {
-            let path = PathBuf::new()
-                .join(crate::INIT_D_DIR)
-                .join("01_on_init_pre.sh");
+        if let Some(on_init_pre) = &config.on_init_pre {
+            if !on_init_pre.is_empty() {
+                let path = PathBuf::new()
+                    .join(crate::INIT_D_DIR)
+                    .join("01_on_init_pre.sh");
 
-            let buffer: String = "#!/bin/sh\nset -e\n".to_string() + &on_init_pre;
-            write_to_file(&ctx, id, &path, &buffer)?;
+                let buffer: String = "#!/bin/sh\nset -e\n".to_string() + on_init_pre;
+                write_to_file(&ctx, id, &path, &buffer)?;
+            }
         }
 
-        if !persist_user.is_empty() {
+        if !config.persist_user.is_empty() {
             let path = PathBuf::new()
                 .join(crate::INIT_D_DIR)
                 .join("00_chown_persist.sh");
 
             // get each path
-            let persist_user_paths = persist_user
+            let persist_user_paths = config.persist_user
                 .iter()
                 .map(|(_, x)| x.clone())
                 .collect::<Vec<_>>()
@@ -411,13 +386,15 @@ asroot chown "$USER:$USER" {0}
         }
 
         // write post init script into the container
-        if !on_init_post.is_empty() {
-            let path = PathBuf::new()
-                .join(crate::INIT_D_DIR)
-                .join("99_on_init_post.sh");
+        if let Some(on_init_post) = &config.on_init_post {
+            if !on_init_post.is_empty() {
+                let path = PathBuf::new()
+                    .join(crate::INIT_D_DIR)
+                    .join("99_on_init_post.sh");
 
-            let buffer: String = "#!/bin/sh\nset -e\n".to_string() + &on_init_post;
-            write_to_file(&ctx, id, &path, &buffer)?;
+                let buffer: String = "#!/bin/sh\nset -e\n".to_string() + on_init_post;
+                write_to_file(&ctx, id, &path, &buffer)?;
+            }
         }
 
         log::trace!("Waiting for container preinitalization");
@@ -444,7 +421,7 @@ asroot chown "$USER:$USER" {0}
             crate::commands::open_shell(
                 ctx,
                 crate::cli::CmdShellArgs {
-                    name: container_name,
+                    name: config.name.map(|x| x.clone()).unwrap(),
                     shell: None,
                 },
             )

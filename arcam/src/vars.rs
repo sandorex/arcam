@@ -67,6 +67,10 @@ pub const ENV_CFG_DIR: &str = ENV_VAR_PREFIX!("CFG_DIR");
 /// Name of the config loaded
 pub const ENV_CFG_NAME: &str = ENV_VAR_PREFIX!("CFG_NAME");
 
+// originally was "ws" but not fits XDG_PROJECTS default
+/// Where to the to put the projects inside the container
+pub const WS_DIR: &str = "Projects";
+
 /// Where scripts are executed from
 pub const INIT_D_DIR: &str = "/init.d";
 

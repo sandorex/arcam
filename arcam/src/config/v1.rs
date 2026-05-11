@@ -1,8 +1,46 @@
-//! Configuration version 1
+//! Configuration version 1.1
 
-use code_docs::{code_docs_struct, DocumentedStruct};
+use code_docs::{DocumentedEnum, DocumentedStruct, code_docs_enum, code_docs_struct};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{fmt::{Display, Write}, path::PathBuf};
+
+code_docs_enum! {
+    #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+    pub enum SourceV1 {
+        /// Use OCI image for the container source
+        #[serde(rename = "image")]
+        Image(String),
+
+        /// Nix file or flake directory with specifier
+        #[serde(rename = "nix")]
+        Nix(PathBuf, Option<String>),
+
+        // /// Use path as rootfs
+        // Rootfs(PathBuf),
+    }
+}
+
+impl Default for SourceV1 {
+    fn default() -> Self {
+        // this is just to implement default
+        Self::Image("".to_owned())
+    }
+}
+
+impl Display for SourceV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Image(image) => write!(f, "Image {image:?}")?,
+            Self::Nix(path, spec) => if let Some(spec) = spec {
+                write!(f, "Nix Flake {}#{spec}", path.display())?;
+            } else {
+                write!(f, "Nix File {}", path.display())?;
+            },
+        }
+
+        Ok(())
+    }
+}
 
 // save all the fields and docs so they can be printed as always up-to-date documentation
 code_docs_struct! {
@@ -21,10 +59,12 @@ code_docs_struct! {
         #[serde(skip)]
         pub name: Option<String>,
 
-        // --- real config options --- //
+        /// Source for the container
+        /// @skip
+        #[serde(flatten)]
+        pub source: SourceV1,
 
-        /// Image used for the container
-        pub image: String,
+        // --- real config options --- //
 
         /// Optional path to directory to use as /etc/skel (static dotfiles)
         ///
@@ -83,8 +123,6 @@ code_docs_struct! {
         #[serde(default)]
         pub on_init_post: Option<String>,
 
-        // TODO make this into a command so any kind of script/executable could
-        // be used like python for example
         /// Runs following shell script and pass all arguments verbatim to it,
         /// script itself is responsible for running arcam start with all the arguments
         ///
@@ -122,4 +160,107 @@ code_docs_struct! {
 
 impl ConfigV1 {
     pub const VERSION: u32 = 1;
+
+    /// Returns docs for the version of config
+    pub fn docs() -> String {
+        use std::fmt::Write;
+
+        let mut output = String::new();
+
+        // print config version in same style as the rest of options
+        let _ = writeln!(
+            &mut output,
+            "/// Config schema version (latest: \"{}\")\nversion: String\n",
+            Self::VERSION
+        );
+
+        // convert some types to be easier to understand for non-rust users
+        let convert_type = |x: &str| -> String { x.replace("Vec<", "Array<") };
+
+        // add properties from Source
+        let iter = SourceV1::variant_names()
+            .into_iter()
+            .zip(SourceV1::variant_docs().into_iter());
+
+        for (name, docs) in iter {
+            for i in docs {
+                let _ = writeln!(&mut output, "///{i}");
+            }
+
+            let _ = writeln!(&mut output, "{}: String\n", name.to_lowercase());
+        }
+
+        // add properties from Config
+        let iter = Self::field_names()
+            .into_iter()
+            .zip(Self::field_types().into_iter())
+            .zip(Self::field_docs().into_iter())
+            .map(|((name, r#type), docs)| (name, r#type, docs));
+
+        for (name, t, docs) in iter {
+            // skip any that contains '@skip' in its docs
+            if docs.join("\n").contains("@skip") {
+                continue;
+            }
+
+            // format like rust docs
+            for i in docs {
+                let _ = writeln!(&mut output, "///{i}");
+            }
+
+            let _ = writeln!(&mut output, "{name}: {}\n", convert_type(t));
+        }
+
+        output.trim().to_owned()
+    }
+
+    /// Expands vars in select properties
+    pub fn expand_vars<T: Fn(&str) -> Option<String>>(&mut self, getter: T) -> anyhow::Result<()> {
+        use crate::util::expand_vars as expand;
+
+        // expand engine args
+        for arg in self.engine_args.iter_mut() {
+            *arg = expand(arg, &getter)?;
+        }
+
+        // expand skel path
+        if let Some(skel) = self.skel.as_mut() {
+            *skel = expand(skel, &getter)?;
+        }
+
+        // expand only the values in env
+        for (_, val) in self.env.iter_mut() {
+            *val = expand(val, &getter)?;
+        }
+
+        Ok(())
+    }
+
+    // TODO this should probably be a trait so all config version could share this
+    /// Merges cli into the config
+    pub fn merge_cli(&mut self, args: &crate::cli::CmdStartArgs) -> &mut Self {
+        if let Some(shell) = args.shell.as_ref() { self.shell = Some(shell.clone()); }
+        if let Some(gvisor) = args.gvisor.as_ref() { self.gvisor = *gvisor; }
+        if let Some(network) = args.network.as_ref() { self.network = *network; }
+        if let Some(pipewire) = args.pipewire.as_ref() { self.pipewire = *pipewire; }
+        if let Some(pulseaudio) = args.pulseaudio.as_ref() { self.pulseaudio = *pulseaudio; }
+        if let Some(wayland) = args.wayland.as_ref() { self.wayland = *wayland; }
+        if let Some(gpus) = args.gpus.as_ref() { self.gpus = gpus.clone(); }
+        if let Some(ssh_agent) = args.ssh_agent.as_ref() { self.ssh_agent = *ssh_agent; }
+        if let Some(session_bus) = args.session_bus.as_ref() { self.session_bus = *session_bus; }
+
+        self.ports.extend_from_slice(&args.ports);
+        self.capabilities.extend_from_slice(&args.capabilities);
+
+        // append on init to the config value
+        let mut on_init_pre = self.on_init_pre.take().unwrap_or_default();
+        on_init_pre += &args.on_init_pre.join("\n");
+        self.on_init_pre = Some(on_init_pre);
+
+        let mut on_init_post = self.on_init_post.take().unwrap_or_default();
+        on_init_post += &args.on_init_post.join("\n");
+        self.on_init_post = Some(on_init_post);
+
+        self
+    }
 }

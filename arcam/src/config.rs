@@ -9,6 +9,7 @@ use std::path::Path;
 
 // Alias the latest config version
 pub type Config = ConfigV1;
+pub type Source = v1::SourceV1;
 
 /// Config file with version string, use `Config` directly elsewhere
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -80,7 +81,7 @@ engine_args = [ "default" ]
         assert_eq!(
             result_ok,
             Config {
-                image: "fedora".into(),
+                source: v1::SourceV1::Image("fedora".into()),
                 engine_args: vec!["default".into()],
 
                 ..Default::default()

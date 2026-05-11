@@ -1,4 +1,4 @@
-use crate::{FULL_VERSION, LONG_VERSION, config::Config, context::Context};
+use crate::{FULL_VERSION, LONG_VERSION};
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -31,32 +31,45 @@ pub enum ConfigArg {
     /// Use no configuration, plain container using this image
     Image(String),
 
+    /// Nix file or flake directory with specifier
+    Nix(PathBuf, Option<String>),
+
     /// Use following config
     Config(String),
 }
 
-impl ConfigArg {
-    /// Convert ContainerConfig into config
-    pub fn into_config(self, ctx: &Context) -> anyhow::Result<Config> {
-        use crate::config::ConfigFile;
+/// Parses nix flake syntax or literal path to `.nix` file
+pub fn parse_nix(input: &str) -> Option<(PathBuf, Option<String>)> {
+    const DEFAULT_FLAKE: &str = "default";
 
-        match self {
-            Self::File(x) => ConfigFile::config_from_file(&x),
-            // basically an empty config with only image set
-            Self::Image(x) => Ok(Config {
-                image: x.clone(),
-                ..Default::default()
-            }),
-            Self::Config(x) => ctx.find_config(&x),
-        }
+    if input == "." { // assume nix flake
+        Some((PathBuf::from(input), Some(DEFAULT_FLAKE.to_string())))
+    } else if let Some((left, right)) = input.split_once('#') {
+        Some((
+            PathBuf::from(left),
+            Some(if right.is_empty() { DEFAULT_FLAKE.to_owned() } else { right.to_owned() })
+        ))
+    } else if input.ends_with(".nix") {
+        Some((PathBuf::from(input), None))
+    } else {
+        None
     }
+}
 
+impl ConfigArg {
     pub fn parse(input: &str) -> Result<Self, String> {
-        if input.starts_with("./")          // ex. ./local/file.toml
-            || input.starts_with(".")       // ex. .arcam.toml
-            || input.starts_with("/")       // ex. /etc/arcam/configs/something.toml
-            || input.starts_with("~/")      // ex. ~/.config/arcam/configs/something.toml
-            || input.ends_with(".toml")     // well no image is gonna end with .toml? right?
+        if let Some((path, specifier)) = parse_nix(input) {
+            if let Some(specifier) = specifier {
+                Ok(Self::Nix(path, Some(specifier)))
+            } else {
+                Ok(Self::Nix(path, None))
+            }
+        }
+        else if input.starts_with("./")           // ex. ./local/file.toml
+            || input.starts_with(".")               // ex. .arcam.toml
+            || input.starts_with("/")               // ex. /etc/arcam/configs/something.toml
+            || input.starts_with("~/")              // ex. ~/.config/arcam/configs/something.toml
+            || input.ends_with(".toml")             // well no image is gonna end with .toml? right?
         {
             Ok(Self::File(PathBuf::from(input)))
         } else if let Some(config_name) = input.strip_prefix("@") {
@@ -87,7 +100,7 @@ pub struct CmdStartArgs {
     /// Use gvisor runtime for better sandboxing (EXPERIMENTAL)
     ///
     /// Requires runsc to be in PATH
-    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1)]
+    #[arg(long, value_name = "BOOL", default_missing_value = "true", require_equals = true, num_args = 0..=1, help_heading = START_HEADING_EXPERIMENTAL)]
     pub gvisor: Option<bool>,
 
     /// Set container default shell
